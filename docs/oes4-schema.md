@@ -86,7 +86,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `opportunities` | TenantId, Number, Name, **PrimaryContactId** (required), **PropertyId (nullable)**, OwnerUserId, SourceKey, StageId, Outcome (open/won/lost/recycled), LostReasonKey, ExpectedValue, IsInsurance, PerilKey, DateOfLoss, StormEventId (later), ContactAttempts, LastContactAt, LastDispositionId, RecycleAt, LockedBy, LockedAt, WonAt, ClosedAt | **A lead is an opportunity.** It can exist without a property; it attaches to one (existing or new) when the address is collected. |
+| `opportunities` | TenantId, Number, Name, **PrimaryContactId** (required), **PropertyId (nullable)**, OwnerUserId, SourceKey, StageId, Outcome (open/won/lost/recycled), LostReasonKey, ExpectedValue, IsInsurance, PerilKey, DateOfLoss, StormEventId (nullable), ContactAttempts, LastContactAt, LastDispositionId, RecycleAt, LockedBy, LockedAt, WonAt, ClosedAt | **A lead is an opportunity.** It can exist without a property; it attaches to one (existing or new) when the address is collected. |
 | `opportunity_contacts` | OpportunityId, ContactId, RoleKey | Spouse, property manager, public adjuster… |
 | `opportunity_stage_history` | OpportunityId, FromStageId, ToStageId, DispositionId, ByUserId, At, Note | Stale detection and conversion reports |
 | `saved_views` | TenantId, UserId (null = shared), ListKey, Name, CriteriaJson, SortJson, IsDefault | Saved filters on every list |
@@ -100,7 +100,8 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 |---|---|---|
 | `carriers` | **Platform** default list: name, phones, claims email/fax, preferred submission, address, website | |
 | `tenant_carriers` | TenantId, CarrierId (nullable = tenant-only carrier), override fields, Notes, IsHidden | The tenant's editable copy. Effective carrier = default ⊕ overrides. |
-| `insurance_claims` | TenantId, PropertyId, OpportunityId, TenantCarrierId, ClaimNumber, PolicyNumber, DateOfLoss, PerilKey, Deductible, AdjusterContactId, DeskAdjusterContactId, Status (open/approved/denied/closed), Notes | First-class claim record (OES3 kept these fields on the project). Shared by the opportunity, estimates, project and supplements. |
+| `storm_events` | TenantId, Name (e.g. "May 14 2026 hail – North Metro"), EventDate, PerilKey (hail/wind/tornado…), MaxHailSizeIn, MaxWindMph, AreaGeoJson (nullable), ZipCodes (nullable), Source (manual; import later), Notes, ArchivedAt | **Decided 2026-11-16.** A first-class storm record. Opportunities, claims and properties-in-area can be grouped, reported and blasted by storm. HailRecon/IHM imports fill it later. |
+| `insurance_claims` | TenantId, PropertyId, OpportunityId, TenantCarrierId, StormEventId (nullable), ClaimNumber, PolicyNumber, DateOfLoss, PerilKey, Deductible, AdjusterContactId, DeskAdjusterContactId, Status (not_filed/open/approved/denied/closed), Notes | First-class claim record (OES3 kept these fields on the project). Shared by the opportunity, estimates, project and supplements. **Optional (decided 2026-11-16):** an insurance opportunity can leave claim fields empty; the claim record is created when the homeowner files, and any field can stay blank until known. |
 | `supplements` | TenantId, ClaimId, ProjectId, Status (needed/sent/approved/denied/partial), Reason, RequestedAmount, ApprovedAmount, SentAt, RespondedAt, SubmittedBy, DocumentId | Request history (OES3 had a cover sheet only). Line-level reconciliation spec later. |
 
 ## 7. Catalog and price lists
@@ -240,6 +241,9 @@ erDiagram
     PROJECT ||--o{ CHANGE_ORDER : has
     PROJECT_TRADE ||--o{ WORK_ORDER : "issued to sub"
     SUBCONTRACTOR ||--o{ WORK_ORDER : receives
+    CONTACT ||--o| SUBCONTRACTOR : "org contact has sub profile"
+    STORM_EVENT ||--o{ OPPORTUNITY : "groups leads"
+    STORM_EVENT ||--o{ INSURANCE_CLAIM : "caused"
 ```
 
 ## 18. OES3 → OES4 data migration (JRS = tenant #1)
@@ -263,9 +267,9 @@ erDiagram
 | work orders, change orders, booking, blasts, AI tables | Direct mapping, with `TenantId` |
 | `collections`, commission tables, weather tables | Not migrated (dropped features). Archive export kept. |
 
-## Open questions on this draft
+## Resolved questions (owner, 2026-11-16)
 
-1. **Project numbering format.** `P-2026-0311` style, or keep a plain number per tenant?
-2. **Subcontractors as contacts.** This draft makes each sub an organization contact plus a `subcontractors` profile. Is that OK? It means subs show up in contact search (filterable).
-3. **Storm events.** Should storms be a first-class record (date, area, hail size), so opportunities and blasts can be grouped by storm? Common in storm restoration. This draft reserves `StormEventId`.
-4. **Claim-first flow.** Should an insurance opportunity require a claim record as soon as a claim is filed, or can claim fields stay empty until then? This draft allows empty.
+1. **Project numbering:** `P-2026-0311` style (prefix, year, per-tenant sequence that resets yearly). The same pattern applies to estimates and work orders.
+2. **Subcontractors are contacts:** each sub is an organization contact plus a `subcontractors` profile. Subs appear in contact search with a "Subcontractor" filter, and their crew members are person contacts linked to the organization.
+3. **Storm events are records:** `storm_events` table (section 6). Opportunities and claims link to a storm. Storm filters are available on lists, reports and blast audiences.
+4. **Claims are optional up front:** insurance opportunities may leave claim fields empty until a claim is filed.

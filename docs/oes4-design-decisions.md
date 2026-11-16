@@ -109,6 +109,12 @@ Contact (one table)
 - Tenants can **edit their own copy** of any carrier (submission method, claims email/fax, special contacts, notes) and add their own. A tenant's edit never changes the default list.
 - Proposed design: `Carrier` (platform), plus `TenantCarrier` (TenantId, optional CarrierId, override fields). A tenant sees the default list merged with its own overrides.
 
+**Decided 2026-11-16:**
+- **Storm events are first-class records** (date, peril, hail size/wind, area). Opportunities and claims link to a storm; lists, reports and blast audiences filter by storm.
+- **Claims are optional up front.** An insurance opportunity can leave claim fields empty until the homeowner files.
+- **Subcontractors are organization contacts** with a subcontractor profile, so they appear in contact search (filterable).
+- **Display numbers** use the `P-2026-0311` style (prefix, year, per-tenant yearly sequence) for projects, estimates and work orders.
+
 ## 6. Record levels and navigation (Decided 2026-11-15)
 
 - Each level (**Property, Contact/Organization, Estimate, Project, Trade**) must be instantly recognizable, with its own "dashboard" layout, not one shared template.
