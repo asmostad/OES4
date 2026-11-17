@@ -6,6 +6,7 @@ using Oes.Application.Abstractions;
 using Oes.Domain.Common;
 using Oes.Domain.Crm;
 using Oes.Domain.Insurance;
+using Oes.Domain.Measurements;
 using Oes.Domain.Tenancy;
 using Oes.Infrastructure.Identity;
 
@@ -52,6 +53,12 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<StormEvent> StormEvents => Set<StormEvent>();
     public DbSet<InsuranceClaim> Claims => Set<InsuranceClaim>();
     public DbSet<Supplement> Supplements => Set<Supplement>();
+
+    // Measurements
+    public DbSet<TradeType> TradeTypes => Set<TradeType>();
+    public DbSet<MeasurementFieldDef> MeasurementFieldDefs => Set<MeasurementFieldDef>();
+    public DbSet<MeasurementSet> MeasurementSets => Set<MeasurementSet>();
+    public DbSet<MeasurementValue> MeasurementValues => Set<MeasurementValue>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -157,7 +164,56 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
 
         ConfigureCrm(b);
         ConfigureInsurance(b);
+        ConfigureMeasurements(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureMeasurements(ModelBuilder b)
+    {
+        b.Entity<TradeType>(e =>
+        {
+            e.ToTable("trade_types");
+            e.Property(t => t.Name).HasMaxLength(100);
+            e.Property(t => t.Code).HasMaxLength(50);
+            e.Property(t => t.MeasurementMode).HasMaxLength(20);
+            e.Property(t => t.Color).HasMaxLength(20);
+            e.Property(t => t.Icon).HasMaxLength(50);
+            e.HasIndex(t => new { t.TenantId, t.Code }).IsUnique();
+        });
+
+        b.Entity<MeasurementFieldDef>(e =>
+        {
+            e.ToTable("measurement_field_defs");
+            e.Property(f => f.Key).HasMaxLength(60);
+            e.Property(f => f.Label).HasMaxLength(100);
+            e.Property(f => f.Unit).HasMaxLength(20);
+            e.Property(f => f.Group).HasMaxLength(60);
+            e.HasIndex(f => new { f.TenantId, f.TradeTypeId, f.Key }).IsUnique();
+            e.HasOne<TradeType>().WithMany().HasForeignKey(f => f.TradeTypeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<MeasurementSet>(e =>
+        {
+            e.ToTable("measurement_sets");
+            e.Property(s => s.Source).HasMaxLength(30);
+            e.Property(s => s.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(s => new { s.TenantId, s.PropertyId });
+            e.HasIndex(s => new { s.TenantId, s.StructureId, s.TradeTypeId, s.VersionNo }).IsUnique();
+            e.HasOne<Property>().WithMany().HasForeignKey(s => s.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PropertyStructure>().WithMany().HasForeignKey(s => s.StructureId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<TradeType>().WithMany().HasForeignKey(s => s.TradeTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Document>().WithMany().HasForeignKey(s => s.SourceDocumentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(s => s.Values).WithOne().HasForeignKey(v => v.SetId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<MeasurementValue>(e =>
+        {
+            e.ToTable("measurement_values");
+            e.Property(v => v.SurfaceKey).HasMaxLength(30);
+            e.Property(v => v.FieldKey).HasMaxLength(60);
+            e.Property(v => v.Value).HasPrecision(14, 4);
+            e.HasIndex(v => new { v.SetId, v.SurfaceKey, v.FieldKey }).IsUnique();
+        });
     }
 
     private static void ConfigureInsurance(ModelBuilder b)

@@ -82,7 +82,46 @@ public static class DevSeeder
         {
             await SampleDataAsync(root, tenantIds[0], log, ct);
             await SampleInsuranceAsync(root, tenantIds[0], log, ct);
+            await SampleMeasurementsAsync(root, tenantIds[0], log, ct);
         }
+    }
+
+    /// <summary>Two roofing versions and a gutter set on 123 Main St.</summary>
+    private static async Task SampleMeasurementsAsync(IServiceProvider root, Guid tenantId, ILogger log, CancellationToken ct)
+    {
+        using var scope = root.CreateScope();
+        scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<OesDbContext>();
+        if (await db.MeasurementSets.AnyAsync(ct)) return;
+        var property = await db.Properties.Include(p => p.Structures).FirstOrDefaultAsync(p => p.Line1 == "123 Main St", ct);
+        if (property is null) return;
+        var structure = property.Structures.OrderBy(s => s.Sort).First();
+        var roofing = await db.TradeTypes.FirstAsync(t => t.Code == "roofing", ct);
+        var gutters = await db.TradeTypes.FirstAsync(t => t.Code == "gutters", ct);
+
+        Oes.Domain.Measurements.MeasurementSet Set(Guid trade, int version, bool current, string source, DateOnly on, Guid? supersedes, params (string Field, decimal Value)[] values)
+        {
+            var set = new Oes.Domain.Measurements.MeasurementSet
+            {
+                PropertyId = property.Id, StructureId = structure.Id, TradeTypeId = trade, VersionNo = version, IsCurrent = current,
+                Source = source, MeasuredOn = on, SupersedesId = supersedes,
+            };
+            set.Values.AddRange(values.Select(v => new Oes.Domain.Measurements.MeasurementValue { SetId = set.Id, FieldKey = v.Field, Value = v.Value }));
+            db.MeasurementSets.Add(set);
+            return set;
+        }
+
+        var tape = Set(roofing.Id, 1, false, "field_tape", new DateOnly(2026, 5, 18), null,
+            ("total_area", 2480m), ("predominant_pitch", 6m), ("ridges", 48m), ("valleys", 36m), ("eaves", 120m), ("rakes", 88m));
+        Set(roofing.Id, 2, true, "eagleview", new DateOnly(2026, 5, 22), tape.Id,
+            ("total_area", 2612m), ("pitched_area", 2612m), ("predominant_pitch", 7m), ("facets", 9m), ("layers", 1m),
+            ("ridges", 52m), ("hips", 0m), ("valleys", 41m), ("rakes", 92m), ("eaves", 126m), ("step_flashing", 18m),
+            ("pipe_jacks", 3m), ("vents", 4m), ("suggested_waste", 12m));
+        Set(gutters.Id, 1, true, "field_tape", new DateOnly(2026, 5, 18), null,
+            ("gutter_length", 126m), ("downspout_length", 54m), ("downspouts", 5m), ("inside_miters", 2m), ("outside_miters", 4m));
+
+        await db.SaveChangesAsync(ct);
+        log.LogInformation("Seeded sample measurements");
     }
 
     /// <summary>A storm plus a claim on the Smith hail opportunity.</summary>

@@ -54,6 +54,7 @@ public static class TenantDefaults
 
     public static async Task EnsureAsync(OesDbContext db, Guid tenantId, CancellationToken ct = default)
     {
+        await Measurements.MeasurementDefaults.EnsureAsync(db, tenantId, ct);
         var filter = new[] { OesDbContext.TenantFilter };
 
         if (!await db.PipelineStages.IgnoreQueryFilters(filter).AnyAsync(s => s.TenantId == tenantId, ct))

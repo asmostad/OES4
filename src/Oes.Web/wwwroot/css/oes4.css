@@ -122,6 +122,19 @@
 .storm-stats strong { display: block; color: var(--oes-text); font-size: 0.95rem; }
 .storm-stats span { font-size: 0.7rem; color: var(--oes-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
+/* Measurements */
+.trade-dot {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: var(--oes-radius);
+    background: color-mix(in srgb, var(--trade-color) 14%, white); color: var(--trade-color); font-size: 1rem;
+}
+.trade-dot.sm { width: 22px; height: 22px; font-size: 0.75rem; border-radius: 5px; }
+.trade-accent { border-top: 3px solid var(--trade-color); }
+.measure-grid input { min-width: 80px; }
+.measure-group { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--oes-text-muted); margin: 0.25rem 0 0.5rem; }
+.measure-delta { font-size: 0.7rem; color: var(--level-opportunity); }
+.active-version { background: var(--oes-primary-bg); }
+
 /* Stage pill */
 .stage-pill {
     display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600;

@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<Insurance.CarrierService>();
         services.AddScoped<Insurance.StormService>();
         services.AddScoped<Insurance.ClaimService>();
+        services.AddScoped<Measurements.MeasurementService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

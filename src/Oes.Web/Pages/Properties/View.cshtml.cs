@@ -5,17 +5,20 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Properties;
 
-public class ViewModel(PropertyService properties, RecordItems items, CrmLookups lookups) : CrmPageModel
+public class ViewModel(PropertyService properties, RecordItems items, CrmLookups lookups,
+    Oes.Infrastructure.Measurements.MeasurementService measurements) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
     public PropertyDetail Detail { get; private set; } = null!;
     public TimelineModel Timeline { get; private set; } = null!;
     public List<Option> Roles { get; private set; } = [];
+    public List<Oes.Infrastructure.Measurements.SetSummary> Measurements { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync(string? tab, string? range) => Guard(async () =>
     {
         Detail = await properties.GetAsync(Id);
+        Measurements = (await measurements.ForPropertyAsync(Id)).Current;
         Timeline = await TimelineModel.LoadAsync(items, lookups, EntityTypes.Property, Id, tab, range);
         Roles = await lookups.ValuesAsync(LookupTypes.PropertyContactRole);
         return Page();

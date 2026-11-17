@@ -1,0 +1,124 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Measurements.SetModel
+@using Oes.Domain.Measurements
+@using Oes.Infrastructure.Measurements
+@{
+    var d = Model.Detail;
+    var s = d.Set;
+    ViewData["Title"] = $"{d.Trade.Name} v{s.VersionNo} · {d.Structure.Name}";
+    var surfaces = MeasurementModes.Surfaces(d.Trade.MeasurementMode);
+    var isElevation = d.Trade.MeasurementMode == MeasurementModes.Elevation;
+    string Fmt4(decimal? v) => v is null ? "" : v.Value.ToString("#,0.##");
+    string Delta(decimal? now, decimal? before)
+    {
+        if (d.Previous is null || now == before) return "";
+        if (before is null) return "new";
+        if (now is null) return "removed";
+        var diff = now.Value - before.Value;
+        return (diff > 0 ? "+" : "") + diff.ToString("#,0.##");
+    }
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Property,
+        Title = $"{d.Trade.Name} · {d.Structure.Name}",
+        Number = $"v{s.VersionNo}",
+        Status = s.IsCurrent ? "Current" : "Older version",
+        Subtitle = $"{MeasurementService.SourceLabel(s.Source)} · measured {s.MeasuredOn?.ToString("MMM d, yyyy")}{(d.MeasuredBy is null ? "" : " · entered by " + d.MeasuredBy)}",
+        Parents = [new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}")],
+        Chips = [new RecordChip("bi-rulers", MeasurementService.Headline(d.Trade.MeasurementMode, s.Values), null)],
+    };
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="/Measurements/Property/@d.Property.Id"><i class="bi bi-grid me-1"></i>All measurements</a>
+    @if (d.CanEdit)
+    {
+        <a class="btn btn-sm btn-primary" href="/Measurements/Edit?propertyId=@d.Property.Id&structureId=@d.Structure.Id&tradeTypeId=@d.Trade.Id"><i class="bi bi-plus-lg me-1"></i>New version</a>
+        @if (!s.IsCurrent)
+        {
+            <form method="post" asp-page-handler="MakeCurrent" class="d-inline">
+                <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Make version @s.VersionNo current again? Newer versions are kept."><i class="bi bi-arrow-counterclockwise me-1"></i>Make current</button>
+            </form>
+        }
+    }
+    @if (d.SourceDocument is not null)
+    {
+        <a class="btn btn-sm btn-outline-secondary" href="/Records/Items?handler=Download&id=@d.SourceDocument.Id"><i class="bi bi-file-earmark-pdf me-1"></i>@d.SourceDocument.FileName</a>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card trade-accent" style="--trade-color:@d.Trade.Color">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle">
+                    @if (isElevation)
+                    {
+                        <thead><tr><th>Measurement</th>@foreach (var sf in surfaces) { <th class="text-end text-capitalize">@sf</th> }<th class="text-end">Total</th><th>Unit</th></tr></thead>
+                        <tbody>
+                            @foreach (var f in d.Fields)
+                            {
+                                <tr>
+                                    <td class="fw-medium">@f.Label</td>
+                                    @foreach (var sf in surfaces)
+                                    {
+                                        var delta = Delta(d.Value(sf, f.Key), d.PreviousValue(sf, f.Key));
+                                        <td class="text-end">@Fmt4(d.Value(sf, f.Key))@if (delta.Length > 0) { <div class="measure-delta">@delta</div> }</td>
+                                    }
+                                    <td class="text-end fw-semibold">@Fmt4(d.Total(f.Key))</td>
+                                    <td class="text-muted small">@f.Unit</td>
+                                </tr>
+                            }
+                        </tbody>
+                    }
+                    else
+                    {
+                        <thead><tr><th>Measurement</th><th class="text-end">Value</th><th>Unit</th>@if (d.Previous is not null) { <th class="text-end">vs v@(d.Previous.VersionNo)</th> }</tr></thead>
+                        <tbody>
+                            @foreach (var group in d.Fields.GroupBy(f => f.Group ?? ""))
+                            {
+                                @if (group.Key.Length > 0) { <tr class="table-light"><td colspan="4" class="small fw-semibold text-uppercase text-muted">@group.Key</td></tr> }
+                                foreach (var f in group)
+                                {
+                                    var now = d.Value("", f.Key);
+                                    <tr class="@(now is null ? "text-muted" : "")">
+                                        <td>@f.Label</td>
+                                        <td class="text-end fw-medium">@(now is null ? "—" : Fmt4(now))</td>
+                                        <td class="text-muted small">@f.Unit</td>
+                                        @if (d.Previous is not null) { <td class="text-end measure-delta">@Delta(now, d.PreviousValue("", f.Key))</td> }
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    }
+                </table>
+            </div>
+            @if (d.Trade.MeasurementMode == MeasurementModes.Roof && d.Value("", "total_area") is { } area)
+            {
+                var waste = d.Value("", "suggested_waste") ?? 10m;
+                <div class="card-footer small">
+                    <strong>@((area / 100m).ToString("0.##")) squares</strong> measured ·
+                    <strong>@((area / 100m * (1 + waste / 100m)).ToString("0.##")) squares</strong> with @waste.ToString("0.#")% waste
+                </div>
+            }
+        </div>
+        @if (s.Notes is not null) { <div class="card mt-3"><div class="card-body small pre-wrap">@s.Notes</div></div> }
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">Versions</div>
+            <ul class="list-group list-group-flush small">
+                @foreach (var v in d.Versions)
+                {
+                    <li class="list-group-item d-flex align-items-center @(v.Id == s.Id ? "active-version" : "")">
+                        <a href="/Measurements/Set/@v.Id" class="fw-medium me-2">v@(v.VersionNo)</a>
+                        <span class="text-muted">@MeasurementService.SourceLabel(v.Source) · @v.MeasuredOn?.ToString("MMM d, yyyy")</span>
+                        @if (v.IsCurrent) { <span class="badge bg-success-subtle text-success ms-auto">Current</span> }
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>

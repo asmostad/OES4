@@ -1514,6 +1514,230 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_carriers", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementFieldDef", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Group")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TradeTypeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TradeTypeId");
+
+                    b.HasIndex("TenantId", "TradeTypeId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("measurement_field_defs", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementSet", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte[]>("MeasuredByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("MeasuredOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("PropertyId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("SourceDocumentId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("StructureId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("SupersedesId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TradeTypeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
+
+                    b.HasIndex("SourceDocumentId");
+
+                    b.HasIndex("StructureId");
+
+                    b.HasIndex("TradeTypeId");
+
+                    b.HasIndex("TenantId", "PropertyId");
+
+                    b.HasIndex("TenantId", "StructureId", "TradeTypeId", "VersionNo")
+                        .IsUnique();
+
+                    b.ToTable("measurement_sets", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementValue", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<byte[]>("SetId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("SurfaceKey")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("decimal(14,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetId", "SurfaceKey", "FieldKey")
+                        .IsUnique();
+
+                    b.ToTable("measurement_values", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.TradeType", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("MeasurementMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("trade_types", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Tenancy.MembershipRole", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -1950,6 +2174,50 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementFieldDef", b =>
+                {
+                    b.HasOne("Oes.Domain.Measurements.TradeType", null)
+                        .WithMany()
+                        .HasForeignKey("TradeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementSet", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Crm.Document", null)
+                        .WithMany()
+                        .HasForeignKey("SourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Crm.PropertyStructure", null)
+                        .WithMany()
+                        .HasForeignKey("StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Measurements.TradeType", null)
+                        .WithMany()
+                        .HasForeignKey("TradeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementValue", b =>
+                {
+                    b.HasOne("Oes.Domain.Measurements.MeasurementSet", null)
+                        .WithMany("Values")
+                        .HasForeignKey("SetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Oes.Domain.Tenancy.MembershipRole", b =>
                 {
                     b.HasOne("Oes.Domain.Tenancy.TenantMembership", null)
@@ -2008,6 +2276,11 @@ namespace Oes.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Oes.Domain.Crm.Property", b =>
                 {
                     b.Navigation("Structures");
+                });
+
+            modelBuilder.Entity("Oes.Domain.Measurements.MeasurementSet", b =>
+                {
+                    b.Navigation("Values");
                 });
 
             modelBuilder.Entity("Oes.Domain.Tenancy.Role", b =>

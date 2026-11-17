@@ -155,7 +155,12 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
    - Supplements with status, amounts and dates.
    - Storm events with ZIP codes, a canvass list and storm suggestions; storm filters on the pipeline and claims.
    - Admin screens for pipeline stages and pick lists.
-4. **Measurements** — measurement page, sets/versions, field definitions, AI report extraction.
+4. **Measurements** (done 2026-11-17, except AI extraction)
+   - Default trades and measurement fields per tenant, editable under Administration › Trades & Measurements.
+   - Per-property measurements page by structure × trade.
+   - Versions that are never overwritten, with a "vs previous" delta, revert by making an older version current, and the report file kept on the property.
+   - Roof, elevation (per wall side) and linear modes.
+   - Still to do: AI extraction from EagleView/Hover PDFs (needs the AI client from milestone 10).
 5. **Estimating**
    - Catalog, price lists and importer, products.
    - Price-book builder, line-item/takeoff method.

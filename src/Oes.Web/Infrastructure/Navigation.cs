@@ -37,6 +37,7 @@ public static class Navigation
             new("Properties", "bi-house-door", "/Properties"),
             new("Contacts", "bi-people", "/Contacts"),
             new("Opportunities", "bi-funnel", "/Opportunities"),
+            new("Measurements", "bi-rulers", "/Measurements"),
             new("Estimates", "bi-file-earmark-text", null),
             new("Price Approvals", "bi-patch-check", null, Permissions.PricingApprove),
         ]),
@@ -80,7 +81,7 @@ public static class Navigation
             [
                 new("Catalog", "bi-box-seam", null, Permissions.ProductsManage),
                 new("Price Lists", "bi-tags", null, Permissions.PriceListsManage),
-                new("Trade Categories", "bi-hammer", null, Permissions.ProductsManage),
+                new("Trades & Measurements", "bi-hammer", "/Admin/Trades", Permissions.ProductsManage),
                 new("Takeoff Rules", "bi-rulers", null, Permissions.ProductsManage),
             ]),
             new("people", "People & Partners", "bi-people",

@@ -134,6 +134,8 @@
         function setAlt() { if (alt) alt.classList.toggle('d-none', !!hidden.value); }
         function close() { menu.classList.remove('show'); active = -1; }
         function choose(item) {
+            const go = box.getAttribute('data-typeahead-go');
+            if (go) { window.location.href = go.replace('{id}', encodeURIComponent(item.id)); return; }
             hidden.value = item.id;
             input.value = item.label;
             input.classList.add('is-picked');
