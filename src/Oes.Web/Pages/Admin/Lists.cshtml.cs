@@ -14,8 +14,18 @@ public class ListsModel(ListSettingsService settings) : CrmPageModel
     public List<PipelineStage> Stages { get; private set; } = [];
     public List<LookupValue> Values { get; private set; } = [];
 
+    public List<Oes.Domain.Production.WorkflowStage> WorkflowStages { get; private set; } = [];
+    public string? WorkflowLevel => List switch { "project_stages" => Oes.Domain.Production.WorkflowLevels.Project, "trade_stages" => Oes.Domain.Production.WorkflowLevels.Trade, _ => null };
+
+    public Task<IActionResult> OnPostWorkflowStageAsync(Guid? id, string name, string? role, string color, int? staleAfterDays, bool isActive) =>
+        Run(() => settings.SaveWorkflowStageAsync(WorkflowLevel!, id, name, role ?? "", color, staleAfterDays, isActive), "Stage saved.");
+
+    public Task<IActionResult> OnPostMoveWorkflowStageAsync(Guid id, int direction) =>
+        Run(() => settings.MoveWorkflowStageAsync(WorkflowLevel!, id, direction), null);
+
     public async Task OnGetAsync()
     {
+        if (WorkflowLevel is { } level) { WorkflowStages = await settings.WorkflowStagesAsync(level); return; }
         if (List == "stages") Stages = await settings.StagesAsync();
         else if (ListSettingsService.EditableLists.ContainsKey(List)) Values = await settings.ValuesAsync(List);
         else List = "stages";

@@ -194,6 +194,22 @@ else if (o.Outcome == Outcomes.Won)
             @if (Model.Estimates.Count > 0) { <partial name="_EstimateTable" model="Model.Estimates" /> }
             else { <div class="card-body small text-muted">No estimates yet.</div> }
         </div>
+        @if (Model.Projects.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-hammer text-level-project me-2"></i>Projects</div>
+                <ul class="list-group list-group-flush small">
+                    @foreach (var pr in Model.Projects)
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-2">
+                            <code>@pr.Number</code><a href="/Projects/View/@pr.Id" class="fw-medium">@pr.Name</a>
+                            <span class="stage-pill ms-auto" style="--stage-color:@pr.StageColor">@pr.StageName</span>
+                            <span>@pr.ContractValue.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-US"))</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
         <partial name="_Timeline" model="Model.Timeline" />
     </div>
 </div>

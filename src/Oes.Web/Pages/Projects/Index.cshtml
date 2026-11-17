@@ -1,0 +1,87 @@
+@page
+@model Oes.Web.Pages.Projects.IndexModel
+@{
+    ViewData["Title"] = "Projects";
+    var isBoard = Model.View != "list";
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+}
+<div class="page-header">
+    <div>
+        <h1>Projects</h1>
+        <p class="page-subtitle">Sold work. A project is created from a signed estimate; each trade moves through production on the <a href="/Workflow">Workflow Board</a>.</p>
+    </div>
+</div>
+
+<form method="get" class="card mb-3">
+    <input type="hidden" name="view" value="@Model.View">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <div class="btn-group btn-group-sm me-2" role="group" aria-label="View">
+            <a class="btn @(isBoard ? "btn-secondary" : "btn-outline-secondary")" href="?view=board&mine=@Model.Mine.ToString().ToLowerInvariant()"><i class="bi bi-kanban me-1"></i>Board</a>
+            <a class="btn @(!isBoard ? "btn-secondary" : "btn-outline-secondary")" href="?view=list&mine=@Model.Mine.ToString().ToLowerInvariant()"><i class="bi bi-list-ul me-1"></i>List</a>
+        </div>
+        <div class="input-group input-group-sm list-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@Model.Q" class="form-control" placeholder="Number, name, customer or address">
+        </div>
+        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mine" value="true" id="mine" checked="@Model.Mine" data-autosubmit-check><label class="form-check-label small" for="mine">Only mine</label></div>
+        @if (!isBoard)
+        {
+            <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="removed" value="true" id="rem" checked="@Model.Removed" data-autosubmit-check><label class="form-check-label small" for="rem">Include removed from board</label></div>
+        }
+        <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+    </div>
+</form>
+
+@if (isBoard)
+{
+    <div class="pipeline-board" data-board data-move-url="/api/v1/projects/{id}/stage">
+        @foreach (var col in Model.Board)
+        {
+            <section class="pipeline-column" data-stage-id="@col.Stage.Id" style="--stage-color:@col.Stage.Color">
+                <header class="pipeline-column-header"><span class="stage-dot"></span>@col.Stage.Name<span class="pipeline-count">@col.Cards.Count</span></header>
+                <div class="pipeline-cards" data-dropzone>
+                    @foreach (var p in col.Cards)
+                    {
+                        <article class="pipeline-card project-card @(p.IsStale ? "stale" : "")" draggable="true" data-card-id="@p.Id">
+                            <a href="/Projects/View/@p.Id" class="pipeline-card-title">@p.Name</a>
+                            <div class="pipeline-card-meta"><i class="bi bi-person"></i> @p.ContactName</div>
+                            <div class="pipeline-card-meta"><i class="bi bi-house-door"></i> @(p.Address ?? "no address")</div>
+                            <div class="pipeline-card-foot">
+                                <code>@p.Number</code>
+                                <span title="Trades complete"><i class="bi bi-layers"></i> @p.TradesComplete/@p.Trades</span>
+                                @if (p.IsStale) { <span class="badge bg-warning-subtle text-warning"><i class="bi bi-hourglass-split"></i></span> }
+                                <span class="ms-auto">@p.ContractValue.ToString("C0", us)</span>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-clickable mb-0 align-middle">
+                <thead><tr><th>Number</th><th>Project</th><th>Customer</th><th>Stage</th><th>Trades</th><th>PM</th><th class="text-end">Contract</th></tr></thead>
+                <tbody>
+                    @if (Model.Rows.Count == 0) { <tr><td colspan="7"><div class="empty-state py-3"><i class="bi bi-hammer"></i><h5>No projects</h5><p>Sign an estimate, then choose <strong>Create project</strong>.</p></div></td></tr> }
+                    @foreach (var p in Model.Rows)
+                    {
+                        <tr data-href="/Projects/View/@p.Id" class="@(p.IsRemoved ? "text-muted" : "")">
+                            <td><code class="small">@p.Number</code></td>
+                            <td><a href="/Projects/View/@p.Id" class="fw-medium">@p.Name</a><div class="small text-muted">@p.Address</div></td>
+                            <td>@p.ContactName</td>
+                            <td><span class="stage-pill" style="--stage-color:@p.StageColor">@p.StageName</span>
+                                @if (p.IsRemoved) { <span class="badge bg-secondary-subtle text-secondary ms-1">Off board · @Fmt.Cap(p.RemovalReason)</span> }</td>
+                            <td>@p.TradesComplete/@p.Trades done</td>
+                            <td class="text-muted">@p.OwnerName</td>
+                            <td class="text-end">@p.ContractValue.ToString("C2", us)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

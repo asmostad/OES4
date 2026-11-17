@@ -90,6 +90,60 @@ public sealed partial class ListSettingsService(OesDbContext db, RecordScope sco
         await db.SaveChangesAsync(ct);
     }
 
+    // ---------------- Workflow stages (projects and trades) ----------------
+
+    public Task<List<Domain.Production.WorkflowStage>> WorkflowStagesAsync(string level, CancellationToken ct = default) =>
+        db.WorkflowStages.Where(s => s.Level == level).OrderBy(s => s.Sort).ToListAsync(ct);
+
+    public async Task SaveWorkflowStageAsync(string level, Guid? id, string name, string role, string color, int? staleAfterDays, bool isActive,
+        CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.SettingsManage);
+        if (level is not (Domain.Production.WorkflowLevels.Project or Domain.Production.WorkflowLevels.Trade)) throw new CrmRuleException("Unknown level.");
+        var allowed = level == Domain.Production.WorkflowLevels.Project ? Domain.Production.StageRoles.Project : Domain.Production.StageRoles.Trade;
+        role ??= "";
+        if (!allowed.Contains(role)) throw new CrmRuleException("That role isn't available at this level.");
+        name = name.Trim();
+        if (name.Length == 0) throw new CrmRuleException("Stage name is required.");
+        if (!HexColor().IsMatch(color)) throw new CrmRuleException("Color must look like #3b82f6.");
+        if (staleAfterDays is < 1) throw new CrmRuleException("Stale-after must be at least 1 day.");
+
+        // Each special role belongs to one active stage, so automation always knows where to go.
+        if (role.Length > 0 && isActive && await db.WorkflowStages.AnyAsync(s => s.Level == level && s.Role == role && s.IsActive && s.Id != id, ct))
+            throw new CrmRuleException($"Another stage already has the \"{Domain.Production.StageRoles.Label(role)}\" role.");
+
+        Domain.Production.WorkflowStage stage;
+        if (id is { } sid)
+        {
+            stage = await db.WorkflowStages.FirstOrDefaultAsync(s => s.Id == sid && s.Level == level, ct) ?? throw new RecordNotFoundException("Stage");
+            if (!isActive && (await db.Projects.AnyAsync(p => p.StageId == sid && p.ArchivedAt == null, ct) || await db.ProjectTrades.AnyAsync(t => t.StageId == sid, ct)))
+                throw new CrmRuleException("Move the work out of this stage before turning it off.");
+        }
+        else
+        {
+            stage = new Domain.Production.WorkflowStage { Level = level, Sort = (await db.WorkflowStages.Where(s => s.Level == level).MaxAsync(s => (int?)s.Sort, ct) ?? 0) + 10 };
+            db.WorkflowStages.Add(stage);
+        }
+        stage.Name = name;
+        stage.Role = role;
+        stage.Color = color.ToLowerInvariant();
+        stage.StaleAfterDays = staleAfterDays;
+        stage.IsActive = isActive;
+        audit.Record(id is null ? "workflow_stage.created" : "workflow_stage.updated", "WorkflowStage", stage.Id, $"{level} stage {name}");
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task MoveWorkflowStageAsync(string level, Guid id, int direction, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.SettingsManage);
+        var stages = await db.WorkflowStages.Where(s => s.Level == level).OrderBy(s => s.Sort).ToListAsync(ct);
+        var i = stages.FindIndex(s => s.Id == id);
+        var j = i + Math.Sign(direction);
+        if (i < 0 || j < 0 || j >= stages.Count) return;
+        (stages[i].Sort, stages[j].Sort) = (stages[j].Sort, stages[i].Sort);
+        await db.SaveChangesAsync(ct);
+    }
+
     public Task<List<LookupValue>> ValuesAsync(string type, CancellationToken ct = default) =>
         db.LookupValues.Where(l => l.Type == type).OrderBy(l => l.Sort).ThenBy(l => l.Label).ToListAsync(ct);
 

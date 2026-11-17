@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<Measurements.MeasurementService>();
         services.AddScoped<Estimating.CatalogService>();
         services.AddScoped<Estimating.EstimateService>();
+        services.AddScoped<Production.ProjectService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

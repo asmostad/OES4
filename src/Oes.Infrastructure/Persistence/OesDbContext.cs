@@ -8,6 +8,7 @@ using Oes.Domain.Crm;
 using Oes.Domain.Estimating;
 using Oes.Domain.Insurance;
 using Oes.Domain.Measurements;
+using Oes.Domain.Production;
 using Oes.Domain.Tenancy;
 using Oes.Infrastructure.Identity;
 
@@ -71,6 +72,13 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<EstimateSection> EstimateSections => Set<EstimateSection>();
     public DbSet<EstimateLine> EstimateLines => Set<EstimateLine>();
     public DbSet<EstimateVersion> EstimateVersions => Set<EstimateVersion>();
+
+    // Production
+    public DbSet<WorkflowStage> WorkflowStages => Set<WorkflowStage>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectTrade> ProjectTrades => Set<ProjectTrade>();
+    public DbSet<WorkflowStageChange> WorkflowStageChanges => Set<WorkflowStageChange>();
+    public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -178,7 +186,78 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureInsurance(b);
         ConfigureMeasurements(b);
         ConfigureEstimating(b);
+        ConfigureProduction(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureProduction(ModelBuilder b)
+    {
+        b.Entity<WorkflowStage>(e =>
+        {
+            e.ToTable("workflow_stages");
+            e.Property(s => s.Level).HasMaxLength(20);
+            e.Property(s => s.Name).HasMaxLength(100);
+            e.Property(s => s.Role).HasMaxLength(30);
+            e.Property(s => s.Color).HasMaxLength(20);
+            e.HasIndex(s => new { s.TenantId, s.Level, s.Sort });
+        });
+
+        b.Entity<Project>(e =>
+        {
+            e.ToTable("projects");
+            e.Property(p => p.Number).HasMaxLength(30);
+            e.Property(p => p.Name).HasMaxLength(200);
+            e.Property(p => p.OriginalContract).HasPrecision(12, 2);
+            e.Property(p => p.ApprovedChangeOrders).HasPrecision(12, 2);
+            e.Property(p => p.RemovalReasonKey).HasMaxLength(60);
+            e.Property(p => p.RemovalNote).HasMaxLength(500);
+            e.Property(p => p.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Ignore(p => p.ContractValue);
+            e.HasIndex(p => new { p.TenantId, p.Number }).IsUnique();
+            e.HasIndex(p => new { p.TenantId, p.StageId });
+            e.HasIndex(p => new { p.TenantId, p.OpportunityId });
+            e.HasIndex(p => new { p.TenantId, p.EstimateId });
+            e.HasOne<Opportunity>().WithMany().HasForeignKey(p => p.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Property>().WithMany().HasForeignKey(p => p.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Estimate>().WithMany().HasForeignKey(p => p.EstimateId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<EstimateVersion>().WithMany().HasForeignKey(p => p.EstimateVersionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<WorkflowStage>().WithMany().HasForeignKey(p => p.StageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ProjectTrade>(e =>
+        {
+            e.ToTable("project_trades");
+            e.Property(t => t.Description).HasMaxLength(500);
+            e.Property(t => t.Amount).HasPrecision(12, 2);
+            e.Property(t => t.CrewNote).HasMaxLength(500);
+            e.Property(t => t.RemovalReasonKey).HasMaxLength(60);
+            e.Property(t => t.RemovalNote).HasMaxLength(500);
+            e.HasIndex(t => new { t.TenantId, t.ProjectId });
+            e.HasIndex(t => new { t.TenantId, t.StageId });
+            e.HasOne<Project>().WithMany().HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<TradeType>().WithMany().HasForeignKey(t => t.TradeTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<WorkflowStage>().WithMany().HasForeignKey(t => t.StageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<WorkflowStageChange>(e =>
+        {
+            e.ToTable("workflow_stage_changes");
+            e.Property(c => c.EntityType).HasMaxLength(20);
+            e.Property(c => c.Note).HasMaxLength(500);
+            e.HasIndex(c => new { c.TenantId, c.EntityType, c.EntityId });
+        });
+
+        b.Entity<ChangeOrder>(e =>
+        {
+            e.ToTable("change_orders");
+            e.Property(c => c.Description).HasMaxLength(1000);
+            e.Property(c => c.Reason).HasMaxLength(500);
+            e.Property(c => c.Amount).HasPrecision(12, 2);
+            e.Property(c => c.Status).HasMaxLength(20);
+            e.Property(c => c.ApprovedByName).HasMaxLength(150);
+            e.HasIndex(c => new { c.TenantId, c.ProjectId, c.Sequence }).IsUnique();
+            e.HasOne<Project>().WithMany().HasForeignKey(c => c.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureEstimating(ModelBuilder b)

@@ -2369,6 +2369,359 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("trade_types", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Production.ChangeOrder", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<string>("ApprovedByName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("DecidedByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<bool>("IsInsuranceSupplement")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte[]>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ProjectTradeId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("TenantId", "ProjectId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("change_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.Project", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("ApprovedChangeOrders")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("ClaimId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("EstimateId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("EstimateVersionId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("OpportunityId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("OriginalContract")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<byte[]>("OwnerUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("PropertyId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("RemovalNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("RemovalReasonKey")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime?>("RemovedFromBoardAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("StageChangedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("StageId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstimateId");
+
+                    b.HasIndex("EstimateVersionId");
+
+                    b.HasIndex("OpportunityId");
+
+                    b.HasIndex("PropertyId");
+
+                    b.HasIndex("StageId");
+
+                    b.HasIndex("TenantId", "EstimateId");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "OpportunityId");
+
+                    b.HasIndex("TenantId", "StageId");
+
+                    b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.ProjectTrade", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CrewNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("MaterialDate")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("RemovalNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("RemovalReasonKey")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime?>("RemovedFromBoardAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StageChangedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("StageId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TradeTypeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("WorkDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("StageId");
+
+                    b.HasIndex("TradeTypeId");
+
+                    b.HasIndex("TenantId", "ProjectId");
+
+                    b.HasIndex("TenantId", "StageId");
+
+                    b.ToTable("project_trades", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.WorkflowStage", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StaleAfterDays")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Level", "Sort");
+
+                    b.ToTable("workflow_stages", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.WorkflowStageChange", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("EntityId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("FromStageId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<bool>("IsAutomatic")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ToStageId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EntityType", "EntityId");
+
+                    b.ToTable("workflow_stage_changes", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Tenancy.MembershipRole", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -2926,6 +3279,66 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany("Values")
                         .HasForeignKey("SetId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.ChangeOrder", b =>
+                {
+                    b.HasOne("Oes.Domain.Production.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.Project", b =>
+                {
+                    b.HasOne("Oes.Domain.Estimating.Estimate", null)
+                        .WithMany()
+                        .HasForeignKey("EstimateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Estimating.EstimateVersion", null)
+                        .WithMany()
+                        .HasForeignKey("EstimateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Crm.Opportunity", null)
+                        .WithMany()
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Crm.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Production.WorkflowStage", null)
+                        .WithMany()
+                        .HasForeignKey("StageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.ProjectTrade", b =>
+                {
+                    b.HasOne("Oes.Domain.Production.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Production.WorkflowStage", null)
+                        .WithMany()
+                        .HasForeignKey("StageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Measurements.TradeType", null)
+                        .WithMany()
+                        .HasForeignKey("TradeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

@@ -291,7 +291,7 @@
             dragged = card;
             card.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', card.getAttribute('data-opportunity-id'));
+            e.dataTransfer.setData('text/plain', card.getAttribute('data-card-id'));
         });
         board.addEventListener('dragend', function () {
             if (dragged) dragged.classList.remove('dragging');
@@ -319,7 +319,13 @@
                 zone.prepend(card);
                 updateCounts();
                 try {
-                    await window.OES.api('/api/v1/opportunities/' + card.getAttribute('data-opportunity-id') + '/stage', { method: 'PUT', body: body });
+                    const url = board.getAttribute('data-move-url').replace('{id}', encodeURIComponent(card.getAttribute('data-card-id')));
+                    const result = await window.OES.api(url, { method: 'PUT', body: body });
+                    // Trade moves report automatic follow-ups (e.g. the project advanced).
+                    if (result && result.automations && result.automations.length) {
+                        window.alert(result.automations.join('\n'));
+                        if (board.hasAttribute('data-reload-on-auto')) window.location.reload();
+                    }
                 } catch (err) {
                     from.prepend(card);
                     updateCounts();

@@ -14,13 +14,59 @@
 
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link @(Model.List == "stages" ? "active" : "")" href="?list=stages">Pipeline stages</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.List == "project_stages" ? "active" : "")" href="?list=project_stages">Project stages</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.List == "trade_stages" ? "active" : "")" href="?list=trade_stages">Trade stages</a></li>
     @foreach (var (key, label) in ListSettingsService.EditableLists)
     {
         <li class="nav-item"><a class="nav-link @(Model.List == key ? "active" : "")" href="?list=@key">@label</a></li>
     }
 </ul>
 
-@if (Model.List == "stages")
+@if (Model.WorkflowLevel is { } level)
+{
+    var roles = level == Oes.Domain.Production.WorkflowLevels.Project ? Oes.Domain.Production.StageRoles.Project : Oes.Domain.Production.StageRoles.Trade;
+    <p class="small text-muted">Rename and reorder freely. The <strong>role</strong> tells OES what a stage means: gates (dates before deliveries and work) and automation
+        (the project starts production when a trade's materials are ordered, and completes when every trade is complete) use roles, never names.</p>
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead><tr><th style="width:80px">Order</th><th>Name</th><th>Role</th><th>Color</th><th>Stale after (days)</th><th>Active</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var s in Model.WorkflowStages)
+                    {
+                        var fid = "ws-" + s.Id.ToString("N");
+                        <tr class="@(s.IsActive ? "" : "text-muted")">
+                            <td class="text-nowrap">
+                                <form method="post" asp-page-handler="MoveWorkflowStage" class="d-inline"><input type="hidden" name="id" value="@s.Id"><input type="hidden" name="direction" value="-1"><input type="hidden" name="list" value="@Model.List">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move up"><i class="bi bi-arrow-up"></i></button></form>
+                                <form method="post" asp-page-handler="MoveWorkflowStage" class="d-inline"><input type="hidden" name="id" value="@s.Id"><input type="hidden" name="direction" value="1"><input type="hidden" name="list" value="@Model.List">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move down"><i class="bi bi-arrow-down"></i></button></form>
+                            </td>
+                            <td><form method="post" asp-page-handler="WorkflowStage" id="@fid"><input type="hidden" name="id" value="@s.Id"><input type="hidden" name="list" value="@Model.List"></form>
+                                <input form="@fid" name="name" value="@s.Name" class="form-control form-control-sm" maxlength="100" required aria-label="Name"></td>
+                            <td><select form="@fid" name="role" class="form-select form-select-sm" aria-label="Role">
+                                @foreach (var r in roles) { <option value="@r" selected="@(s.Role == r)">@Oes.Domain.Production.StageRoles.Label(r)</option> }</select></td>
+                            <td><input form="@fid" type="color" name="color" value="@s.Color" class="form-control form-control-sm form-control-color" aria-label="Color"></td>
+                            <td><input form="@fid" type="number" min="1" name="staleAfterDays" value="@s.StaleAfterDays" class="form-control form-control-sm" style="max-width:100px" aria-label="Stale after days"></td>
+                            <td><input form="@fid" type="checkbox" name="isActive" value="true" class="form-check-input" checked="@s.IsActive" aria-label="Active"></td>
+                            <td><button form="@fid" class="btn btn-sm btn-primary" type="submit">Save</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-body border-top">
+            <form method="post" asp-page-handler="WorkflowStage" class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="hidden" name="list" value="@Model.List"><input type="hidden" name="isActive" value="true"><input type="hidden" name="role" value="">
+                <input name="name" class="form-control form-control-sm w-auto" placeholder="New stage name" maxlength="100" required aria-label="New stage name">
+                <input type="color" name="color" value="#64748b" class="form-control form-control-sm form-control-color" aria-label="Color">
+                <input type="number" min="1" name="staleAfterDays" class="form-control form-control-sm" style="max-width:150px" placeholder="Stale after (days)" aria-label="Stale after days">
+                <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-plus-lg"></i> Add stage</button>
+            </form>
+        </div>
+    </div>
+}
+else if (Model.List == "stages")
 {
     <p class="small text-muted">Rename, recolor and reorder freely. Automation and reports use each stage's role (open, won, lost), never its name.
         "Stale after" flags cards that sit in a stage too long.</p>

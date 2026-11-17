@@ -49,8 +49,8 @@ public static class Navigation
         ]),
         new("Production",
         [
-            new("Projects", "bi-kanban", null),
-            new("Workflow Board", "bi-diagram-3", null),
+            new("Projects", "bi-kanban", "/Projects"),
+            new("Workflow Board", "bi-diagram-3", "/Workflow"),
         ]),
         new("Communication",
         [

@@ -80,8 +80,21 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         return q.Where(e => e.OwnerUserId == me || opps.Any(o => o.Id == e.OpportunityId));
     }
 
+    /// <summary>Projects follow their opportunity's visibility, plus projects the user manages.</summary>
+    public async Task<IQueryable<Domain.Production.Project>> ProjectsAsync(bool includeArchived = false)
+    {
+        var q = db.Projects.AsQueryable();
+        if (!includeArchived) q = q.Where(p => p.ArchivedAt == null);
+        if (await ViewAllAsync()) return q;
+        var me = Me;
+        var opps = await OpportunitiesAsync(includeArchived: true);
+        return q.Where(p => p.OwnerUserId == me || opps.Any(o => o.Id == p.OpportunityId));
+    }
+
     public async Task<bool> CanSeeAsync(string entityType, Guid id) => entityType switch
     {
+        EntityTypes.Project => await (await ProjectsAsync(true)).AnyAsync(p => p.Id == id),
+        EntityTypes.Trade => await CanSeeTradeAsync(id),
         EntityTypes.Estimate => await (await EstimatesAsync(true)).AnyAsync(e => e.Id == id),
         EntityTypes.Contact => await (await ContactsAsync(true)).AnyAsync(c => c.Id == id),
         EntityTypes.Property => await (await PropertiesAsync(true)).AnyAsync(p => p.Id == id),
@@ -89,6 +102,12 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         EntityTypes.Claim => await (await ClaimsAsync(true)).AnyAsync(c => c.Id == id),
         _ => false,
     };
+
+    private async Task<bool> CanSeeTradeAsync(Guid tradeId)
+    {
+        var projectId = await db.ProjectTrades.Where(t => t.Id == tradeId).Select(t => (Guid?)t.ProjectId).FirstOrDefaultAsync();
+        return projectId is { } pid && await (await ProjectsAsync(true)).AnyAsync(p => p.Id == pid);
+    }
 
     public async Task EnsureCanSeeAsync(string entityType, Guid id)
     {
@@ -119,6 +138,8 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         EntityTypes.Opportunity => "Opportunity",
         EntityTypes.Claim => "Claim",
         EntityTypes.Estimate => "Estimate",
+        EntityTypes.Project => "Project",
+        EntityTypes.Trade => "Trade",
         _ => "Record",
     };
 }

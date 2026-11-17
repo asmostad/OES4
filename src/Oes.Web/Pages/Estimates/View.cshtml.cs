@@ -8,7 +8,8 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Estimates;
 
-public class ViewModel(EstimateService estimates, MeasurementService measurements, PropertyService properties, RecordItems items, CrmLookups lookups) : CrmPageModel
+public class ViewModel(EstimateService estimates, MeasurementService measurements, PropertyService properties, RecordItems items, CrmLookups lookups,
+    Oes.Infrastructure.Production.ProjectService projects) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
@@ -16,10 +17,19 @@ public class ViewModel(EstimateService estimates, MeasurementService measurement
     public TimelineModel Timeline { get; private set; } = null!;
     public List<TradeType> Trades { get; private set; } = [];
     public List<PropertyStructure> Structures { get; private set; } = [];
+    public Guid? ProjectId { get; private set; }
+
+    public Task<IActionResult> OnPostCreateProjectAsync() => Guard(async () =>
+    {
+        var projectId = await projects.CreateFromEstimateAsync(Id);
+        Flash("Project created. Its trades are on the workflow board.");
+        return RedirectToPage("/Projects/View", new { id = projectId });
+    });
 
     public Task<IActionResult> OnGetAsync(string? tab) => Guard(async () =>
     {
         Detail = await estimates.GetAsync(Id);
+        ProjectId = await projects.ForEstimateAsync(Id);
         Timeline = await TimelineModel.LoadAsync(items, lookups, EntityTypes.Estimate, Id, tab, null);
         Trades = await measurements.TradesAsync();
         if (Detail.Property is not null) Structures = (await properties.GetAsync(Detail.Property.Id)).Structures;

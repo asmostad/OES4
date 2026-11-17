@@ -174,9 +174,18 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
      - The takeoff rules engine and order sheet.
      - Carrier scope import (AI).
      - Tenant default terms.
-6. **Production**
-   - Projects/trades, workflow stages with roles, kanban, automation rules, Remove from Board.
-   - Change orders, order sheet.
+6. **Production** (core done 2026-11-17)
+   - Done:
+     - Projects from signed estimates (one trade per estimate trade, contract = signed total).
+     - Per-tenant project and trade stages with roles, which are unique per level and editable.
+     - Gates by role: material date before deliveries, work date before labor, all trades complete before the project completes.
+     - Forward-only automation (production start, project complete) with a move preview and "automatic" history.
+     - Project and trade kanban boards (drag and drop), Remove from Board with reasons and restore.
+     - Change orders with customer approval that adds to the contract (and to the trade amount).
+   - Still to do:
+     - Configurable automation rules (tasks and notifications on stage entry) once tasks and notifications exist.
+     - Order sheet (with the takeoff engine).
+     - Line-level change orders.
 7. **Subcontractors** — subs, rates, work orders, sub portal.
 8. **Communication**
    - M365 mail + calendar sync, templates, SMS with consent/STOP, notifications (+ SignalR).

@@ -53,7 +53,7 @@
 
 @if (isBoard)
 {
-    <div class="pipeline-board" data-board data-lost-reasons='@System.Text.Json.JsonSerializer.Serialize(Model.LostReasons.Select(r => new { r.Value, r.Label }))'>
+    <div class="pipeline-board" data-board data-move-url="/api/v1/opportunities/{id}/stage" data-lost-reasons='@System.Text.Json.JsonSerializer.Serialize(Model.LostReasons.Select(r => new { r.Value, r.Label }))'>
         @foreach (var col in Model.Board)
         {
             <section class="pipeline-column" data-stage-id="@col.Stage.Id" data-outcome="@col.Stage.Outcome" style="--stage-color:@col.Stage.Color">
@@ -64,7 +64,7 @@
                 <div class="pipeline-cards" data-dropzone>
                     @foreach (var o in col.Cards)
                     {
-                        <article class="pipeline-card @(o.IsStale ? "stale" : "")" draggable="true" data-opportunity-id="@o.Id">
+                        <article class="pipeline-card @(o.IsStale ? "stale" : "")" draggable="true" data-card-id="@o.Id">
                             <a href="/Opportunities/View/@o.Id" class="pipeline-card-title">@o.Name</a>
                             <div class="pipeline-card-meta"><i class="bi bi-person"></i> @o.ContactName</div>
                             @if (o.Address is not null) { <div class="pipeline-card-meta"><i class="bi bi-house-door"></i> @o.Address</div> }

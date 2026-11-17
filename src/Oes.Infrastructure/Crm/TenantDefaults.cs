@@ -45,6 +45,11 @@ public static class TenantDefaults
             ("price", "Price"), ("competitor", "Chose a competitor"), ("no_damage", "No damage found"),
             ("claim_denied", "Claim denied"), ("no_response", "No response"), ("not_interested", "Not interested"), ("other", "Other"),
         ],
+        [Domain.Production.RemovalReasons.Type] =
+        [
+            ("on_hold", "On hold"), ("waiting_insurance", "Waiting on insurance"), ("customer_cancelled", "Customer cancelled"),
+            ("weather", "Weather delay"), ("financing", "Waiting on financing"), ("other", "Other"),
+        ],
         [LookupTypes.DocumentCategory] =
         [
             ("photos", "Photos"), ("contract", "Contract"), ("insurance", "Insurance"), ("measurement_report", "Measurement Report"),
@@ -52,10 +57,38 @@ public static class TenantDefaults
         ],
     };
 
+    /// <summary>OES3's project and trade stages, now with roles.</summary>
+    public static readonly (string Level, string Name, string Role, string Color, int? StaleDays)[] WorkflowStages =
+    [
+        (Domain.Production.WorkflowLevels.Project, "Verification", Domain.Production.StageRoles.Initial, "#64748b", 3),
+        (Domain.Production.WorkflowLevels.Project, "In Production", Domain.Production.StageRoles.ProductionStart, "#2563eb", 21),
+        (Domain.Production.WorkflowLevels.Project, "Waiting for Invoice", Domain.Production.StageRoles.Complete, "#d97706", 5),
+        (Domain.Production.WorkflowLevels.Project, "Waiting for Payment", Domain.Production.StageRoles.Invoiced, "#f97316", 30),
+        (Domain.Production.WorkflowLevels.Project, "Paid", Domain.Production.StageRoles.Paid, "#10b981", null),
+        (Domain.Production.WorkflowLevels.Project, "Closed", Domain.Production.StageRoles.Closed, "#334155", null),
+        (Domain.Production.WorkflowLevels.Trade, "Trade Setup", Domain.Production.StageRoles.Initial, "#64748b", 5),
+        (Domain.Production.WorkflowLevels.Trade, "Material Orders", Domain.Production.StageRoles.MaterialsOrdered, "#8b5cf6", 7),
+        (Domain.Production.WorkflowLevels.Trade, "Material Deliveries", Domain.Production.StageRoles.MaterialsDelivered, "#a855f7", 7),
+        (Domain.Production.WorkflowLevels.Trade, "Work In Progress", Domain.Production.StageRoles.Labor, "#0d9488", 5),
+        (Domain.Production.WorkflowLevels.Trade, "Final Walkthrough", Domain.Production.StageRoles.FinalWalkthrough, "#06b6d4", 5),
+        (Domain.Production.WorkflowLevels.Trade, "Completed", Domain.Production.StageRoles.Complete, "#10b981", null),
+    ];
+
     public static async Task EnsureAsync(OesDbContext db, Guid tenantId, CancellationToken ct = default)
     {
         await Measurements.MeasurementDefaults.EnsureAsync(db, tenantId, ct);
         var filter = new[] { OesDbContext.TenantFilter };
+
+        foreach (var level in new[] { Domain.Production.WorkflowLevels.Project, Domain.Production.WorkflowLevels.Trade })
+        {
+            if (await db.WorkflowStages.IgnoreQueryFilters(filter).AnyAsync(s => s.TenantId == tenantId && s.Level == level, ct)) continue;
+            var sort = 0;
+            foreach (var w in WorkflowStages.Where(x => x.Level == level))
+                db.WorkflowStages.Add(new Domain.Production.WorkflowStage
+                {
+                    TenantId = tenantId, Level = level, Name = w.Name, Role = w.Role, Color = w.Color, StaleAfterDays = w.StaleDays, Sort = sort += 10,
+                });
+        }
 
         if (!await db.PipelineStages.IgnoreQueryFilters(filter).AnyAsync(s => s.TenantId == tenantId, ct))
         {
