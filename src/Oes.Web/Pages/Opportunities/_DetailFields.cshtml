@@ -1,0 +1,64 @@
+@model (Oes.Infrastructure.Crm.OpportunityInput Input, List<Oes.Infrastructure.Crm.Option> Users, List<Oes.Infrastructure.Crm.Option> Sources, List<Oes.Infrastructure.Crm.Option> Perils, List<Oes.Domain.Crm.PipelineStage>? Stages)
+@{
+    var i = Model.Input;
+}
+<div class="row g-3">
+    <div class="col-md-8">
+        <label class="form-label" for="oname">Name</label>
+        <input id="oname" name="Input.Name" value="@i.Name" class="form-control" maxlength="200" placeholder="Leave blank to use the contact's name">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="ovalue">Expected value</label>
+        <div class="input-group"><span class="input-group-text">$</span>
+            <input id="ovalue" name="Input.ExpectedValue" value="@i.ExpectedValue" type="number" min="0" step="100" class="form-control"></div>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="oowner">Owner</label>
+        <select id="oowner" name="Input.OwnerUserId" class="form-select">
+            <option value="">Unassigned</option>
+            @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(i.OwnerUserId?.ToString() == u.Value)">@u.Label</option> }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="osource">Lead source</label>
+        <select id="osource" name="Input.SourceKey" class="form-select">
+            <option value="">—</option>
+            @foreach (var s in Model.Sources) { <option value="@s.Value" selected="@(i.SourceKey == s.Value)">@s.Label</option> }
+        </select>
+    </div>
+    @if (Model.Stages is not null)
+    {
+        <div class="col-md-4">
+            <label class="form-label" for="ostage">Stage</label>
+            <select id="ostage" name="Input.StageId" class="form-select">
+                @foreach (var s in Model.Stages) { <option value="@s.Id" selected="@(i.StageId == s.Id)">@s.Name</option> }
+            </select>
+        </div>
+    }
+    <div class="col-12">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" name="Input.IsInsurance" value="true" id="oins" checked="@i.IsInsurance" data-toggle-target="#insurance-fields">
+            <label class="form-check-label" for="oins"><i class="bi bi-shield-check text-info me-1"></i>Insurance job</label>
+        </div>
+    </div>
+    <div class="col-12 @(i.IsInsurance ? "" : "d-none")" id="insurance-fields">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="operil">Peril</label>
+                <select id="operil" name="Input.PerilKey" class="form-select">
+                    <option value="">—</option>
+                    @foreach (var p in Model.Perils) { <option value="@p.Value" selected="@(i.PerilKey == p.Value)">@p.Label</option> }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="odol">Date of loss</label>
+                <input id="odol" name="Input.DateOfLoss" type="date" value="@i.DateOfLoss?.ToString("yyyy-MM-dd")" class="form-control">
+            </div>
+            <div class="col-md-4 small text-muted align-self-end">Claim number, carrier and adjuster are added once a claim is filed.</div>
+        </div>
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="odesc">Description</label>
+        <textarea id="odesc" name="Input.Description" class="form-control" rows="3" maxlength="5000">@i.Description</textarea>
+    </div>
+</div>

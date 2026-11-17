@@ -1,0 +1,159 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Opportunities.ViewModel
+@using Oes.Domain.Crm
+@{
+    var d = Model.Detail;
+    var o = d.Opportunity;
+    ViewData["Title"] = $"{o.Number} {o.Name}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    var chips = new List<RecordChip>
+    {
+        new(d.Contact.IsOrganization ? "bi-building" : "bi-person", d.Contact.DisplayName, $"/Contacts/View/{d.Contact.Id}"),
+        new("bi-person-badge", d.OwnerName ?? "Unassigned", null),
+    };
+    if (Model.SourceLabel is not null) chips.Add(new("bi-signpost", Model.SourceLabel, null));
+    if (o.IsInsurance) chips.Add(new("bi-shield-check", "Insurance" + (Model.PerilLabel is null ? "" : " · " + Model.PerilLabel) + (o.DateOfLoss is null ? "" : " · DOL " + o.DateOfLoss.Value.ToString("MMM d, yyyy")), null));
+    if (o.ExpectedValue is not null) chips.Add(new("bi-currency-dollar", Fmt.Money(o.ExpectedValue), null));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Opportunity, Title = o.Name, Number = o.Number, Status = d.Stage.Name,
+        Subtitle = d.Property?.SingleLine ?? "No address yet", Parents = parents, Chips = chips,
+    };
+    var openStages = d.Stages.Where(s => s.Outcome == Outcomes.Open).ToList();
+    var won = d.Stages.FirstOrDefault(s => s.Outcome == Outcomes.Won);
+    var lost = d.Stages.FirstOrDefault(s => s.Outcome == Outcomes.Lost);
+    var currentIndex = openStages.FindIndex(s => s.Id == o.StageId);
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (d.CanEdit) { <a class="btn btn-sm btn-outline-secondary" href="/Opportunities/Edit/@o.Id"><i class="bi bi-pencil me-1"></i>Edit</a> }
+    <form method="post" asp-page-handler="Attempt" class="d-inline-flex gap-1">
+        <input name="note" class="form-control form-control-sm" placeholder="Called, left VM…" maxlength="200" aria-label="Attempt note">
+        <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-telephone-outbound me-1"></i>Log attempt</button>
+    </form>
+    <span class="small text-muted align-self-center">@o.ContactAttempts attempt@(o.ContactAttempts == 1 ? "" : "s")@(o.LastContactAt is null ? "" : ", last " + Fmt.Ago(o.LastContactAt.Value))</span>
+</div>
+
+@if (o.Outcome == Outcomes.Lost)
+{
+    <div class="alert alert-danger"><i class="bi bi-x-octagon me-2"></i>Lost@(Model.LostReasonLabel is null ? "" : ": " + Model.LostReasonLabel) · @o.ClosedAt?.ToString("MMM d, yyyy")</div>
+}
+else if (o.Outcome == Outcomes.Won)
+{
+    <div class="alert alert-success"><i class="bi bi-trophy me-2"></i>Won on @o.WonAt?.ToString("MMM d, yyyy"). Estimates and projects arrive in the estimating milestone.</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="stage-tracker">
+            @for (var i = 0; i < openStages.Count; i++)
+            {
+                var s = openStages[i];
+                var state = o.Outcome != Outcomes.Open ? "done" : i < currentIndex ? "done" : i == currentIndex ? "current" : "";
+                <form method="post" asp-page-handler="Stage" class="stage-step @state" style="--stage-color:@s.Color">
+                    <input type="hidden" name="stageId" value="@s.Id">
+                    <button type="submit" @(d.CanEdit && s.Id != o.StageId ? "" : "disabled") title="Move to @s.Name">@s.Name</button>
+                </form>
+            }
+        </div>
+        @if (d.CanEdit)
+        {
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                @if (won is not null && o.Outcome != Outcomes.Won)
+                {
+                    <form method="post" asp-page-handler="Stage">
+                        <input type="hidden" name="stageId" value="@won.Id">
+                        <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-trophy me-1"></i>Mark won</button>
+                    </form>
+                }
+                @if (lost is not null && o.Outcome != Outcomes.Lost)
+                {
+                    <form method="post" asp-page-handler="Stage" class="d-flex gap-2">
+                        <input type="hidden" name="stageId" value="@lost.Id">
+                        <select name="lostReasonKey" class="form-select form-select-sm" required aria-label="Lost reason">
+                            <option value="">Lost reason…</option>
+                            @foreach (var r in Model.LostReasons) { <option value="@r.Value">@r.Label</option> }
+                        </select>
+                        <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit"><i class="bi bi-x-lg me-1"></i>Mark lost</button>
+                    </form>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        @if (d.Property is null)
+        {
+            <div class="card mb-3 record-header level-property">
+                <div class="card-header"><i class="bi bi-house-exclamation text-warning me-2"></i>Add the address</div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="AttachProperty" class="mb-3">
+                        <div class="typeahead mb-2" data-typeahead="/api/v1/lookup/properties">
+                            <input type="hidden" name="propertyId" data-typeahead-value required>
+                            <input class="form-control form-control-sm" placeholder="Existing property…" autocomplete="off" data-typeahead-input aria-label="Property">
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Attach</button>
+                    </form>
+                    <div class="divider-text"><span>or a new address</span></div>
+                    <form method="post" asp-page-handler="AttachNewProperty" data-address-check="/api/v1/lookup/property-matches">
+                        <div class="row g-2">
+                            <div class="col-12"><input name="address.Line1" class="form-control form-control-sm" placeholder="Street" required maxlength="200" aria-label="Street" data-address-part></div>
+                            <div class="col-6"><input name="address.City" class="form-control form-control-sm" placeholder="City" required maxlength="100" aria-label="City" data-address-part></div>
+                            <div class="col-2"><input name="address.State" class="form-control form-control-sm" placeholder="ST" required maxlength="2" aria-label="State" data-address-part></div>
+                            <div class="col-4"><input name="address.PostalCode" class="form-control form-control-sm" placeholder="ZIP" required maxlength="10" aria-label="ZIP" data-address-part></div>
+                            <div class="col-12"><div class="address-matches alert alert-warning d-none mb-0 small" role="status"></div></div>
+                        </div>
+                        <button class="btn btn-sm btn-primary mt-2" type="submit">Create &amp; attach</button>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-house-door text-level-property me-2"></i>Property</div>
+                <div class="card-body">
+                    <a href="/Properties/View/@d.Property.Id" class="fw-medium">@d.Property.Line1@(d.Property.Line2 is null ? "" : " " + d.Property.Line2)</a>
+                    <div class="small text-muted">@d.Property.CityLine · @Fmt.Cap(d.Property.Kind)</div>
+                    @if (d.Property.Notes is not null) { <div class="small mt-2"><i class="bi bi-info-circle me-1"></i>@d.Property.Notes</div> }
+                </div>
+            </div>
+        }
+
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-person text-level-contact me-2"></i>Contact</div>
+            <div class="card-body">
+                <a href="/Contacts/View/@d.Contact.Id" class="fw-medium">@d.Contact.DisplayName</a>
+                @if (d.Contact.CautionNote is not null) { <div class="small text-warning mt-1"><i class="bi bi-exclamation-triangle"></i> @d.Contact.CautionNote</div> }
+            </div>
+        </div>
+
+        @if (o.Description is not null)
+        {
+            <div class="card mb-3"><div class="card-header">Description</div><div class="card-body small pre-wrap">@o.Description</div></div>
+        }
+
+        <div class="card mb-3">
+            <div class="card-header">Stage history</div>
+            <ul class="list-group list-group-flush small">
+                @foreach (var h in d.History)
+                {
+                    <li class="list-group-item">
+                        <div>@(h.From is null ? "Created in" : h.From + " →") <strong>@h.To</strong></div>
+                        <div class="text-muted">@(h.By ?? "System") · @Fmt.Ago(h.At)@(h.Note is null ? "" : " · " + h.Note)</div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-xl-8">
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+</div>

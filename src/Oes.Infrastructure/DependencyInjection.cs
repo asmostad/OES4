@@ -38,6 +38,13 @@ public static class DependencyInjection
         services.AddScoped<TenantProvisioner>();
         services.AddScoped<Admin.TenantAdminService>();
 
+        services.AddScoped<Crm.RecordScope>();
+        services.AddScoped<Crm.RecordItems>();
+        services.AddScoped<Crm.ContactService>();
+        services.AddScoped<Crm.PropertyService>();
+        services.AddScoped<Crm.OpportunityService>();
+        services.AddScoped<Crm.CrmLookups>();
+
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();
 

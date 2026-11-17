@@ -1,0 +1,54 @@
+@page
+@model Oes.Web.Pages.Properties.IndexModel
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Properties";
+}
+<div class="page-header">
+    <div>
+        <h1>Properties</h1>
+        <p class="page-subtitle">Every address you've worked or quoted. The property is the root of each record.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Properties/New"><i class="bi bi-house-add me-1"></i> Property</a>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <div class="input-group input-group-sm list-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@Model.Q" class="form-control" placeholder="Street, city, ZIP or contact name">
+        </div>
+        <select name="kind" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">All kinds</option>
+            @foreach (var k in PropertyKinds.All) { <option value="@k" selected="@(Model.Kind == k)">@Fmt.Cap(k)</option> }
+        </select>
+        <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+        @if (!string.IsNullOrEmpty(Model.Q) || Model.Kind is not null) { <a class="btn btn-sm btn-link" href="/Properties">Clear</a> }
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-clickable mb-0 align-middle">
+            <thead><tr><th>Address</th><th>City</th><th>Kind</th><th>Primary contact</th><th class="text-center">Open opps</th></tr></thead>
+            <tbody>
+                @if (Model.Result.Items.Count == 0)
+                {
+                    <tr><td colspan="5"><div class="empty-state"><i class="bi bi-house-door"></i><h5>No properties found</h5>
+                        <p>Try another search, or <a href="/Properties/New">add a property</a>.</p></div></td></tr>
+                }
+                @foreach (var p in Model.Result.Items)
+                {
+                    <tr data-href="/Properties/View/@p.Id">
+                        <td class="fw-medium"><i class="bi bi-house-door text-level-property me-1"></i><a href="/Properties/View/@p.Id">@p.Line1@(p.Line2 is null ? "" : " " + p.Line2)</a></td>
+                        <td>@p.CityLine</td>
+                        <td class="text-muted">@Fmt.Cap(p.Kind)</td>
+                        <td>@(p.PrimaryContact ?? "—")</td>
+                        <td class="text-center">@(p.OpenOpportunities > 0 ? p.OpenOpportunities.ToString() : "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Result.Page, Model.Result.Pages, Model.Result.Total)" />

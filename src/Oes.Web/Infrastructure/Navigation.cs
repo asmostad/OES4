@@ -1,4 +1,4 @@
-using Oes.Application.Security;
+﻿using Oes.Application.Security;
 
 namespace Oes.Web.Infrastructure;
 
@@ -34,9 +34,9 @@ public static class Navigation
         ]),
         new("CRM",
         [
-            new("Properties", "bi-house-door", null),
-            new("Contacts", "bi-people", null),
-            new("Opportunities", "bi-funnel", null),
+            new("Properties", "bi-house-door", "/Properties"),
+            new("Contacts", "bi-people", "/Contacts"),
+            new("Opportunities", "bi-funnel", "/Opportunities"),
             new("Estimates", "bi-file-earmark-text", null),
             new("Price Approvals", "bi-patch-check", null, Permissions.PricingApprove),
         ]),

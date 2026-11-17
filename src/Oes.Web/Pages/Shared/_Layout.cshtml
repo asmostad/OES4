@@ -84,13 +84,13 @@
             <button class="btn btn-link sidebar-toggle me-3" id="sidebarToggle" type="button" aria-label="Toggle menu">
                 <i class="bi bi-list fs-4"></i>
             </button>
-            <div class="topbar-search d-none d-md-block">
+            <div class="topbar-search d-none d-md-block position-relative">
                 <div class="input-group">
                     <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0" id="globalSearch"
-                           placeholder="Search properties, contacts, projects..." autocomplete="off" disabled
-                           title="Global search arrives with the CRM core (milestone 2)">
+                    <input type="search" class="form-control border-start-0" id="globalSearch"
+                           placeholder="Search properties, contacts, opportunities..." autocomplete="off" aria-label="Search">
                 </div>
+                <div class="dropdown-menu global-search-menu" id="globalSearchMenu"></div>
             </div>
         </div>
 
@@ -102,9 +102,9 @@
                         <i class="bi bi-plus-lg me-1"></i> New
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><span class="dropdown-item disabled"><i class="bi bi-funnel me-2"></i>Opportunity</span></li>
-                        <li><span class="dropdown-item disabled"><i class="bi bi-person-plus me-2"></i>Contact</span></li>
-                        <li><span class="dropdown-item disabled"><i class="bi bi-house-add me-2"></i>Property</span></li>
+                        <li><a class="dropdown-item" href="/Opportunities/New"><i class="bi bi-funnel me-2"></i>Lead / opportunity</a></li>
+                        <li><a class="dropdown-item" href="/Contacts/New"><i class="bi bi-person-plus me-2"></i>Contact</a></li><li><a class="dropdown-item" href="/Contacts/New?type=organization"><i class="bi bi-building-add me-2"></i>Organization</a></li>
+                        <li><a class="dropdown-item" href="/Properties/New"><i class="bi bi-house-add me-2"></i>Property</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><span class="dropdown-item disabled"><i class="bi bi-file-earmark-text me-2"></i>Estimate</span></li>
                         <li><span class="dropdown-item disabled"><i class="bi bi-kanban me-2"></i>Project</span></li>

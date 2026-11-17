@@ -4,40 +4,77 @@
 @{
     ViewData["Title"] = "Dashboard";
     var shell = await ShellService.GetAsync();
+    var c = Model.Counts;
 }
 <div class="page-header">
     <div>
         <h1>Dashboard</h1>
         <p class="page-subtitle">Welcome back, @(shell?.FullName). You're working in <strong>@(shell?.TenantName)</strong>.</p>
     </div>
+    <a class="btn btn-primary btn-sm" href="/Opportunities/New"><i class="bi bi-plus-lg me-1"></i> New lead</a>
 </div>
 
 <div class="row g-3">
-    @foreach (var (label, icon, color) in new[]
+    @foreach (var (label, value, icon, color, href) in new[]
     {
-        ("Open opportunities", "bi-funnel", "primary"),
-        ("Estimates out", "bi-file-earmark-text", "warning"),
-        ("Projects in production", "bi-kanban", "success"),
-        ("Tasks due today", "bi-check2-square", "info"),
+        ("Open opportunities", c.Open.ToString("N0"), "bi-funnel", "primary", "/Opportunities?view=list&outcome=open"),
+        ("Open pipeline value", Fmt.Money(c.OpenValue), "bi-currency-dollar", "success", "/Opportunities"),
+        ("Leads with no address", c.NeedAddress.ToString("N0"), "bi-house-exclamation", "warning", "/Opportunities?view=list&outcome=open"),
+        ("Stale in their stage", c.Stale.ToString("N0"), "bi-hourglass-split", "danger", "/Opportunities"),
     })
     {
         <div class="col-sm-6 col-xl-3">
-            <div class="card stat-card">
+            <a class="card stat-card text-decoration-none" href="@href">
                 <div class="d-flex align-items-center">
                     <div class="stat-icon bg-@color-subtle text-@color"><i class="bi @icon"></i></div>
                     <div class="ms-3">
-                        <div class="stat-value">&mdash;</div>
+                        <div class="stat-value">@value</div>
                         <div class="stat-label">@label</div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
     }
 </div>
 
-<div class="card mt-4">
-    <div class="card-body text-center py-5 text-muted">
-        <i class="bi bi-cone-striped fs-1 d-block mb-2"></i>
-        The foundation is in place. Properties, contacts and opportunities arrive in the CRM core milestone.
+<div class="row g-3 mt-1">
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-funnel text-level-opportunity me-2"></i>My open opportunities
+                <a class="btn btn-sm btn-link ms-auto" href="/Opportunities?mine=true">Board</a></div>
+            @if (Model.Recent.Count == 0)
+            {
+                <div class="card-body text-muted small">Nothing open assigned to you. <a href="/Opportunities/New">Add a lead</a>.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-clickable mb-0 align-middle">
+                        <tbody>
+                            @foreach (var o in Model.Recent)
+                            {
+                                <tr data-href="/Opportunities/View/@o.Id">
+                                    <td><a href="/Opportunities/View/@o.Id" class="fw-medium">@o.Name</a>
+                                        <div class="small text-muted">@o.ContactName · @(o.Address ?? "no address yet")</div></td>
+                                    <td class="text-nowrap"><span class="stage-pill" style="--stage-color:@o.StageColor">@o.StageName</span>
+                                        @if (o.IsStale) { <span class="badge bg-warning-subtle text-warning ms-1"><i class="bi bi-hourglass-split"></i></span> }</td>
+                                    <td class="text-end text-nowrap">@Fmt.Money(o.ExpectedValue)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2"><i class="bi bi-trophy text-success fs-4 me-2"></i><div class="stat-value fs-3">@c.WonThisMonth</div></div>
+                <div class="text-muted small">Won this month</div>
+                <hr>
+                <div class="small text-muted">Coming next: insurance claims and storms, measurements, then estimating and production.</div>
+            </div>
+        </div>
     </div>
 </div>

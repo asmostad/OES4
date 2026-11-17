@@ -101,6 +101,8 @@ public sealed class TenantProvisioner(OesDbContext db, TenantContext tenantConte
         membership.Roles.Add(new MembershipRole { TenantId = tenant.Id, RoleId = admin!.Id });
         db.Memberships.Add(membership);
 
+        await Crm.TenantDefaults.EnsureAsync(db, tenant.Id, ct);
+
         db.AuditEntries.Add(new Domain.Common.AuditEntry
         {
             TenantId = tenant.Id,

@@ -1,0 +1,183 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Contacts.ViewModel
+@using Oes.Domain.Crm
+@{
+    var c = Model.Detail.Contact;
+    var isOrg = c.IsOrganization;
+    ViewData["Title"] = c.DisplayName;
+    var chips = new List<RecordChip>();
+    chips.Add(new("bi-person-badge", Model.Detail.OwnerName ?? "Unassigned", null));
+    if (Model.SourceLabel is not null) chips.Add(new("bi-signpost", Model.SourceLabel, null));
+    foreach (var o in Model.Detail.Organizations) chips.Add(new("bi-building", o.OtherName + (o.Title is null ? "" : " · " + o.Title), $"/Contacts/View/{o.OtherContactId}"));
+    var header = new RecordHeaderModel
+    {
+        Level = isOrg ? RecordLevel.Organization : RecordLevel.Contact,
+        Title = c.DisplayName,
+        Subtitle = isOrg
+            ? $"{Model.Detail.People.Count} people · {Model.Detail.Properties.Count(p => p.IsCurrent)} properties"
+            : $"{Model.Detail.Properties.Count(p => p.IsCurrent)} propert{(Model.Detail.Properties.Count(p => p.IsCurrent) == 1 ? "y" : "ies")} · {Model.Detail.Opportunities.Count} opportunit{(Model.Detail.Opportunities.Count == 1 ? "y" : "ies")}",
+        Status = isOrg ? null : Fmt.Cap(c.Status),
+        Chips = chips,
+    };
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (Model.Detail.CanEdit) { <a class="btn btn-sm btn-outline-secondary" href="/Contacts/Edit/@c.Id"><i class="bi bi-pencil me-1"></i>Edit</a> }
+    <a class="btn btn-sm btn-primary" href="/Opportunities/New?contactId=@c.Id"><i class="bi bi-funnel me-1"></i>New opportunity</a>
+    @if (isOrg) { <a class="btn btn-sm btn-outline-primary" href="/Contacts/New?organizationId=@c.Id"><i class="bi bi-person-plus me-1"></i>New person here</a> }
+</div>
+
+@if (c.ArchivedAt is not null)
+{
+    <div class="alert alert-secondary"><i class="bi bi-archive me-2"></i>This contact was archived on @c.ArchivedAt.Value.ToString("MMM d, yyyy").</div>
+}
+@if (c.CautionNote is not null)
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i><strong>Caution:</strong> @c.CautionNote</div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header">Reach @(isOrg ? "them" : c.FirstName ?? "them")</div>
+            <ul class="list-group list-group-flush">
+                @if (Model.Detail.Methods.Count == 0) { <li class="list-group-item text-muted small">No phone or email yet.</li> }
+                @foreach (var m in Model.Detail.Methods)
+                {
+                    var icon = m.Kind switch { "email" => "bi-envelope", "mobile" => "bi-phone", "fax" => "bi-printer", "website" => "bi-globe", _ => "bi-telephone" };
+                    var href = m.Kind switch
+                    {
+                        "email" => "mailto:" + m.Value,
+                        "website" => "https://" + m.NormalizedValue,
+                        "fax" => null,
+                        _ => "tel:" + m.NormalizedValue,
+                    };
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <i class="bi @icon text-muted"></i>
+                        @if (href is null) { <span>@m.Value</span> } else { <a href="@href" rel="noopener noreferrer">@(ContactMethodKinds.IsPhone(m.Kind) ? ContactValue.FormatPhone(m.NormalizedValue, m.Value) : m.Value)</a> }
+                        <span class="small text-muted ms-auto">@(m.Label ?? Fmt.Cap(m.Kind))@(m.IsPrimary ? " · primary" : "")</span>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-house-door text-level-property me-2"></i>Properties</div>
+            <ul class="list-group list-group-flush">
+                @if (Model.Detail.Properties.Count == 0) { <li class="list-group-item text-muted small">Not linked to a property yet.</li> }
+                @foreach (var p in Model.Detail.Properties)
+                {
+                    <li class="list-group-item @(p.IsCurrent ? "" : "text-muted")">
+                        <div class="d-flex align-items-start gap-2">
+                            <div class="flex-grow-1">
+                                <a href="/Properties/View/@p.PropertyId" class="fw-medium">@p.Address</a>
+                                <div class="small text-muted">@Fmt.Cap(p.RoleKey)@(p.IsPrimary ? " · primary" : "")@(p.IsCurrent ? "" : " · past")</div>
+                            </div>
+                            @if (p.IsCurrent)
+                            {
+                                <form method="post" asp-page-handler="EndPropertyLink">
+                                    <input type="hidden" name="linkId" value="@p.LinkId">
+                                    <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="End link (e.g. sold)" data-confirm="End this link? It stays in the history."><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+            <div class="card-body border-top">
+                <form method="post" asp-page-handler="LinkProperty" class="d-flex flex-wrap gap-2">
+                    <div class="typeahead flex-grow-1" data-typeahead="/api/v1/lookup/properties">
+                        <input type="hidden" name="propertyId" data-typeahead-value required>
+                        <input class="form-control form-control-sm" placeholder="Link existing property…" autocomplete="off" data-typeahead-input aria-label="Property">
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <select name="roleKey" class="form-select form-select-sm w-auto" aria-label="Role">
+                        @foreach (var r in Model.Roles) { <option value="@r.Value">@r.Label</option> }
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Link</button>
+                </form>
+                <a class="small d-inline-block mt-2" href="/Properties/New?contactId=@c.Id"><i class="bi bi-plus-lg"></i> New property for @(isOrg ? "this organization" : c.FirstName ?? "this contact")</a>
+            </div>
+        </div>
+
+        @if (isOrg)
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-people text-level-contact me-2"></i>People</div>
+                <ul class="list-group list-group-flush">
+                    @if (Model.Detail.People.Count == 0) { <li class="list-group-item text-muted small">No people yet.</li> }
+                    @foreach (var p in Model.Detail.People)
+                    {
+                        <li class="list-group-item d-flex align-items-start gap-2">
+                            <div class="flex-grow-1">
+                                <a href="/Contacts/View/@p.OtherContactId" class="fw-medium">@p.OtherName</a>@if (p.IsPrimary) { <span class="badge bg-primary-subtle text-primary ms-1">Primary</span> }
+                                <div class="small text-muted">@p.Title @(p.Email is null ? "" : " · " + p.Email) @(p.Phone is null ? "" : " · " + p.Phone)</div>
+                            </div>
+                            <form method="post" asp-page-handler="EndRelationship">
+                                <input type="hidden" name="relationshipId" value="@p.Id">
+                                <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="Remove from organization" data-confirm="Remove this person from the organization?"><i class="bi bi-x-circle"></i></button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="AddPerson" class="d-flex flex-wrap gap-2">
+                        <div class="typeahead flex-grow-1" data-typeahead="/api/v1/lookup/people">
+                            <input type="hidden" name="personId" data-typeahead-value required>
+                            <input class="form-control form-control-sm" placeholder="Add existing person…" autocomplete="off" data-typeahead-input aria-label="Person">
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                        <input name="title" class="form-control form-control-sm w-auto" placeholder="Title" maxlength="100" aria-label="Title">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-building text-level-organization me-2"></i>Organizations</div>
+                <ul class="list-group list-group-flush">
+                    @if (Model.Detail.Organizations.Count == 0) { <li class="list-group-item text-muted small">Not part of an organization.</li> }
+                    @foreach (var o in Model.Detail.Organizations)
+                    {
+                        <li class="list-group-item d-flex align-items-start gap-2">
+                            <div class="flex-grow-1"><a href="/Contacts/View/@o.OtherContactId" class="fw-medium">@o.OtherName</a><div class="small text-muted">@o.Title</div></div>
+                            <form method="post" asp-page-handler="EndRelationship">
+                                <input type="hidden" name="relationshipId" value="@o.Id">
+                                <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="Remove" data-confirm="Remove this link?"><i class="bi bi-x-circle"></i></button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="AddToOrganization" class="d-flex flex-wrap gap-2">
+                        <div class="typeahead flex-grow-1" data-typeahead="/api/v1/lookup/organizations">
+                            <input type="hidden" name="organizationId" data-typeahead-value required>
+                            <input class="form-control form-control-sm" placeholder="Add to organization…" autocomplete="off" data-typeahead-input aria-label="Organization">
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                        <input name="title" class="form-control form-control-sm w-auto" placeholder="Title" maxlength="100" aria-label="Title">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (c.Notes is not null)
+        {
+            <div class="card mb-3"><div class="card-header">Background</div><div class="card-body small pre-wrap">@c.Notes</div></div>
+        }
+    </div>
+
+    <div class="col-xl-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-funnel text-level-opportunity me-2"></i>Opportunities
+                <a class="btn btn-sm btn-link ms-auto" href="/Opportunities/New?contactId=@c.Id"><i class="bi bi-plus-lg"></i> New</a></div>
+            <partial name="_OpportunityList" model="Model.Detail.Opportunities" />
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+</div>

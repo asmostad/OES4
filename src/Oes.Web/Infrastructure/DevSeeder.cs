@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Oes.Application.Abstractions;
+using Oes.Domain.Common;
+using Oes.Domain.Crm;
+using Oes.Infrastructure.Crm;
 using Oes.Infrastructure.Identity;
 using Oes.Infrastructure.Persistence;
 using Oes.Infrastructure.Tenancy;
@@ -18,8 +22,9 @@ public sealed class SeedOptions
 }
 
 /// <summary>
-/// Development only: applies migrations, then creates demo tenants and an admin user who
-/// belongs to all of them (to exercise the tenant picker). Does nothing once users exist.
+/// Development only: applies migrations, creates demo tenants and an admin who belongs to
+/// all of them (to exercise the tenant picker), makes sure every tenant has its default
+/// stages and pick lists, and adds sample CRM records to the first demo tenant.
 /// </summary>
 public static class DevSeeder
 {
@@ -33,31 +38,126 @@ public static class DevSeeder
         await db.Database.MigrateAsync(ct);
 
         var opts = sp.GetRequiredService<IConfiguration>().GetSection(SeedOptions.Section).Get<SeedOptions>() ?? new();
-        if (await db.Users.AnyAsync(ct)) return;
-        if (string.IsNullOrWhiteSpace(opts.AdminEmail) || string.IsNullOrWhiteSpace(opts.AdminPassword))
+        if (!await db.Users.AnyAsync(ct))
         {
-            log.LogWarning("No users exist and Seed:AdminEmail / Seed:AdminPassword are not set (use dotnet user-secrets). Skipping seed.");
-            return;
+            if (string.IsNullOrWhiteSpace(opts.AdminEmail) || string.IsNullOrWhiteSpace(opts.AdminPassword))
+            {
+                log.LogWarning("No users exist and Seed:AdminEmail / Seed:AdminPassword are not set (use dotnet user-secrets). Skipping seed.");
+                return;
+            }
+
+            var users = sp.GetRequiredService<UserManager<AppUser>>();
+            var admin = new AppUser
+            {
+                UserName = opts.AdminEmail, Email = opts.AdminEmail, EmailConfirmed = true,
+                FirstName = "Demo", LastName = "Admin",
+            };
+            var created = await users.CreateAsync(admin, opts.AdminPassword);
+            if (!created.Succeeded)
+                throw new InvalidOperationException("Seed admin not created: " + string.Join("; ", created.Errors.Select(e => e.Description)));
+
+            foreach (var name in opts.TenantNames)
+            {
+                // Each tenant needs its own scope: a scope's tenant context is set once.
+                using var tScope = root.CreateScope();
+                var provisioner = tScope.ServiceProvider.GetRequiredService<TenantProvisioner>();
+                var slug = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+                await provisioner.ProvisionAsync(new ProvisionTenantRequest(name, slug, "America/Chicago", admin), ct);
+                log.LogInformation("Seeded tenant {Tenant}", name);
+            }
         }
 
-        var users = sp.GetRequiredService<UserManager<AppUser>>();
-        var admin = new AppUser
+        // Defaults added in later milestones reach tenants created before them.
+        var tenantIds = await db.Tenants.OrderBy(t => t.CreatedAt).Select(t => t.Id).ToListAsync(ct);
+        foreach (var tenantId in tenantIds)
         {
-            UserName = opts.AdminEmail, Email = opts.AdminEmail, EmailConfirmed = true,
-            FirstName = "Demo", LastName = "Admin",
-        };
-        var created = await users.CreateAsync(admin, opts.AdminPassword);
-        if (!created.Succeeded)
-            throw new InvalidOperationException("Seed admin not created: " + string.Join("; ", created.Errors.Select(e => e.Description)));
-
-        foreach (var name in opts.TenantNames)
-        {
-            // Each tenant needs its own scope: a scope's tenant context is set once.
             using var tScope = root.CreateScope();
-            var provisioner = tScope.ServiceProvider.GetRequiredService<TenantProvisioner>();
-            var slug = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-            await provisioner.ProvisionAsync(new ProvisionTenantRequest(name, slug, "America/Chicago", admin), ct);
-            log.LogInformation("Seeded tenant {Tenant}", name);
+            tScope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(tenantId);
+            var tdb = tScope.ServiceProvider.GetRequiredService<OesDbContext>();
+            await TenantDefaults.EnsureAsync(tdb, tenantId, ct);
+            await tdb.SaveChangesAsync(ct);
         }
+
+        if (tenantIds.Count > 0) await SampleDataAsync(root, tenantIds[0], log, ct);
+    }
+
+    /// <summary>A handful of contacts, properties and opportunities so the CRM screens have something to show.</summary>
+    private static async Task SampleDataAsync(IServiceProvider root, Guid tenantId, ILogger log, CancellationToken ct)
+    {
+        using var scope = root.CreateScope();
+        var sp = scope.ServiceProvider;
+        sp.GetRequiredService<TenantContext>().SetTenant(tenantId);
+        var db = sp.GetRequiredService<OesDbContext>();
+        if (await db.Contacts.AnyAsync(ct)) return;
+
+        var ownerId = await db.Memberships.OrderBy(m => m.CreatedAt).Select(m => m.UserId).FirstAsync(ct);
+        var stages = await db.PipelineStages.OrderBy(s => s.Sort).ToListAsync(ct);
+        var numbers = sp.GetRequiredService<INumberSequence>();
+
+        Contact Person(string first, string last, string email, string phone, string status = ContactStatuses.Lead)
+        {
+            var c = new Contact { FirstName = first, LastName = last, OwnerUserId = ownerId, Status = status, SourceKey = "door_knock" };
+            c.RefreshDisplayName();
+            c.Methods.Add(new ContactMethod { ContactId = c.Id, Kind = ContactMethodKinds.Email, Value = email, NormalizedValue = email, IsPrimary = true });
+            c.Methods.Add(new ContactMethod { ContactId = c.Id, Kind = ContactMethodKinds.Mobile, Value = phone, NormalizedValue = ContactValue.Phone(phone), IsPrimary = true });
+            db.Contacts.Add(c);
+            return c;
+        }
+
+        Property House(string line1, string city, string zip, string kind = PropertyKinds.Residential)
+        {
+            var p = new Property { Line1 = line1, City = city, State = "NE", PostalCode = zip, Kind = kind, CreatedByUserId = ownerId };
+            p.NormalizedKey = AddressKey.For(p.Line1, p.Line2, p.City, p.State, p.PostalCode);
+            p.Structures.Add(new PropertyStructure { PropertyId = p.Id, Name = "Main House", Kind = "house", Sort = 10 });
+            db.Properties.Add(p);
+            return p;
+        }
+
+        void Link(Property p, Contact c, string role = "owner", bool primary = true) =>
+            db.PropertyContacts.Add(new PropertyContact { PropertyId = p.Id, ContactId = c.Id, RoleKey = role, IsPrimary = primary, StartedOn = new DateOnly(2024, 4, 1) });
+
+        async Task Opp(Contact c, Property? p, string name, int stageIndex, bool insurance, decimal? value)
+        {
+            var stage = stages[stageIndex];
+            var o = new Opportunity
+            {
+                Number = await numbers.NextAsync(NumberedKinds.Opportunity, ct), Name = name, PrimaryContactId = c.Id, PropertyId = p?.Id,
+                OwnerUserId = ownerId, StageId = stage.Id, Outcome = stage.Outcome, StageChangedAt = DateTime.UtcNow.AddDays(-stageIndex),
+                IsInsurance = insurance, PerilKey = insurance ? "hail" : null, DateOfLoss = insurance ? new DateOnly(2026, 5, 14) : null,
+                ExpectedValue = value, SourceKey = "storm_canvass",
+            };
+            if (stage.Outcome == Outcomes.Won) { o.WonAt = DateTime.UtcNow; o.ClosedAt = DateTime.UtcNow; }
+            db.Opportunities.Add(o);
+            db.OpportunityStageChanges.Add(new OpportunityStageChange { OpportunityId = o.Id, ToStageId = stage.Id, ByUserId = ownerId });
+        }
+
+        var jane = Person("Jane", "Smith", "jane.smith@example.com", "(402) 555-0134");
+        var mark = Person("Mark", "Smith", "mark.smith@example.com", "(402) 555-0135");
+        var luis = Person("Luis", "Ortega", "luis.ortega@example.com", "(402) 555-0190", ContactStatuses.Customer);
+        var amy = Person("Amy", "Chen", "amy.chen@example.com", "(531) 555-0101");
+        var dana = Person("Dana", "Whitfield", "dana@acmepm.example.com", "(402) 555-0177");
+        var acme = new Contact { Type = ContactTypes.Organization, OrganizationName = "Acme Property Management", OwnerUserId = ownerId };
+        acme.RefreshDisplayName();
+        db.Contacts.Add(acme);
+        db.ContactRelationships.Add(new ContactRelationship { PersonContactId = dana.Id, OrganizationContactId = acme.Id, Title = "Portfolio Manager", IsPrimary = true });
+
+        var main = House("123 Main St", "Lincoln", "68502");
+        var oak = House("4410 Oak Ridge Dr", "Lincoln", "68516");
+        var pine = House("88 Pine Ct", "Omaha", "68104");
+        var plaza = House("2200 Commerce Plaza", "Lincoln", "68508", PropertyKinds.Commercial);
+
+        Link(main, jane); Link(main, mark, "co_owner", false);
+        Link(oak, luis);
+        Link(pine, mark, "owner");
+        Link(plaza, acme, "owner"); Link(plaza, dana, "property_manager", false);
+
+        await Opp(jane, main, "Smith hail claim – roof & gutters", 4, true, 18500m);
+        await Opp(luis, oak, "Ortega roof replacement", 6, false, 14200m);
+        await Opp(amy, null, "Amy Chen – storm inspection request", 0, true, null);
+        await Opp(acme, plaza, "Commerce Plaza flat roof", 2, false, 96000m);
+        await Opp(mark, pine, "Pine Ct rental – siding", 1, true, 9800m);
+
+        await db.SaveChangesAsync(ct);
+        log.LogInformation("Seeded sample CRM data");
     }
 }

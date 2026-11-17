@@ -1,0 +1,71 @@
+@page
+@model Oes.Web.Pages.Contacts.IndexModel
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Contacts";
+}
+<div class="page-header">
+    <div>
+        <h1>Contacts</h1>
+        <p class="page-subtitle">People and organizations. Properties, opportunities and jobs hang off them.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/Contacts/New?type=organization"><i class="bi bi-building-add me-1"></i> Organization</a>
+        <a class="btn btn-primary btn-sm" href="/Contacts/New"><i class="bi bi-person-plus me-1"></i> Contact</a>
+    </div>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <div class="input-group input-group-sm list-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@Model.Q" class="form-control" placeholder="Name, email or phone">
+        </div>
+        <select name="type" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">People &amp; organizations</option>
+            <option value="@ContactTypes.Person" selected="@(Model.Type == ContactTypes.Person)">People</option>
+            <option value="@ContactTypes.Organization" selected="@(Model.Type == ContactTypes.Organization)">Organizations</option>
+        </select>
+        <select name="status" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">Any status</option>
+            <option value="@ContactStatuses.Lead" selected="@(Model.Status == ContactStatuses.Lead)">Lead</option>
+            <option value="@ContactStatuses.Customer" selected="@(Model.Status == ContactStatuses.Customer)">Customer</option>
+            <option value="@ContactStatuses.PastCustomer" selected="@(Model.Status == ContactStatuses.PastCustomer)">Past customer</option>
+        </select>
+        <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+        @if (!string.IsNullOrEmpty(Model.Q) || Model.Type is not null || Model.Status is not null)
+        {
+            <a class="btn btn-sm btn-link" href="/Contacts">Clear</a>
+        }
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-clickable mb-0 align-middle">
+            <thead><tr><th>Name</th><th>Status</th><th>Email</th><th>Phone</th><th>Owner</th><th class="text-center">Open opps</th></tr></thead>
+            <tbody>
+                @if (Model.Result.Items.Count == 0)
+                {
+                    <tr><td colspan="6"><div class="empty-state"><i class="bi bi-people"></i><h5>No contacts found</h5>
+                        <p>Try another search, or <a href="/Contacts/New">add a contact</a>.</p></div></td></tr>
+                }
+                @foreach (var c in Model.Result.Items)
+                {
+                    <tr data-href="/Contacts/View/@c.Id">
+                        <td class="fw-medium">
+                            <i class="bi @(c.Type == ContactTypes.Organization ? "bi-building text-level-organization" : "bi-person text-level-contact") me-1"></i>
+                            <a href="/Contacts/View/@c.Id">@c.DisplayName</a>
+                        </td>
+                        <td>@if (c.Type == ContactTypes.Person) { <span class="badge @Fmt.StatusBadge(c.Status)">@Fmt.Cap(c.Status)</span> } else { <span class="text-muted small">Organization</span> }</td>
+                        <td>@c.Email</td>
+                        <td class="text-nowrap">@c.Phone</td>
+                        <td class="text-muted">@(c.OwnerName ?? "Unassigned")</td>
+                        <td class="text-center">@(c.OpenOpportunities > 0 ? c.OpenOpportunities.ToString() : "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+<partial name="_Pager" model="(Model.Result.Page, Model.Result.Pages, Model.Result.Total)" />

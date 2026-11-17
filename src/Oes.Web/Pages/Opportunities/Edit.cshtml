@@ -1,0 +1,29 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Opportunities.EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.Title}";
+}
+<div class="page-header">
+    <div>
+        <h1>Edit @Model.Title</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Opportunities">Opportunities</a></li>
+            <li class="breadcrumb-item"><a href="/Opportunities/View/@Model.Id">@Model.Number</a></li>
+            <li class="breadcrumb-item active">Edit</li>
+        </ol></nav>
+    </div>
+</div>
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <div class="row"><div class="col-xl-8">
+        <div class="card mb-3 record-header level-opportunity"><div class="card-body">
+            <partial name="_DetailFields" model="(Model.Input, Model.Users, Model.Sources, Model.Perils, (List<Oes.Domain.Crm.PipelineStage>?)null)" />
+        </div></div>
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <a class="btn btn-outline-secondary" href="/Opportunities/View/@Model.Id">Cancel</a>
+        <button type="submit" asp-page-handler="Archive" class="btn btn-outline-danger ms-auto" formnovalidate
+                data-confirm="Archive this opportunity?"><i class="bi bi-archive me-1"></i>Archive</button>
+    </div>
+</form>

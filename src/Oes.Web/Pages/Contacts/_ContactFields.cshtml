@@ -1,0 +1,103 @@
+@model (Oes.Web.Pages.Contacts.ContactForm Form, List<Oes.Infrastructure.Crm.Option> Users, List<Oes.Infrastructure.Crm.Option> Sources, bool IsNew)
+@using Oes.Domain.Crm
+@{
+    var f = Model.Form;
+}
+<input type="hidden" name="Form.Type" value="@f.Type">
+<div class="card mb-3">
+    <div class="card-header">@(f.IsOrganization ? "Organization" : "Person")</div>
+    <div class="card-body">
+        <div class="row g-3">
+            @if (f.IsOrganization)
+            {
+                <div class="col-md-8">
+                    <label class="form-label" for="orgname">Organization name</label>
+                    <input id="orgname" name="Form.OrganizationName" value="@f.OrganizationName" class="form-control" maxlength="200" required autofocus>
+                </div>
+            }
+            else
+            {
+                <div class="col-md-4">
+                    <label class="form-label" for="first">First name</label>
+                    <input id="first" name="Form.FirstName" value="@f.FirstName" class="form-control" maxlength="100" autofocus>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="last">Last name</label>
+                    <input id="last" name="Form.LastName" value="@f.LastName" class="form-control" maxlength="100">
+                </div>
+                @if (Model.IsNew)
+                {
+                    <div class="col-md-8">
+                        <label class="form-label" for="org-search">Works for (optional)</label>
+                        <div class="typeahead" data-typeahead="/api/v1/lookup/organizations">
+                            <input type="hidden" name="Form.OrganizationId" value="@f.OrganizationId" data-typeahead-value>
+                            <input id="org-search" name="Form.OrganizationLabel" value="@f.OrganizationLabel" class="form-control" autocomplete="off"
+                                   placeholder="Search organizations…" data-typeahead-input>
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="title">Title at organization</label>
+                        <input id="title" name="Form.Title" value="@f.Title" class="form-control" maxlength="100">
+                    </div>
+                }
+            }
+            <div class="col-md-4">
+                <label class="form-label" for="owner">Owner</label>
+                <select id="owner" name="Form.OwnerUserId" class="form-select">
+                    <option value="">Unassigned</option>
+                    @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(f.OwnerUserId?.ToString() == u.Value)">@u.Label</option> }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="source">Lead source</label>
+                <select id="source" name="Form.SourceKey" class="form-select">
+                    <option value="">—</option>
+                    @foreach (var s in Model.Sources) { <option value="@s.Value" selected="@(f.SourceKey == s.Value)">@s.Label</option> }
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Phone, email &amp; web</div>
+    <div class="card-body">
+        @for (var i = 0; i < f.Methods.Count; i++)
+        {
+            var m = f.Methods[i];
+            <div class="row g-2 align-items-center mb-2">
+                <div class="col-sm-3">
+                    <select name="Form.Methods[@i].Kind" class="form-select form-select-sm" aria-label="Kind">
+                        @foreach (var k in ContactMethodKinds.All) { <option value="@k" selected="@(m.Kind == k)">@Fmt.Cap(k)</option> }
+                    </select>
+                </div>
+                <div class="col-sm-5"><input name="Form.Methods[@i].Value" value="@m.Value" class="form-control form-control-sm" maxlength="254" aria-label="Value"></div>
+                <div class="col-sm-2"><input name="Form.Methods[@i].Label" value="@m.Label" class="form-control form-control-sm" maxlength="50" placeholder="Label" aria-label="Label"></div>
+                <div class="col-sm-2">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" name="Form.Methods[@i].IsPrimary" value="true" id="mp-@i" checked="@m.IsPrimary">
+                        <label class="form-check-label small" for="mp-@i">Primary</label>
+                    </div>
+                </div>
+            </div>
+        }
+        <div class="form-text">Leave a row blank to skip it. The first of each kind is primary unless you tick another.</div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Notes</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-12">
+                <label class="form-label" for="caution"><i class="bi bi-exclamation-triangle text-warning me-1"></i>Caution note (shown as a banner on the record)</label>
+                <input id="caution" name="Form.CautionNote" value="@f.CautionNote" class="form-control" maxlength="500">
+            </div>
+            <div class="col-md-12">
+                <label class="form-label" for="notes">Background</label>
+                <textarea id="notes" name="Form.Notes" class="form-control" rows="3" maxlength="5000">@f.Notes</textarea>
+            </div>
+        </div>
+    </div>
+</div>

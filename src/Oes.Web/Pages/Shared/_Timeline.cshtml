@@ -1,0 +1,120 @@
+@* Notes, documents and activity for any record. "Everything under it" uses record_links. *@
+@model TimelineModel
+@using Oes.Domain.Crm
+@using Oes.Infrastructure.Crm
+@{
+    var self = Context.Request.Path + Context.Request.QueryString;
+    string Url(string? filter, TimelineScope? scope) =>
+        $"{Context.Request.Path}?tab={filter ?? "all"}&range={(scope ?? Model.Range) switch { TimelineScope.Everything => "all", _ => "this" }}#timeline";
+}
+<div class="card" id="timeline">
+    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+        <ul class="nav nav-pills nav-sm timeline-tabs me-auto">
+            @foreach (var (key, label, icon) in new[] { ("all", "All", "bi-list-ul"), ("note", "Notes", "bi-sticky"), ("document", "Documents", "bi-paperclip"), ("activity", "Activity", "bi-clock-history") })
+            {
+                <li class="nav-item">
+                    <a class="nav-link @((Model.Filter ?? "all") == key ? "active" : "")" href="@Url(key, null)"><i class="bi @icon me-1"></i>@label</a>
+                </li>
+            }
+        </ul>
+        @if (Model.ShowRange)
+        {
+            <div class="btn-group btn-group-sm" role="group" aria-label="Range">
+                <a class="btn @(Model.Range == TimelineScope.ThisRecord ? "btn-secondary" : "btn-outline-secondary")" href="@Url(Model.Filter, TimelineScope.ThisRecord)">This record</a>
+                <a class="btn @(Model.Range == TimelineScope.Everything ? "btn-secondary" : "btn-outline-secondary")" href="@Url(Model.Filter, TimelineScope.Everything)">Everything under it</a>
+            </div>
+        }
+    </div>
+    <div class="card-body">
+        <div class="row g-2 mb-3">
+            <div class="col-lg-7">
+                <form method="post" asp-antiforgery="true" action="/Records/Items?handler=Note" class="timeline-compose">
+                    <input type="hidden" name="entityType" value="@Model.EntityType">
+                    <input type="hidden" name="entityId" value="@Model.EntityId">
+                    <input type="hidden" name="returnUrl" value="@self">
+                    <textarea name="body" class="form-control form-control-sm" rows="2" placeholder="Add a note…" required maxlength="20000"></textarea>
+                    <button class="btn btn-primary btn-sm mt-2" type="submit"><i class="bi bi-plus-lg me-1"></i>Add note</button>
+                </form>
+            </div>
+            <div class="col-lg-5">
+                <form method="post" asp-antiforgery="true" action="/Records/Items?handler=Upload" enctype="multipart/form-data" class="timeline-upload">
+                    <input type="hidden" name="entityType" value="@Model.EntityType">
+                    <input type="hidden" name="entityId" value="@Model.EntityId">
+                    <input type="hidden" name="returnUrl" value="@self">
+                    <input type="file" name="file" class="form-control form-control-sm" required>
+                    <div class="d-flex gap-2 mt-2">
+                        <select name="categoryKey" class="form-select form-select-sm">
+                            <option value="">Category…</option>
+                            @foreach (var c in Model.Categories) { <option value="@c.Value">@c.Label</option> }
+                        </select>
+                        <button class="btn btn-outline-primary btn-sm text-nowrap" type="submit"><i class="bi bi-upload me-1"></i>Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        @if (Model.Items.Count == 0)
+        {
+            <div class="empty-state py-4"><i class="bi bi-inbox"></i><h5>Nothing here yet</h5><p>Notes, files and activity will show up here.</p></div>
+        }
+        <ul class="timeline-list">
+            @foreach (var i in Model.Items)
+            {
+                var elsewhere = i.EntityType != Model.EntityType || i.EntityId != Model.EntityId;
+                <li class="timeline-item timeline-@i.ItemType @(i.IsPinned ? "pinned" : "")">
+                    <div class="timeline-icon">
+                        <i class="bi @(i.ItemType switch { ItemTypes.Note => "bi-sticky", ItemTypes.Document => "bi-paperclip", _ => "bi-lightning" })"></i>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-meta">
+                            <strong>@(i.AuthorName ?? "System")</strong>
+                            <span title="@i.At.ToString("u")">@Fmt.Ago(i.At)</span>
+                            @if (elsewhere)
+                            {
+                                <span class="timeline-origin"><i class="bi bi-arrow-return-right"></i> on @RecordScope.Describe(i.EntityType).ToLowerInvariant()</span>
+                            }
+                            @if (i.IsPinned) { <span class="badge bg-warning-subtle text-warning"><i class="bi bi-pin-angle-fill"></i> Pinned</span> }
+                        </div>
+                        @if (i.ItemType == ItemTypes.Document)
+                        {
+                            <div>
+                                <a href="/Records/Items?handler=Download&id=@i.Id"><i class="bi bi-file-earmark me-1"></i>@i.FileName</a>
+                                <span class="text-muted small ms-1">@Fmt.Size(i.SizeBytes)@(i.CategoryKey is null ? "" : " · " + Fmt.Cap(i.CategoryKey))</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="timeline-text">@i.Text</div>
+                        }
+                        @if (i.ItemType != ItemTypes.Activity)
+                        {
+                            <div class="timeline-actions">
+                                @if (i.ItemType == ItemTypes.Note)
+                                {
+                                    <form method="post" asp-antiforgery="true" action="/Records/Items?handler=Pin" class="d-inline">
+                                        <input type="hidden" name="id" value="@i.Id"><input type="hidden" name="returnUrl" value="@self">
+                                        <button class="btn btn-link btn-sm p-0" type="submit">@(i.IsPinned ? "Unpin" : "Pin")</button>
+                                    </form>
+                                    @if (i.CanEdit)
+                                    {
+                                        <form method="post" asp-antiforgery="true" action="/Records/Items?handler=DeleteNote" class="d-inline ms-2">
+                                            <input type="hidden" name="id" value="@i.Id"><input type="hidden" name="returnUrl" value="@self">
+                                            <button class="btn btn-link btn-sm p-0 text-danger" type="submit" data-confirm="Delete this note?">Delete</button>
+                                        </form>
+                                    }
+                                }
+                                else
+                                {
+                                    <form method="post" asp-antiforgery="true" action="/Records/Items?handler=ArchiveDocument" class="d-inline">
+                                        <input type="hidden" name="id" value="@i.Id"><input type="hidden" name="returnUrl" value="@self">
+                                        <button class="btn btn-link btn-sm p-0 text-danger" type="submit" data-confirm="Remove this file?">Remove</button>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+</div>

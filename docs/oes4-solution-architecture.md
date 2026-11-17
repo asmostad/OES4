@@ -132,15 +132,23 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
 
 ## 9. Build order (proposed milestones)
 
-1. **Foundation**
+1. **Foundation** (done 2026-11-16)
    - Solution skeleton; CI.
    - Tenancy + Identity + roles/permissions + tenant isolation tests.
    - App shell with the OES3 look; audit log; file store; SES system mail.
-2. **CRM core**
-   - Contacts (person/org), properties + structures, property ↔ contact links.
-   - Opportunities + pipeline, dispositions and prospecting tools.
-   - Notes, documents and activity with `record_links`.
-   - Global search, saved views, level headers + breadcrumbs.
+2. **CRM core** (most of it done 2026-11-16)
+   - Done:
+     - Contacts (person/org) and properties with structures, property ↔ contact links with roles and history.
+     - Duplicate-address detection by normalized key.
+     - Opportunities with numbering, a pipeline board (drag and drop), stage history, won/lost with a reason, and attaching a property later.
+     - Notes, documents and activity with `record_links` rollups ("This record / Everything under it").
+     - Record-level visibility (own + unassigned pool unless `records.view_all`).
+     - Global search and typeahead pickers, level headers and breadcrumbs, a dashboard with pipeline numbers.
+   - Still to do:
+     - Dispositions and the prospecting back/next list with locks.
+     - Saved views, campaigns, the property/contact merge tool.
+     - Contact mailing addresses and consents (needed before SMS and blasts).
+     - Admin screens for pipeline stages and pick lists (defaults are seeded).
 3. **Insurance** — carriers (platform + tenant), claims, supplements.
 4. **Measurements** — measurement page, sets/versions, field definitions, AI report extraction.
 5. **Estimating**

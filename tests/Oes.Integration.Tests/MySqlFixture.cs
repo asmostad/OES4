@@ -55,6 +55,17 @@ public sealed class MySqlFixture : IAsyncLifetime
         return scope;
     }
 
+    /// <summary>A scope acting as a signed-in user in a tenant, so services see their permissions.</summary>
+    public AsyncServiceScope ScopeAs(Guid tenantId, AppUser user)
+    {
+        var scope = ScopeFor(tenantId);
+        var identity = new System.Security.Claims.ClaimsIdentity(
+            [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, user.Id.ToString())], "test");
+        scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>().HttpContext =
+            new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(identity), RequestServices = scope.ServiceProvider };
+        return scope;
+    }
+
     public const string Password = "Integration-Test-Pass-1";
 
     /// <summary>Creates a user and a tenant they administer.</summary>

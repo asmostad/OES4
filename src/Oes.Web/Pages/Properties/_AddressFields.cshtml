@@ -1,0 +1,37 @@
+@model Oes.Infrastructure.Crm.PropertyInput
+@using Oes.Domain.Crm
+<div class="row g-3" data-address-check="/api/v1/lookup/property-matches">
+    <div class="col-md-8">
+        <label class="form-label" for="line1">Street address</label>
+        <input id="line1" name="Input.Line1" value="@Model.Line1" class="form-control" maxlength="200" required autocomplete="off" data-address-part autofocus>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="line2">Unit / suite</label>
+        <input id="line2" name="Input.Line2" value="@Model.Line2" class="form-control" maxlength="100" data-address-part>
+    </div>
+    <div class="col-md-5">
+        <label class="form-label" for="city">City</label>
+        <input id="city" name="Input.City" value="@Model.City" class="form-control" maxlength="100" required data-address-part>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="state">State</label>
+        <input id="state" name="Input.State" value="@Model.State" class="form-control" maxlength="2" required data-address-part>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="zip">ZIP</label>
+        <input id="zip" name="Input.PostalCode" value="@Model.PostalCode" class="form-control" maxlength="10" required data-address-part>
+    </div>
+    <div class="col-12">
+        <div class="address-matches alert alert-warning d-none" role="status"></div>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="kind">Kind</label>
+        <select id="kind" name="Input.Kind" class="form-select">
+            @foreach (var k in PropertyKinds.All) { <option value="@k" selected="@(Model.Kind == k)">@Fmt.Cap(k)</option> }
+        </select>
+    </div>
+    <div class="col-md-8">
+        <label class="form-label" for="pnotes">Notes (gate code, dog, access…)</label>
+        <input id="pnotes" name="Input.Notes" value="@Model.Notes" class="form-control" maxlength="2000">
+    </div>
+</div>
