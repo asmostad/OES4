@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, planning]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore OES4.slnx
+
+      - name: Build
+        run: dotnet build OES4.slnx --no-restore -c Release -warnaserror
+
+      # Includes the tenant-isolation suite, which runs against real MySQL in Docker (Testcontainers).
+      - name: Test
+        run: dotnet test OES4.slnx --no-build -c Release --logger "trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+      - name: Check migrations are up to date
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/Oes.Infrastructure --no-build -c Release

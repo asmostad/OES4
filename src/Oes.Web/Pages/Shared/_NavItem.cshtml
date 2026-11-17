@@ -1,0 +1,13 @@
+@model NavItem
+@if (Model.Href is null)
+{
+    <li class="menu-item menu-item-soon">
+        <span title="Coming in a later milestone"><i class="bi @Model.Icon"></i><span>@Model.Label</span><span class="soon-badge">Soon</span></span>
+    </li>
+}
+else
+{
+    <li class="menu-item @(Model.IsActive(Context.Request.Path) ? "active" : "")">
+        <a href="@Model.Href"><i class="bi @Model.Icon"></i><span>@Model.Label</span></a>
+    </li>
+}

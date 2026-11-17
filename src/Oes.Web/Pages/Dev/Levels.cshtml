@@ -1,0 +1,36 @@
+@page
+@model Oes.Web.Pages.Dev.LevelsModel
+@{
+    ViewData["Title"] = "Record levels preview";
+    var property = new Crumb(RecordLevel.Property, "123 Main St, Lincoln NE", "#property");
+    var project = new Crumb(RecordLevel.Project, "Smith Roof 2026", "#project");
+    var contactChip = new RecordChip("bi-person", "Jane Smith", "#contact");
+    var headers = new[]
+    {
+        new RecordHeaderModel { Level = RecordLevel.Property, Title = "123 Main St", Subtitle = "Lincoln, NE 68502 · 2 structures",
+            Chips = [contactChip, new("bi-cloud-lightning-rain", "May 14 2026 hail", null)] },
+        new RecordHeaderModel { Level = RecordLevel.Contact, Title = "Jane Smith", Subtitle = "Homeowner · 2 properties", Status = "Customer" },
+        new RecordHeaderModel { Level = RecordLevel.Organization, Title = "Acme Property Management", Subtitle = "Commercial · 14 properties · 3 people" },
+        new RecordHeaderModel { Level = RecordLevel.Opportunity, Title = "Hail claim – roof and gutters", Number = "OPP-2026-0042", Status = "Inspection set",
+            Parents = [property], Chips = [contactChip] },
+        new RecordHeaderModel { Level = RecordLevel.Estimate, Title = "Roof replacement", Number = "EST-2026-0107", Status = "Sent",
+            Parents = [property], Chips = [contactChip, new("bi-tags", "Price list: NE Oct 2026", null)] },
+        new RecordHeaderModel { Level = RecordLevel.Project, Title = "Smith Roof 2026", Number = "P-2026-0311", Status = "In production",
+            Parents = [property], Chips = [contactChip, new("bi-shield-check", "Claim 04-88213", null)] },
+        new RecordHeaderModel { Level = RecordLevel.Trade, Title = "Roofing", Subtitle = "Work date Jun 3 · Sub: Top Crew LLC", Status = "Material ordered",
+            Parents = [property, project], Chips = [contactChip] },
+    };
+}
+<div class="page-header">
+    <div>
+        <h1>Record levels</h1>
+        <p class="page-subtitle">Development preview of the header each record level gets. Each level has its own accent, icon and band.</p>
+    </div>
+</div>
+
+@foreach (var h in headers)
+{
+    <div class="mb-4">
+        <partial name="_RecordHeader" model="h" />
+    </div>
+}

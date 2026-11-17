@@ -23,9 +23,11 @@
 | Validation | FluentValidation | Same rules for pages and API |
 | Tests | xUnit, Testcontainers (MySQL in Docker) for integration tests, Playwright for UI smoke tests | Docker is already on this machine |
 
-> **To verify at setup:**
-> - **.NET SDK:** not installed on this machine yet.
-> - **MySQL provider:** check that the provider (Pomelo vs Oracle `MySql.EntityFrameworkCore`) supports EF Core 10 and MySQL 9.x. Pick whichever is current and stable at setup time.
+> **Settled at setup (2026-11-16):**
+> - **.NET SDK 10.0.404** is installed and pinned in `global.json`. .NET 11 shipped in November 2026, but it is a short-term-support (STS) release, so we stay on the 10 LTS. All Microsoft packages are pinned to 10.0.x.
+> - **MySQL provider:** Oracle `MySql.EntityFrameworkCore` 10.0.x. The official Pomelo release does not support EF Core 10 yet (only a fork does). The provider is configured in one place (`DependencyInjection.cs`), so we can switch back to Pomelo if it catches up.
+> - GUIDs are stored as `BINARY(16)` in big-endian byte order through our own converter, so v7 IDs stay in time order regardless of provider.
+> - **OpenIddict** (mobile tokens) is deferred to milestone 13. Until then the API uses the same auth cookie and anti-forgery header as the web pages.
 
 ## 2. Solution layout
 
@@ -47,10 +49,9 @@ OES4/
 │  └─ Oes.Worker/            Windows Service host for Hangfire jobs (sync, nurture, blasts,
 │                            notifications, reminders, cleanup)
 ├─ tests/
-│  ├─ Oes.Domain.Tests/
-│  ├─ Oes.Application.Tests/
-│  ├─ Oes.Integration.Tests/  Real MySQL via Testcontainers; tenant-isolation test suite
-│  └─ Oes.Web.Tests/          Endpoint + authorization tests, Playwright smoke tests
+│  ├─ Oes.UnitTests/          Fast tests with no database (domain, permissions, file store, rules)
+│  └─ Oes.Integration.Tests/  Real MySQL via Testcontainers: tenant-isolation suite, end-to-end
+│                             auth/permission/API tests (Playwright UI smoke tests later)
 ├─ tools/
 │  └─ Oes.Migrator/           OES3 → OES4 data migration (JRS = tenant #1), re-runnable
 ├─ docs/

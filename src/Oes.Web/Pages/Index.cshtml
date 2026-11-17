@@ -1,0 +1,43 @@
+﻿@page
+@model Oes.Web.Pages.IndexModel
+@inject Shell ShellService
+@{
+    ViewData["Title"] = "Dashboard";
+    var shell = await ShellService.GetAsync();
+}
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="page-subtitle">Welcome back, @(shell?.FullName). You're working in <strong>@(shell?.TenantName)</strong>.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    @foreach (var (label, icon, color) in new[]
+    {
+        ("Open opportunities", "bi-funnel", "primary"),
+        ("Estimates out", "bi-file-earmark-text", "warning"),
+        ("Projects in production", "bi-kanban", "success"),
+        ("Tasks due today", "bi-check2-square", "info"),
+    })
+    {
+        <div class="col-sm-6 col-xl-3">
+            <div class="card stat-card">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-@color-subtle text-@color"><i class="bi @icon"></i></div>
+                    <div class="ms-3">
+                        <div class="stat-value">&mdash;</div>
+                        <div class="stat-label">@label</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="card mt-4">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-cone-striped fs-1 d-block mb-2"></i>
+        The foundation is in place. Properties, contacts and opportunities arrive in the CRM core milestone.
+    </div>
+</div>

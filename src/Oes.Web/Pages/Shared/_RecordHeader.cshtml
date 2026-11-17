@@ -1,0 +1,54 @@
+@* Shared header for every record page. The level sets the accent, icon and band (oes4.css .level-*). *@
+@model RecordHeaderModel
+<div class="record-header @Model.Level.Css()">
+    <nav class="record-breadcrumb" aria-label="Record location">
+        @if (Model.Up is { } up && up.Href is not null)
+        {
+            <a class="record-up" href="@up.Href" title="Up to @up.Level.Label()"><i class="bi bi-arrow-up-left"></i></a>
+        }
+        <ol>
+            @foreach (var crumb in Model.Parents)
+            {
+                <li class="@crumb.Level.Css()">
+                    <i class="bi @crumb.Level.Icon()"></i>
+                    <span class="crumb-level">@crumb.Level.Label()</span>
+                    @if (crumb.Href is not null) { <a href="@crumb.Href">@crumb.Name</a> } else { <span>@crumb.Name</span> }
+                </li>
+            }
+            <li class="current" aria-current="page">
+                <i class="bi @Model.Level.Icon()"></i>
+                <span class="crumb-level">@Model.Level.Label()</span>
+                <span>@Model.Title</span>
+            </li>
+        </ol>
+    </nav>
+
+    <div class="record-band">
+        <div class="record-icon"><i class="bi @Model.Level.Icon()"></i></div>
+        <div class="record-title-block">
+            <div class="record-kicker">
+                @Model.Level.Label()
+                @if (Model.Number is not null) { <span class="record-number">@Model.Number</span> }
+                @if (Model.Status is not null) { <span class="record-status">@Model.Status</span> }
+            </div>
+            <h1 class="record-title">@Model.Title</h1>
+            @if (Model.Subtitle is not null) { <div class="record-subtitle">@Model.Subtitle</div> }
+            @if (Model.Chips.Count > 0)
+            {
+                <div class="record-chips">
+                    @foreach (var chip in Model.Chips)
+                    {
+                        if (chip.Href is not null)
+                        {
+                            <a class="record-chip" href="@chip.Href"><i class="bi @chip.Icon"></i>@chip.Text</a>
+                        }
+                        else
+                        {
+                            <span class="record-chip"><i class="bi @chip.Icon"></i>@chip.Text</span>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Oes.Application/Oes.Application.csproj" />
+    <Project Path="src/Oes.Domain/Oes.Domain.csproj" />
+    <Project Path="src/Oes.Infrastructure/Oes.Infrastructure.csproj" />
+    <Project Path="src/Oes.Web/Oes.Web.csproj" />
+    <Project Path="src/Oes.Worker/Oes.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Oes.Integration.Tests/Oes.Integration.Tests.csproj" />
+    <Project Path="tests/Oes.UnitTests/Oes.UnitTests.csproj" />
+  </Folder>
+</Solution>

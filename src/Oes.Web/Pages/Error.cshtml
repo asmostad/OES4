@@ -1,0 +1,14 @@
+﻿@page
+@model ErrorModel
+@{
+    Layout = "_AuthLayout";
+    var notFound = Model.Code == 404;
+    ViewData["Title"] = notFound ? "Not found" : "Error";
+    ViewData["Tagline"] = notFound ? "Page not found" : "Something went wrong";
+}
+<h4>@(notFound ? "We couldn't find that page" : "Something went wrong")</h4>
+<p class="subtitle">
+    @(notFound ? "It may have moved, or you may not have access to it." : "The error has been logged.")
+    @if (!notFound && Model.RequestId is not null) { <br><small>Reference: <code>@Model.RequestId</code></small> }
+</p>
+<a class="btn btn-login" href="/"><i class="bi bi-house me-1"></i> Go to the dashboard</a>
