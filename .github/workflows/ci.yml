@@ -38,4 +38,4 @@ jobs:
       - name: Check migrations are up to date
         run: |
           dotnet tool restore
-          dotnet ef migrations has-pending-model-changes --project src/Oes.Infrastructure --no-build -c Release
+          dotnet ef migrations has-pending-model-changes --project src/Oes.Infrastructure --no-build --configuration Release
