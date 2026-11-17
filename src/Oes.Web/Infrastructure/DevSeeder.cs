@@ -83,7 +83,62 @@ public static class DevSeeder
             await SampleDataAsync(root, tenantIds[0], log, ct);
             await SampleInsuranceAsync(root, tenantIds[0], log, ct);
             await SampleMeasurementsAsync(root, tenantIds[0], log, ct);
+            await SamplePricesAsync(root, tenantIds[0], log, ct);
         }
+    }
+
+    /// <summary>
+    /// A small made-up price list and a few products for trying estimates locally.
+    /// Not real or licensed price data: tenants import their own.
+    /// </summary>
+    private static async Task SamplePricesAsync(IServiceProvider root, Guid tenantId, ILogger log, CancellationToken ct)
+    {
+        using var scope = root.CreateScope();
+        scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<OesDbContext>();
+        if (await db.PriceLists.AnyAsync(ct)) return;
+
+        var list = new Oes.Domain.Estimating.PriceList
+        {
+            Name = "Sample prices (made up)", RegionCode = "DEMO", EffectiveDate = new DateOnly(2026, 11, 1),
+            Status = Oes.Domain.Estimating.PriceListStatuses.Active, Source = "sample",
+            Notes = "Invented numbers for local testing only.",
+        };
+        db.PriceLists.Add(list);
+        var cats = new Dictionary<string, Oes.Domain.Estimating.CatalogCategory>();
+        Oes.Domain.Estimating.CatalogCategory Cat(string code, string name) =>
+            cats.TryGetValue(code, out var c) ? c : cats[code] = db.CatalogCategories.Add(new() { Code = code, Name = name }).Entity;
+
+        void Item(string cat, string catName, string code, string desc, string unit, params (string Activity, decimal Price, decimal? Material)[] prices)
+        {
+            var item = db.CatalogItems.Add(new Oes.Domain.Estimating.CatalogItem { CategoryId = Cat(cat, catName).Id, Code = code, Description = desc, Unit = unit }).Entity;
+            foreach (var (a, p, m) in prices)
+                db.PriceListItems.Add(new Oes.Domain.Estimating.PriceListItem { PriceListId = list.Id, CatalogItemId = item.Id, Activity = a, UnitPrice = p, MaterialPrice = m });
+        }
+
+        const string R = "replace", X = "remove", RR = "r_and_r", DR = "detach_reset";
+        Item("RFG", "Roofing", "LAM", "Laminated architectural shingles", "SQ", (R, 285.00m, 145m), (X, 62.50m, null));
+        Item("RFG", "Roofing", "3TAB", "3-tab shingles", "SQ", (R, 240.00m, 110m), (X, 58.00m, null));
+        Item("RFG", "Roofing", "FELTS", "Synthetic underlayment", "SQ", (R, 38.00m, 21m));
+        Item("RFG", "Roofing", "ICE", "Ice & water shield", "SF", (R, 1.95m, 1.10m));
+        Item("RFG", "Roofing", "DRIP", "Drip edge", "LF", (R, 2.80m, 1.15m));
+        Item("RFG", "Roofing", "STRT", "Starter strip", "LF", (R, 2.10m, 0.95m));
+        Item("RFG", "Roofing", "RIDGC", "Hip / ridge cap", "LF", (R, 8.40m, 3.90m));
+        Item("RFG", "Roofing", "RVENT", "Ridge vent", "LF", (R, 9.75m, 5.10m));
+        Item("RFG", "Roofing", "PJACK", "Pipe jack flashing", "EA", (R, 48.00m, 14m));
+        Item("RFG", "Roofing", "STEPF", "Step flashing", "LF", (R, 11.20m, 3.50m));
+        Item("RFG", "Roofing", "STEEP", "Steep charge (7/12–9/12)", "SQ", (R, 32.00m, null));
+        Item("RFG", "Roofing", "SAT", "Satellite dish", "EA", (DR, 65.00m, null));
+        Item("SFG", "Soffit, fascia & gutter", "GUT5", "5\" aluminum gutter", "LF", (R, 9.80m, 4.20m), (RR, 12.40m, 4.20m));
+        Item("SFG", "Soffit, fascia & gutter", "DSP", "Downspout 2x3", "LF", (R, 8.90m, 3.80m));
+        Item("SDG", "Siding", "VNL", "Vinyl siding", "SF", (RR, 4.35m, 1.90m));
+
+        db.Products.AddRange(
+            new Oes.Domain.Estimating.Product { Sku = "SHG-LAM-BUNDLE", Name = "Laminated shingle bundle", Unit = "BD", DefaultPrice = 48m, DefaultCost = 34m },
+            new Oes.Domain.Estimating.Product { Sku = "GUT-K5", Name = "5\" K-style seamless gutter (installed)", Unit = "LF", DefaultPrice = 11.50m, DefaultCost = 5.25m },
+            new Oes.Domain.Estimating.Product { Sku = "LAB-TEAROFF", Name = "Tear-off labor, per square", Unit = "SQ", DefaultPrice = 75m, DefaultCost = 45m, IsMaterial = false });
+        await db.SaveChangesAsync(ct);
+        log.LogInformation("Seeded sample price list");
     }
 
     /// <summary>Two roofing versions and a gutter set on 123 Main St.</summary>

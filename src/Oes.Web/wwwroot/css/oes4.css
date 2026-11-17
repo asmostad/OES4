@@ -135,6 +135,32 @@
 .measure-delta { font-size: 0.7rem; color: var(--level-opportunity); }
 .active-version { background: var(--oes-primary-bg); }
 
+/* Estimates */
+.est-status, .ver-status { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: 999px; background: #f1f5f9; color: #475569; }
+.est-issued, .ver-issued { background: var(--oes-info-bg); color: #0e7490; }
+.est-signed, .ver-signed { background: var(--oes-success-bg); color: #047857; }
+.est-declined, .ver-declined { background: var(--oes-danger-bg); color: #b91c1c; }
+.ver-superseded { background: #f1f5f9; color: #94a3b8; text-decoration: line-through; }
+.estimate-section { border-top: 3px solid var(--trade-color); }
+.estimate-lines input.form-control-sm { padding: 0.15rem 0.35rem; }
+.estimate-lines td { vertical-align: top; }
+.estimate-lines tr.line-pending { background: var(--oes-warning-bg); }
+.estimate-lines tr.line-rejected { background: var(--oes-danger-bg); }
+.activity-tag { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0 0.35rem; margin-right: 0.3rem; border-radius: 4px; background: var(--level-estimate-bg); color: var(--level-estimate); }
+.approval-note { margin-top: 0.25rem; font-size: 0.72rem; }
+.approval-badge { font-weight: 700; padding: 0 0.35rem; border-radius: 4px; }
+.approval-pending { background: #fde68a; color: #92400e; }
+.approval-approved { background: #bbf7d0; color: #166534; }
+.approval-rejected { background: #fecaca; color: #991b1b; }
+.measure-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; padding: 0.5rem 1rem; background: var(--level-property-bg); border-bottom: 1px solid var(--oes-border-light); }
+.measure-chip { border: 1px solid var(--oes-border); background: #fff; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.72rem; color: var(--oes-text-secondary); }
+.measure-chip:hover { border-color: var(--level-estimate); color: var(--level-estimate); }
+.add-line { background: var(--level-estimate-bg); }
+.estimate-totals .list-group-item:last-child { background: var(--level-estimate-bg); }
+.method-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.method-option { display: flex; gap: 0.6rem; align-items: flex-start; border: 1.5px solid var(--oes-border); border-radius: var(--oes-radius-lg); padding: 0.75rem; cursor: pointer; }
+.method-option:has(input:checked) { border-color: var(--level-estimate); background: var(--level-estimate-bg); }
+
 /* Stage pill */
 .stage-pill {
     display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600;

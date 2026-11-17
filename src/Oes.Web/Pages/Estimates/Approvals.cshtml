@@ -1,0 +1,47 @@
+@page
+@model Oes.Web.Pages.Estimates.ApprovalsModel
+@{
+    ViewData["Title"] = "Price Approvals";
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+}
+<div class="page-header">
+    <div>
+        <h1>Price Approvals</h1>
+        <p class="page-subtitle">Custom lines and prices below list wait here. Nobody can approve their own exception.</p>
+    </div>
+</div>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle small">
+            <thead><tr><th>Estimate</th><th>Line</th><th class="text-end">Qty</th><th class="text-end">Price</th><th class="text-end">List</th><th>Why</th><th>Requested</th><th style="width:340px"></th></tr></thead>
+            <tbody>
+                @if (Model.Rows.Count == 0) { <tr><td colspan="8"><div class="empty-state py-3"><i class="bi bi-patch-check"></i><h5>Nothing waiting</h5></div></td></tr> }
+                @foreach (var r in Model.Rows)
+                {
+                    var own = r.RequestedById == Model.Me;
+                    <tr>
+                        <td><a href="/Estimates/View/@r.EstimateId"><code>@r.EstimateNumber</code></a><div class="text-muted">@r.EstimateName</div></td>
+                        <td>@r.Description</td>
+                        <td class="text-end">@r.Qty.ToString("#,0.##", us) @r.Unit</td>
+                        <td class="text-end fw-medium">@r.UnitPrice.ToString("C2", us)</td>
+                        <td class="text-end text-muted">@(r.DefaultUnitPrice?.ToString("C2", us) ?? "—")</td>
+                        <td>@r.Reason</td>
+                        <td>@r.RequestedBy<div class="text-muted">@Fmt.Ago(r.RequestedAt)</div></td>
+                        <td>
+                            @if (own) { <span class="text-muted">Your request: another approver must decide.</span> }
+                            else
+                            {
+                                <form method="post" asp-page-handler="Decide" class="d-flex gap-1">
+                                    <input type="hidden" name="lineId" value="@r.LineId">
+                                    <input name="note" class="form-control form-control-sm" placeholder="Note (required to reject)" maxlength="500" aria-label="Note">
+                                    <button class="btn btn-sm btn-success" type="submit" name="approve" value="true">Approve</button>
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" name="approve" value="false">Reject</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

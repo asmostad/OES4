@@ -69,8 +69,20 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         return q.Where(c => opps.Any(o => o.Id == c.OpportunityId));
     }
 
+    /// <summary>Estimates follow their opportunity's visibility, plus any estimate the user owns.</summary>
+    public async Task<IQueryable<Domain.Estimating.Estimate>> EstimatesAsync(bool includeArchived = false)
+    {
+        var q = db.Estimates.AsQueryable();
+        if (!includeArchived) q = q.Where(e => e.ArchivedAt == null);
+        if (await ViewAllAsync() || await user.HasPermissionAsync(Permissions.EstimatesViewAll)) return q;
+        var me = Me;
+        var opps = await OpportunitiesAsync(includeArchived: true);
+        return q.Where(e => e.OwnerUserId == me || opps.Any(o => o.Id == e.OpportunityId));
+    }
+
     public async Task<bool> CanSeeAsync(string entityType, Guid id) => entityType switch
     {
+        EntityTypes.Estimate => await (await EstimatesAsync(true)).AnyAsync(e => e.Id == id),
         EntityTypes.Contact => await (await ContactsAsync(true)).AnyAsync(c => c.Id == id),
         EntityTypes.Property => await (await PropertiesAsync(true)).AnyAsync(p => p.Id == id),
         EntityTypes.Opportunity => await (await OpportunitiesAsync(true)).AnyAsync(o => o.Id == id),
@@ -106,6 +118,7 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         EntityTypes.Property => "Property",
         EntityTypes.Opportunity => "Opportunity",
         EntityTypes.Claim => "Claim",
+        EntityTypes.Estimate => "Estimate",
         _ => "Record",
     };
 }

@@ -1,0 +1,302 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Estimates.ViewModel
+@using Oes.Domain.Estimating
+@using Oes.Domain.Crm
+@{
+    var d = Model.Detail;
+    var e = d.Estimate;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal v) => v.ToString("C2", us);
+    ViewData["Title"] = $"{e.Number} {e.Name}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    parents.Add(new Crumb(RecordLevel.Opportunity, d.Opportunity.Name, $"/Opportunities/View/{d.Opportunity.Id}"));
+    var chips = new List<RecordChip>
+    {
+        new(d.Contact.IsOrganization ? "bi-building" : "bi-person", d.Contact.DisplayName, $"/Contacts/View/{d.Contact.Id}"),
+        new(e.Method == EstimateMethods.PriceBook ? "bi-book" : "bi-list-ul", e.Method == EstimateMethods.PriceBook ? $"Price list: {d.PriceList?.Name}" : "Line items", null),
+    };
+    if (d.Claim is not null) chips.Add(new("bi-shield-check", "Claim " + (d.Claim.ClaimNumber ?? "(not filed)"), $"/Claims/View/{d.Claim.Id}"));
+    if (d.OwnerName is not null) chips.Add(new("bi-person-badge", d.OwnerName, null));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Estimate, Title = e.Name, Number = e.Number,
+        Status = Fmt.Cap(e.Status) + (e.LatestVersionNo > 0 ? $" · v{e.LatestVersionNo}" : ""),
+        Subtitle = d.Property?.SingleLine ?? "No address yet", Parents = parents, Chips = chips,
+    };
+    var latest = d.Versions.FirstOrDefault();
+    var edit = d.CanEdit;
+    var isPriceBook = e.Method == EstimateMethods.PriceBook;
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (edit)
+    {
+        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#issue-form"><i class="bi bi-send-check me-1"></i>@(e.LatestVersionNo == 0 ? "Issue estimate" : "Issue revision")</button>
+    }
+    @if (latest is not null) { <a class="btn btn-sm btn-outline-secondary" href="/Estimates/Proposal/@latest.Id"><i class="bi bi-file-earmark-text me-1"></i>Proposal v@(latest.VersionNo)</a> }
+    <span class="ms-auto fs-5 fw-semibold align-self-center">@M(e.Total)</span>
+</div>
+
+@if (edit)
+{
+    <div class="collapse @(ModelState.ErrorCount > 0 ? "show" : "")" id="issue-form">
+        <div class="card mb-3 border-primary"><div class="card-body">
+            <form method="post" asp-page-handler="Issue" class="d-flex flex-wrap gap-2 align-items-center">
+                @if (e.LatestVersionNo > 0)
+                {
+                    <input name="revisionReason" class="form-control form-control-sm" style="max-width:420px" placeholder="What changed? (e.g. added gutters after adjuster meeting)" required maxlength="500" aria-label="Revision reason">
+                }
+                <span class="small text-muted">Issuing freezes version @(e.LatestVersionNo + 1): lines, prices, terms and measurements.</span>
+                <button class="btn btn-sm btn-primary" type="submit">Issue v@(e.LatestVersionNo + 1)</button>
+            </form>
+        </div></div>
+    </div>
+}
+
+@if (d.IsLocked)
+{
+    <div class="alert alert-success"><i class="bi bi-pen me-2"></i>Signed. This estimate is locked; changes will go through change orders (coming with projects).</div>
+}
+else if (e.Status == EstimateStatuses.Draft && e.LatestVersionNo > 0)
+{
+    <div class="alert alert-info small"><i class="bi bi-pencil-square me-1"></i>Revising after v@(e.LatestVersionNo). The issued version stays as it was; issue again to create v@(e.LatestVersionNo + 1).</div>
+}
+@if (d.PendingApprovals > 0)
+{
+    <div class="alert alert-warning small"><i class="bi bi-hourglass-split me-1"></i>@d.PendingApprovals price exception@(d.PendingApprovals == 1 ? " is" : "s are") waiting for approval@(d.CanApprove ? " (you can approve ones you didn't request, below)." : ". An approver will review them.")</div>
+}
+@if (d.RejectedLines > 0)
+{
+    <div class="alert alert-danger small"><i class="bi bi-x-octagon me-1"></i>@d.RejectedLines line(s) were rejected. Change the price or remove them to issue.</div>
+}
+
+<div class="row g-3">
+    <div class="col-xxl-9">
+        @foreach (var sv in d.Sections)
+        {
+            var s = sv.Section;
+            var sid = s.Id.ToString("N");
+            <div class="card mb-3 estimate-section" id="s-@sid" style="--trade-color:@(sv.TradeColor ?? "#d97706")">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-semibold">@s.Name</span>
+                    @if (sv.StructureName is not null || sv.TradeName is not null) { <span class="small text-muted">@sv.StructureName @(sv.TradeName is null ? "" : "· " + sv.TradeName)</span> }
+                    <span class="ms-auto fw-semibold">@M(sv.Subtotal)</span>
+                    @if (edit) { <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#se-@sid" title="Edit section"><i class="bi bi-pencil"></i></button> }
+                </div>
+                @if (edit)
+                {
+                    <div class="collapse" id="se-@sid"><div class="card-body border-bottom bg-light">
+                        <form method="post" asp-page-handler="Section" class="row g-2">
+                            <input type="hidden" name="sectionId" value="@s.Id">
+                            <div class="col-md-4"><input name="name" value="@s.Name" class="form-control form-control-sm" required maxlength="150" aria-label="Section name"></div>
+                            <div class="col-md-8"><textarea name="scopeOfWork" class="form-control form-control-sm" rows="2" placeholder="Scope of work shown on the proposal" maxlength="5000" aria-label="Scope of work">@s.ScopeOfWork</textarea></div>
+                            <div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" type="submit">Save section</button>
+                                <button class="btn btn-sm btn-outline-danger ms-auto" type="submit" asp-page-handler="DeleteSection" formnovalidate data-confirm="Remove this section and its lines?">Remove section</button></div>
+                        </form>
+                    </div></div>
+                }
+                @if (s.ScopeOfWork is not null) { <div class="card-body small pre-wrap border-bottom">@s.ScopeOfWork</div> }
+                @if (sv.Measurements.Count > 0)
+                {
+                    <div class="measure-chips">
+                        <span class="small text-muted me-1"><i class="bi bi-rulers"></i> Use measurement:</span>
+                        @foreach (var m in sv.Measurements)
+                        {
+                            <button type="button" class="measure-chip" data-fill-qty="@m.Qty.ToString("0.####", us)" data-target="#qty-@sid" title="Use as quantity">@m.Label <strong>@m.Qty.ToString("#,0.##", us) @m.Unit</strong></button>
+                        }
+                    </div>
+                }
+                <div class="table-responsive">
+                    <table class="table mb-0 align-middle small estimate-lines">
+                        <thead><tr><th style="width:120px">Code</th><th>Description</th><th class="text-end" style="width:110px">Qty</th><th style="width:50px">Unit</th><th class="text-end" style="width:130px">Unit price</th><th class="text-end" style="width:110px">Amount</th><th style="width:90px"></th></tr></thead>
+                        <tbody>
+                            @if (sv.Lines.Count == 0) { <tr><td colspan="7" class="text-muted">No lines yet.</td></tr> }
+                            @foreach (var l in sv.Lines)
+                            {
+                                var fid = "l-" + l.Id.ToString("N");
+                                <tr class="line-@l.ApprovalStatus">
+                                    <td><code>@(l.Code ?? (l.Kind == LineKinds.Misc ? "CUSTOM" : ""))</code></td>
+                                    <td>
+                                        @if (l.Activity.Length > 0) { <span class="activity-tag">@Activities.Label(l.Activity)</span> }
+                                        @if (edit && l.Kind == LineKinds.Misc) { <input form="@fid" name="description" value="@l.Description" class="form-control form-control-sm d-inline-block" style="max-width:340px" maxlength="500" aria-label="Description"> }
+                                        else { @l.Description }
+                                        @if (l.ApprovalStatus != ApprovalStatuses.None)
+                                        {
+                                            <div class="approval-note">
+                                                <span class="approval-badge approval-@l.ApprovalStatus">@Fmt.Cap(l.ApprovalStatus)</span> @l.ApprovalReason
+                                                @if (l.ApprovalNote is not null) { <span class="text-muted">· @l.ApprovalNote</span> }
+                                                @if (l.ApprovalStatus == ApprovalStatuses.Pending && d.CanApprove)
+                                                {
+                                                    <form method="post" asp-page-handler="Decide" class="d-inline-flex gap-1 ms-2">
+                                                        <input type="hidden" name="lineId" value="@l.Id">
+                                                        <input name="note" class="form-control form-control-sm py-0" style="max-width:160px" placeholder="Note (required to reject)" maxlength="500" aria-label="Approval note">
+                                                        <button class="btn btn-sm btn-success py-0" type="submit" name="approve" value="true">Approve</button>
+                                                        <button class="btn btn-sm btn-outline-danger py-0" type="submit" name="approve" value="false">Reject</button>
+                                                    </form>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (edit)
+                                        {
+                                            <form method="post" asp-page-handler="Line" id="@fid"><input type="hidden" name="lineId" value="@l.Id"><input type="hidden" name="sectionId" value="@s.Id"></form>
+                                            <input form="@fid" type="number" step="any" min="0" name="qty" value="@l.Qty.ToString("0.####", us)" class="form-control form-control-sm text-end" aria-label="Quantity">
+                                        }
+                                        else { @l.Qty.ToString("#,0.##", us) }
+                                    </td>
+                                    <td>@l.Unit</td>
+                                    <td class="text-end">
+                                        @if (edit) { <input form="@fid" type="number" step="0.01" min="0" name="unitPrice" value="@l.UnitPrice.ToString("0.00", us)" class="form-control form-control-sm text-end" aria-label="Unit price"> }
+                                        else { @M(l.UnitPrice) }
+                                        @if (l.DefaultUnitPrice is { } dp && dp != l.UnitPrice) { <div class="text-muted" title="List price when added">list @M(dp)</div> }
+                                    </td>
+                                    <td class="text-end fw-medium">@M(l.Amount)</td>
+                                    <td class="text-end text-nowrap">
+                                        @if (edit)
+                                        {
+                                            <button form="@fid" class="btn btn-sm btn-link p-0" type="submit" title="Save line"><i class="bi bi-check-lg"></i></button>
+                                            <form method="post" asp-page-handler="DeleteLine" class="d-inline"><input type="hidden" name="lineId" value="@l.Id"><input type="hidden" name="sectionId" value="@s.Id">
+                                                <button class="btn btn-sm btn-link p-0 text-danger ms-2" type="submit" title="Remove line" data-confirm="Remove this line?"><i class="bi bi-trash"></i></button></form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (edit)
+                {
+                    <div class="card-body border-top add-line">
+                        <form method="post" asp-page-handler="@(isPriceBook ? "AddPriceItem" : "AddProduct")" class="d-flex flex-wrap gap-2 align-items-center">
+                            <input type="hidden" name="sectionId" value="@s.Id">
+                            <div class="typeahead flex-grow-1" style="min-width:280px" data-typeahead="@(isPriceBook ? $"/api/v1/estimates/{e.Id}/price-items" : "/api/v1/lookup/products")">
+                                <input type="hidden" name="@(isPriceBook ? "priceListItemId" : "productId")" data-typeahead-value>
+                                <input class="form-control form-control-sm" autocomplete="off" data-typeahead-input aria-label="Item"
+                                       placeholder="@(isPriceBook ? "Search the price list: code or words (e.g. RFG 300, drip edge)" : "Search products by SKU or name")">
+                                <div class="typeahead-menu dropdown-menu"></div>
+                            </div>
+                            <input id="qty-@sid" type="number" step="any" min="0" name="qty" value="1" class="form-control form-control-sm" style="max-width:110px" aria-label="Quantity" required>
+                            <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Add line</button>
+                            <button class="btn btn-sm btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#misc-@sid">Custom line…</button>
+                        </form>
+                        <div class="collapse mt-2" id="misc-@sid">
+                            <form method="post" asp-page-handler="AddMisc" class="d-flex flex-wrap gap-2 align-items-center">
+                                <input type="hidden" name="sectionId" value="@s.Id">
+                                <input name="description" class="form-control form-control-sm flex-grow-1" style="min-width:240px" placeholder="Description" required maxlength="500" aria-label="Description">
+                                <input type="number" step="any" min="0" name="qty" value="1" class="form-control form-control-sm" style="max-width:90px" aria-label="Quantity">
+                                <input name="unit" value="EA" class="form-control form-control-sm" style="max-width:70px" maxlength="10" aria-label="Unit">
+                                <input type="number" step="0.01" min="0" name="unitPrice" class="form-control form-control-sm" style="max-width:110px" placeholder="Unit price" required aria-label="Unit price">
+                                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="isMaterial" value="true" id="mm-@sid"><label class="form-check-label small" for="mm-@sid">Material</label></div>
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Add custom line</button>
+                                <span class="small text-muted">Custom lines need a price approval.</span>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (edit)
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="post" asp-page-handler="AddSection" class="d-flex flex-wrap gap-2 align-items-center">
+                        <input name="name" class="form-control form-control-sm" style="max-width:240px" placeholder="New section (e.g. Garage – Gutters)" required maxlength="150" aria-label="Section name">
+                        @if (Model.Structures.Count > 0)
+                        {
+                            <select name="structureId" class="form-select form-select-sm w-auto" aria-label="Structure"><option value="">Structure…</option>
+                                @foreach (var st in Model.Structures) { <option value="@st.Id">@st.Name</option> }</select>
+                        }
+                        <select name="tradeTypeId" class="form-select form-select-sm w-auto" aria-label="Trade"><option value="">Trade…</option>
+                            @foreach (var t in Model.Trades) { <option value="@t.Id">@t.Name</option> }</select>
+                        <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-plus-lg"></i> Add section</button>
+                        <span class="small text-muted">Picking a structure and trade links the current measurements.</span>
+                    </form>
+                </div>
+            </div>
+        }
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+
+    <div class="col-xxl-3">
+        <div class="card mb-3 estimate-totals">
+            <div class="card-header">Totals</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex"><span>Line items</span><span class="ms-auto">@M(e.Subtotal)</span></li>
+                @if (e.OverheadPct > 0) { <li class="list-group-item d-flex"><span>Overhead (@e.OverheadPct.ToString("0.##")%)</span><span class="ms-auto">@M(e.Overhead)</span></li> }
+                @if (e.ProfitPct > 0) { <li class="list-group-item d-flex"><span>Profit (@e.ProfitPct.ToString("0.##")%)</span><span class="ms-auto">@M(e.Profit)</span></li> }
+                @if (e.TaxRate > 0) { <li class="list-group-item d-flex"><span>Tax (@e.TaxRate.ToString("0.###")% on @(e.TaxBasis == TaxBases.All ? "all" : e.TaxBasis))</span><span class="ms-auto">@M(e.Tax)</span></li> }
+                <li class="list-group-item d-flex fw-semibold fs-6"><span>Total</span><span class="ms-auto">@M(e.Total)</span></li>
+            </ul>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Versions</div>
+            <ul class="list-group list-group-flush small">
+                @if (d.Versions.Count == 0) { <li class="list-group-item text-muted">Not issued yet.</li> }
+                @foreach (var v in d.Versions)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex align-items-center">
+                            <a href="/Estimates/Proposal/@v.Id" class="fw-medium me-2">v@(v.VersionNo)</a>
+                            <span class="ver-status ver-@v.Status">@Fmt.Cap(v.Status)</span>
+                            <span class="ms-auto">@M(v.Total)</span>
+                        </div>
+                        <div class="text-muted">@v.IssuedAt.ToString("MMM d, yyyy") · @v.IssuedBy@(v.RevisionReason is null ? "" : " · " + v.RevisionReason)</div>
+                        @if (v.SignerName is not null) { <div class="text-success"><i class="bi bi-pen"></i> Signed by @v.SignerName @v.SignedAt?.ToString("MMM d")</div> }
+                        @if (edit && v.Status == VersionStatuses.Issued && v.VersionNo == e.LatestVersionNo && e.Status == EstimateStatuses.Issued)
+                        {
+                            <form method="post" asp-page-handler="Sign" class="d-flex gap-1 mt-2">
+                                <input type="hidden" name="versionId" value="@v.Id">
+                                <input name="signerName" value="@d.Contact.DisplayName" class="form-control form-control-sm" required maxlength="150" aria-label="Signed by">
+                                <button class="btn btn-sm btn-success text-nowrap" type="submit">Mark signed</button>
+                            </form>
+                            <form method="post" asp-page-handler="Decline" class="d-flex gap-1 mt-1">
+                                <input type="hidden" name="versionId" value="@v.Id">
+                                <input name="reason" class="form-control form-control-sm" placeholder="Reason (optional)" maxlength="300" aria-label="Decline reason">
+                                <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit">Declined</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex">Settings @if (edit) { <button class="btn btn-sm btn-link p-0 ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#settings">Edit</button> }</div>
+            <div class="card-body small">
+                <div>Expires @(e.ExpiresOn?.ToString("MMM d, yyyy") ?? "—")</div>
+                <div>@(e.ShowLinePrices ? "Proposal shows line prices" : "Proposal shows section totals only")</div>
+                @if (e.Terms is not null) { <div class="text-muted text-truncate">Terms: @e.Terms</div> }
+            </div>
+            @if (edit)
+            {
+                <div class="collapse" id="settings"><div class="card-body border-top">
+                    <form method="post" asp-page-handler="Settings" class="small">
+                        <div class="mb-2"><label class="form-label" for="sn">Name</label><input id="sn" name="settings.Name" value="@e.Name" class="form-control form-control-sm" required maxlength="200"></div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label" for="so">Overhead %</label><input id="so" type="number" step="0.01" min="0" max="100" name="settings.OverheadPct" value="@e.OverheadPct.ToString("0.##", us)" class="form-control form-control-sm"></div>
+                            <div class="col-6"><label class="form-label" for="sp">Profit %</label><input id="sp" type="number" step="0.01" min="0" max="100" name="settings.ProfitPct" value="@e.ProfitPct.ToString("0.##", us)" class="form-control form-control-sm"></div>
+                            <div class="col-6"><label class="form-label" for="st">Tax rate %</label><input id="st" type="number" step="0.001" min="0" max="30" name="settings.TaxRate" value="@e.TaxRate.ToString("0.###", us)" class="form-control form-control-sm"></div>
+                            <div class="col-6"><label class="form-label" for="sb">Tax on</label>
+                                <select id="sb" name="settings.TaxBasis" class="form-select form-select-sm">
+                                    <option value="@TaxBases.Materials" selected="@(e.TaxBasis == TaxBases.Materials)">Materials</option>
+                                    <option value="@TaxBases.All" selected="@(e.TaxBasis == TaxBases.All)">Everything</option>
+                                    <option value="@TaxBases.None" selected="@(e.TaxBasis == TaxBases.None)">Nothing</option>
+                                </select></div>
+                        </div>
+                        <div class="mb-2"><label class="form-label" for="se">Expires on</label><input id="se" type="date" name="settings.ExpiresOn" value="@e.ExpiresOn?.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+                        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="settings.ShowLinePrices" value="true" id="slp" checked="@e.ShowLinePrices"><label class="form-check-label" for="slp">Show line prices on the proposal</label></div>
+                        <div class="mb-2"><label class="form-label" for="sterms">Terms &amp; conditions</label><textarea id="sterms" name="settings.Terms" class="form-control form-control-sm" rows="4" maxlength="20000">@e.Terms</textarea></div>
+                        <div class="mb-2"><label class="form-label" for="snotes">Internal notes</label><textarea id="snotes" name="settings.Notes" class="form-control form-control-sm" rows="2" maxlength="5000">@e.Notes</textarea></div>
+                        <button class="btn btn-sm btn-primary" type="submit">Save settings</button>
+                    </form>
+                </div></div>
+            }
+        </div>
+    </div>
+</div>

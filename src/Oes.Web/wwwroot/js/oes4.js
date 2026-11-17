@@ -109,12 +109,33 @@
         window.location.href = row.getAttribute('data-href');
     });
 
-    // ---------------- show/hide sections from a checkbox ----------------
+    // ---------------- show/hide sections from a checkbox or radio ----------------
     document.querySelectorAll('[data-toggle-target]').forEach(function (cb) {
         const target = document.querySelector(cb.getAttribute('data-toggle-target'));
         if (!target) return;
-        cb.addEventListener('change', function () { target.classList.toggle('d-none', !cb.checked); });
+        const sync = function () { target.classList.toggle('d-none', !cb.checked); };
+        if (cb.type === 'radio' && cb.name) {
+            // Radios only fire change on the newly checked one, so listen to the whole group.
+            document.querySelectorAll('input[type="radio"][name="' + cb.name + '"]').forEach(function (r) { r.addEventListener('change', sync); });
+        } else {
+            cb.addEventListener('change', sync);
+        }
     });
+
+    // ---------------- measurement chips fill a quantity box ----------------
+    document.addEventListener('click', function (e) {
+        const chip = e.target.closest('[data-fill-qty]');
+        if (!chip) return;
+        const input = document.querySelector(chip.getAttribute('data-target'));
+        if (!input) return;
+        input.value = chip.getAttribute('data-fill-qty');
+        input.focus();
+        input.classList.add('is-picked');
+        setTimeout(function () { input.classList.remove('is-picked'); }, 800);
+    });
+
+    // ---------------- print buttons ----------------
+    document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
     document.querySelectorAll('input[data-autosubmit-check]').forEach(function (cb) {
         cb.addEventListener('change', function () { cb.form.submit(); });
     });

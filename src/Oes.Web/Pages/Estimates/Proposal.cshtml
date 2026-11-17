@@ -1,0 +1,101 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Estimates.ProposalModel
+@using Oes.Domain.Estimating
+@{
+    Layout = "_PrintLayout";
+    var c = Model.Doc;
+    var v = Model.Version;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal x) => x.ToString("C2", us);
+    ViewData["Title"] = $"{c.Number} v{c.VersionNo} – {c.CustomerName}";
+}
+<div class="print-toolbar no-print">
+    <a href="/Estimates/View/@Model.Estimate.Id" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Back to estimate</a>
+    <span class="small text-muted">Version @c.VersionNo · @Fmt.Cap(v.Status) · frozen @c.IssuedAt.ToString("MMM d, yyyy")</span>
+    <button type="button" class="btn btn-sm btn-primary" data-print><i class="bi bi-printer me-1"></i>Print / save as PDF</button>
+</div>
+
+<article class="proposal">
+    <header class="proposal-head">
+        <div>
+            <div class="proposal-company">@Model.Company.Name</div>
+            @if (Model.Company.PostalAddress is not null) { <div class="small text-muted pre-wrap">@Model.Company.PostalAddress</div> }
+        </div>
+        <div class="text-end">
+            <div class="proposal-title">Proposal</div>
+            <div><strong>@c.Number</strong> · version @c.VersionNo</div>
+            <div class="small text-muted">Issued @c.IssuedAt.ToString("MMMM d, yyyy")@(c.ExpiresOn is null ? "" : " · valid until " + c.ExpiresOn.Value.ToString("MMMM d, yyyy"))</div>
+        </div>
+    </header>
+
+    <section class="proposal-parties">
+        <div>
+            <div class="label">Prepared for</div>
+            <div class="fw-semibold">@c.CustomerName</div>
+            @if (c.CustomerEmail is not null) { <div>@c.CustomerEmail</div> }
+            @if (c.CustomerPhone is not null) { <div>@c.CustomerPhone</div> }
+        </div>
+        <div>
+            <div class="label">Property</div>
+            <div>@(c.PropertyAddress ?? "—")</div>
+        </div>
+        @if (c.ClaimNumber is not null || c.CarrierName is not null)
+        {
+            <div>
+                <div class="label">Insurance</div>
+                <div>@c.CarrierName</div>
+                @if (c.ClaimNumber is not null) { <div>Claim @c.ClaimNumber</div> }
+            </div>
+        }
+    </section>
+
+    <h1 class="proposal-name">@c.Name</h1>
+
+    @foreach (var s in c.Sections)
+    {
+        <section class="proposal-section">
+            <div class="proposal-section-head"><h2>@s.Name</h2>@if (!c.ShowLinePrices) { <span class="fw-semibold">@M(s.Subtotal)</span> }</div>
+            @if (s.ScopeOfWork is not null) { <p class="pre-wrap">@s.ScopeOfWork</p> }
+            @if (s.MeasurementSummary is not null) { <p class="small text-muted mb-2">Measurements: @s.MeasurementSummary</p> }
+            <table class="table table-sm proposal-lines">
+                <thead><tr><th>Description</th><th class="text-end">Qty</th>@if (c.ShowLinePrices) { <th class="text-end">Unit price</th><th class="text-end">Amount</th> }</tr></thead>
+                <tbody>
+                    @foreach (var l in s.Lines)
+                    {
+                        <tr>
+                            <td>@(l.Activity.Length > 0 ? Activities.Label(l.Activity) + " " : "")@l.Description</td>
+                            <td class="text-end text-nowrap">@l.Qty.ToString("#,0.##", us) @l.Unit</td>
+                            @if (c.ShowLinePrices) { <td class="text-end">@M(l.UnitPrice)</td><td class="text-end">@M(l.Amount)</td> }
+                        </tr>
+                    }
+                </tbody>
+                @if (c.ShowLinePrices)
+                {
+                    <tfoot><tr><td colspan="3" class="text-end">Section total</td><td class="text-end fw-semibold">@M(s.Subtotal)</td></tr></tfoot>
+                }
+            </table>
+        </section>
+    }
+
+    <section class="proposal-totals">
+        <table class="table table-sm">
+            <tr><td>Subtotal</td><td class="text-end">@M(c.Subtotal)</td></tr>
+            @if (c.Overhead > 0) { <tr><td>Overhead (@c.OverheadPct.ToString("0.##")%)</td><td class="text-end">@M(c.Overhead)</td></tr> }
+            @if (c.Profit > 0) { <tr><td>Profit (@c.ProfitPct.ToString("0.##")%)</td><td class="text-end">@M(c.Profit)</td></tr> }
+            @if (c.Tax > 0) { <tr><td>Sales tax (@c.TaxRate.ToString("0.###")%)</td><td class="text-end">@M(c.Tax)</td></tr> }
+            <tr class="grand"><td>Total</td><td class="text-end">@M(c.Total)</td></tr>
+        </table>
+    </section>
+
+    @if (c.Terms is not null)
+    {
+        <section class="proposal-terms"><h2>Terms &amp; conditions</h2><div class="pre-wrap">@c.Terms</div></section>
+    }
+
+    <section class="proposal-sign">
+        <div><div class="sign-line">@(v.SignerName ?? "")</div><div class="label">Customer signature@(v.SignedAt is null ? "" : " · signed " + v.SignedAt.Value.ToString("MMM d, yyyy"))</div></div>
+        <div><div class="sign-line"></div><div class="label">Date</div></div>
+        <div><div class="sign-line"></div><div class="label">@Model.Company.Name</div></div>
+    </section>
+    <footer class="proposal-foot">@c.Number v@(c.VersionNo) · @v.ContentHash[..12]</footer>
+</article>

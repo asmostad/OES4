@@ -1,4 +1,4 @@
-﻿@* Authenticated shell, ported from OES3 includes/header.cfm + footer.cfm *@
+@* Authenticated shell, ported from OES3 includes/header.cfm + footer.cfm *@
 @inject Shell ShellService
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
@@ -106,7 +106,7 @@
                         <li><a class="dropdown-item" href="/Contacts/New"><i class="bi bi-person-plus me-2"></i>Contact</a></li><li><a class="dropdown-item" href="/Contacts/New?type=organization"><i class="bi bi-building-add me-2"></i>Organization</a></li>
                         <li><a class="dropdown-item" href="/Properties/New"><i class="bi bi-house-add me-2"></i>Property</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><span class="dropdown-item disabled"><i class="bi bi-file-earmark-text me-2"></i>Estimate</span></li>
+                        <li><a class="dropdown-item" href="/Estimates"><i class="bi bi-file-earmark-text me-2"></i>Estimate (from an opportunity)</a></li>
                         <li><span class="dropdown-item disabled"><i class="bi bi-kanban me-2"></i>Project</span></li>
                         <li><span class="dropdown-item disabled"><i class="bi bi-check2-square me-2"></i>Task</span></li>
                     </ul>

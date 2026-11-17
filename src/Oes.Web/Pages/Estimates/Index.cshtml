@@ -1,0 +1,32 @@
+@page
+@model Oes.Web.Pages.Estimates.IndexModel
+@using Oes.Domain.Estimating
+@{
+    ViewData["Title"] = "Estimates";
+}
+<div class="page-header">
+    <div>
+        <h1>Estimates</h1>
+        <p class="page-subtitle">Start an estimate from an opportunity. Price-book estimates use one of your price lists; line-item estimates use products.</p>
+    </div>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <div class="input-group input-group-sm list-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@Model.Q" class="form-control" placeholder="Number, name or customer">
+        </div>
+        <select name="status" class="form-select form-select-sm w-auto" data-autosubmit aria-label="Status">
+            <option value="">Any status</option>
+            @foreach (var s in new[] { EstimateStatuses.Draft, EstimateStatuses.Issued, EstimateStatuses.Signed, EstimateStatuses.Declined })
+            { <option value="@s" selected="@(Model.Status == s)">@Fmt.Cap(s)</option> }
+        </select>
+        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mine" value="true" id="mine" checked="@Model.Mine" data-autosubmit-check><label class="form-check-label small" for="mine">Only mine</label></div>
+        <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+    </div>
+</form>
+
+<div class="card">
+    <partial name="_EstimateTable" model="Model.Rows" />
+</div>

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oes.Application.Abstractions;
 using Oes.Domain.Common;
 using Oes.Domain.Crm;
+using Oes.Domain.Estimating;
 using Oes.Domain.Insurance;
 using Oes.Domain.Measurements;
 using Oes.Domain.Tenancy;
@@ -59,6 +60,17 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<MeasurementFieldDef> MeasurementFieldDefs => Set<MeasurementFieldDef>();
     public DbSet<MeasurementSet> MeasurementSets => Set<MeasurementSet>();
     public DbSet<MeasurementValue> MeasurementValues => Set<MeasurementValue>();
+
+    // Estimating
+    public DbSet<CatalogCategory> CatalogCategories => Set<CatalogCategory>();
+    public DbSet<CatalogItem> CatalogItems => Set<CatalogItem>();
+    public DbSet<PriceList> PriceLists => Set<PriceList>();
+    public DbSet<PriceListItem> PriceListItems => Set<PriceListItem>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Estimate> Estimates => Set<Estimate>();
+    public DbSet<EstimateSection> EstimateSections => Set<EstimateSection>();
+    public DbSet<EstimateLine> EstimateLines => Set<EstimateLine>();
+    public DbSet<EstimateVersion> EstimateVersions => Set<EstimateVersion>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -165,7 +177,134 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureCrm(b);
         ConfigureInsurance(b);
         ConfigureMeasurements(b);
+        ConfigureEstimating(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureEstimating(ModelBuilder b)
+    {
+        b.Entity<CatalogCategory>(e =>
+        {
+            e.ToTable("catalog_categories");
+            e.Property(c => c.Code).HasMaxLength(20);
+            e.Property(c => c.Name).HasMaxLength(100);
+            e.HasIndex(c => new { c.TenantId, c.Code }).IsUnique();
+        });
+
+        b.Entity<CatalogItem>(e =>
+        {
+            e.ToTable("catalog_items");
+            e.Property(c => c.Code).HasMaxLength(40);
+            e.Property(c => c.Description).HasMaxLength(500);
+            e.Property(c => c.Unit).HasMaxLength(10);
+            e.Property(c => c.CoverageNotes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(c => new { c.TenantId, c.CategoryId, c.Code }).IsUnique();
+            e.HasIndex(c => new { c.TenantId, c.Code });
+            e.HasOne<CatalogCategory>().WithMany().HasForeignKey(c => c.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PriceList>(e =>
+        {
+            e.ToTable("price_lists");
+            e.Property(p => p.Name).HasMaxLength(150);
+            e.Property(p => p.RegionCode).HasMaxLength(30);
+            e.Property(p => p.Source).HasMaxLength(20);
+            e.Property(p => p.Status).HasMaxLength(20);
+            e.Property(p => p.Notes).HasMaxLength(2000);
+        });
+
+        b.Entity<PriceListItem>(e =>
+        {
+            e.ToTable("price_list_items");
+            e.Property(p => p.Activity).HasMaxLength(20);
+            e.Property(p => p.UnitPrice).HasPrecision(12, 4);
+            e.Property(p => p.MaterialPrice).HasPrecision(12, 4);
+            e.Property(p => p.LaborPrice).HasPrecision(12, 4);
+            e.HasIndex(p => new { p.TenantId, p.PriceListId, p.CatalogItemId, p.Activity }).IsUnique();
+            e.HasOne<PriceList>().WithMany().HasForeignKey(p => p.PriceListId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<CatalogItem>().WithMany().HasForeignKey(p => p.CatalogItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Product>(e =>
+        {
+            e.ToTable("products");
+            e.Property(p => p.Sku).HasMaxLength(60);
+            e.Property(p => p.Name).HasMaxLength(200);
+            e.Property(p => p.Unit).HasMaxLength(10);
+            e.Property(p => p.DefaultCost).HasPrecision(12, 4);
+            e.Property(p => p.DefaultPrice).HasPrecision(12, 4);
+            e.Property(p => p.Supplier).HasMaxLength(100);
+            e.HasIndex(p => new { p.TenantId, p.Sku }).IsUnique();
+        });
+
+        b.Entity<Estimate>(e =>
+        {
+            e.ToTable("estimates");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Method).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.TaxBasis).HasMaxLength(20);
+            foreach (var p in new[] { nameof(Estimate.OverheadPct), nameof(Estimate.ProfitPct), nameof(Estimate.TaxRate) })
+                e.Property(p).HasPrecision(7, 4);
+            foreach (var p in new[] { nameof(Estimate.Subtotal), nameof(Estimate.Overhead), nameof(Estimate.Profit), nameof(Estimate.Tax), nameof(Estimate.Total) })
+                e.Property(p).HasPrecision(12, 2);
+            e.Property(x => x.Terms).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(x => x.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.OpportunityId });
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasOne<Opportunity>().WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<InsuranceClaim>().WithMany().HasForeignKey(x => x.ClaimId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PriceList>().WithMany().HasForeignKey(x => x.PriceListId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<EstimateSection>(e =>
+        {
+            e.ToTable("estimate_sections");
+            e.Property(s => s.Name).HasMaxLength(150);
+            e.Property(s => s.ScopeOfWork).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(s => new { s.TenantId, s.EstimateId });
+            e.HasOne<Estimate>().WithMany().HasForeignKey(s => s.EstimateId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<MeasurementSet>().WithMany().HasForeignKey(s => s.MeasurementSetId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<EstimateLine>(e =>
+        {
+            e.ToTable("estimate_lines");
+            e.Property(l => l.Kind).HasMaxLength(20);
+            e.Property(l => l.Activity).HasMaxLength(20);
+            e.Property(l => l.Code).HasMaxLength(60);
+            e.Property(l => l.Description).HasMaxLength(500);
+            e.Property(l => l.Qty).HasPrecision(14, 4);
+            e.Property(l => l.Unit).HasMaxLength(10);
+            e.Property(l => l.UnitPrice).HasPrecision(12, 4);
+            e.Property(l => l.UnitCost).HasPrecision(12, 4);
+            e.Property(l => l.DefaultUnitPrice).HasPrecision(12, 4);
+            e.Property(l => l.Notes).HasMaxLength(1000);
+            e.Property(l => l.ApprovalStatus).HasMaxLength(20);
+            e.Property(l => l.ApprovalReason).HasMaxLength(200);
+            e.Property(l => l.ApprovalNote).HasMaxLength(500);
+            e.HasIndex(l => new { l.TenantId, l.EstimateId });
+            e.HasIndex(l => new { l.TenantId, l.ApprovalStatus });
+            e.HasOne<EstimateSection>().WithMany().HasForeignKey(l => l.SectionId).OnDelete(DeleteBehavior.Cascade);
+            e.Ignore(l => l.Amount);
+        });
+
+        b.Entity<EstimateVersion>(e =>
+        {
+            e.ToTable("estimate_versions");
+            e.Property(v => v.Status).HasMaxLength(20);
+            e.Property(v => v.RevisionReason).HasMaxLength(500);
+            foreach (var p in new[] { nameof(EstimateVersion.Subtotal), nameof(EstimateVersion.Overhead), nameof(EstimateVersion.Profit), nameof(EstimateVersion.Tax), nameof(EstimateVersion.Total) })
+                e.Property(p).HasPrecision(12, 2);
+            e.Property(v => v.ContentJson).HasColumnType("json").Metadata.SetMaxLength(null);
+            e.Property(v => v.ContentHash).HasMaxLength(64);
+            e.Property(v => v.SignerName).HasMaxLength(150);
+            e.HasIndex(v => new { v.TenantId, v.EstimateId, v.VersionNo }).IsUnique();
+            e.HasOne<Estimate>().WithMany().HasForeignKey(v => v.EstimateId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureMeasurements(ModelBuilder b)

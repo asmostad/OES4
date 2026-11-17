@@ -188,6 +188,12 @@ else if (o.Outcome == Outcomes.Won)
     </div>
 
     <div class="col-xl-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-calculator text-level-estimate me-2"></i>Estimates
+                <a class="btn btn-sm btn-link ms-auto" href="/Estimates/New?opportunityId=@o.Id"><i class="bi bi-plus-lg"></i> New estimate</a></div>
+            @if (Model.Estimates.Count > 0) { <partial name="_EstimateTable" model="Model.Estimates" /> }
+            else { <div class="card-body small text-muted">No estimates yet.</div> }
+        </div>
         <partial name="_Timeline" model="Model.Timeline" />
     </div>
 </div>

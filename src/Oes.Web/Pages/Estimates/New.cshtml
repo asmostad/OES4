@@ -1,0 +1,56 @@
+@page
+@model Oes.Web.Pages.Estimates.NewModel
+@using Oes.Domain.Estimating
+@{
+    ViewData["Title"] = "New estimate";
+    var o = Model.Opportunity.Opportunity;
+}
+<div class="page-header">
+    <div>
+        <h1>New estimate</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Opportunities/View/@o.Id">@o.Number · @o.Name</a></li>
+            <li class="breadcrumb-item active">New estimate</li>
+        </ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <input type="hidden" asp-for="OpportunityId">
+    <div class="row"><div class="col-xl-8">
+        <div class="card mb-3 record-header level-estimate"><div class="card-body">
+            <div class="mb-3"><label class="form-label" for="en">Name</label><input id="en" name="Input.Name" value="@Model.Input.Name" class="form-control" maxlength="200"></div>
+            <label class="form-label d-block">Method</label>
+            <div class="method-choice">
+                <label class="method-option">
+                    <input type="radio" name="Input.Method" value="@EstimateMethods.PriceBook" checked="@(Model.Input.Method == EstimateMethods.PriceBook)" disabled="@(Model.PriceLists.Count == 0)" data-toggle-target="#price-list-pick">
+                    <span><strong><i class="bi bi-book me-1"></i>Price book</strong><br><small class="text-muted">Xactimate-style: pick items and activities from one of your price lists. Best for insurance work.</small></span>
+                </label>
+                <label class="method-option">
+                    <input type="radio" name="Input.Method" value="@EstimateMethods.LineItem" checked="@(Model.Input.Method == EstimateMethods.LineItem)">
+                    <span><strong><i class="bi bi-list-ul me-1"></i>Line items</strong><br><small class="text-muted">Your products and custom lines. Best for retail work.</small></span>
+                </label>
+            </div>
+            <div class="mt-3 @(Model.Input.Method == EstimateMethods.PriceBook ? "" : "d-none")" id="price-list-pick">
+                <label class="form-label" for="pl">Price list</label>
+                @if (Model.PriceLists.Count == 0)
+                {
+                    <div class="small text-muted">No active price lists yet. <a href="/PriceLists">Set one up</a>, or use line items.</div>
+                }
+                else
+                {
+                    <select id="pl" name="Input.PriceListId" class="form-select">
+                        @foreach (var p in Model.PriceLists) { <option value="@p.List.Id" selected="@(Model.Input.PriceListId == p.List.Id)">@p.List.Name (@p.List.EffectiveDate.ToString("MMM yyyy"), @p.ItemCount.ToString("N0") items)</option> }
+                    </select>
+                    <div class="form-text">Prices are copied onto each line when it's added, so later list changes won't alter this estimate.</div>
+                }
+            </div>
+            <div class="small text-muted mt-3"><i class="bi bi-rulers me-1"></i>Sections are created from the property's current measurements, so quantities are one click away.</div>
+        </div></div>
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create estimate</button>
+        <a class="btn btn-outline-secondary" href="/Opportunities/View/@o.Id">Cancel</a>
+    </div>
+</form>

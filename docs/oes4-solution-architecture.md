@@ -161,10 +161,19 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
    - Versions that are never overwritten, with a "vs previous" delta, revert by making an older version current, and the report file kept on the property.
    - Roof, elevation (per wall side) and linear modes.
    - Still to do: AI extraction from EagleView/Hover PDFs (needs the AI client from milestone 10).
-5. **Estimating**
-   - Catalog, price lists and importer, products.
-   - Price-book builder, line-item/takeoff method.
-   - Approvals, versions and signing, **proposal PDF**.
+5. **Estimating** (core done 2026-11-17)
+   - Done:
+     - Catalog separate from many dated price lists, with a CSV importer, list copying and price editing; products.
+     - Price-book and line-item estimates on one line model, with sections built from current measurements (one-click quantities) and prices copied onto lines.
+     - O&P and tax (materials, all or none).
+     - Approvals by exception (custom lines, below list, no price) with no self-approval.
+     - Frozen versions on issue (JSON snapshot plus hash, a revision reason after v1), sign/decline, and signing wins the opportunity.
+     - A printable proposal rendered from the frozen version.
+   - Still to do:
+     - Server-side PDF (Playwright).
+     - The takeoff rules engine and order sheet.
+     - Carrier scope import (AI).
+     - Tenant default terms.
 6. **Production**
    - Projects/trades, workflow stages with roles, kanban, automation rules, Remove from Board.
    - Change orders, order sheet.

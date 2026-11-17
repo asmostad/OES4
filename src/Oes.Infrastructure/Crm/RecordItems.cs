@@ -22,6 +22,12 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
     public async Task<List<(string Type, Guid Id)>> LinkTargetsAsync(string entityType, Guid entityId, CancellationToken ct = default)
     {
         var targets = new List<(string, Guid)> { (entityType, entityId) };
+        if (entityType == EntityTypes.Estimate)
+        {
+            var est = db.Estimates.Local.FirstOrDefault(x => x.Id == entityId) ?? await db.Estimates.FirstAsync(x => x.Id == entityId, ct);
+            targets.AddRange(await LinkTargetsAsync(EntityTypes.Opportunity, est.OpportunityId, ct));
+            return targets;
+        }
         if (entityType == EntityTypes.Claim)
         {
             // A claim sits under its opportunity: link to the claim, then everything above the opportunity.

@@ -1,0 +1,72 @@
+@page
+@model Oes.Web.Pages.PriceLists.IndexModel
+@using Oes.Domain.Estimating
+@{
+    ViewData["Title"] = "Price Lists";
+}
+<div class="page-header">
+    <div>
+        <h1>Price Lists</h1>
+        <p class="page-subtitle">Keep as many dated lists as you need. Each price-book estimate picks one, and its prices are copied onto the lines,
+            so changing or replacing a list never changes existing estimates.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-clickable mb-0 align-middle">
+                    <thead><tr><th>Name</th><th>Region</th><th>Effective</th><th>Status</th><th class="text-end">Items</th><th class="text-end">Estimates</th><th></th></tr></thead>
+                    <tbody>
+                        @if (Model.Lists.Count == 0)
+                        {
+                            <tr><td colspan="7"><div class="empty-state"><i class="bi bi-tags"></i><h5>No price lists yet</h5>
+                                <p>Create one, then import your prices from a CSV export. OES doesn't ship price data: use a list you're licensed to use.</p></div></td></tr>
+                        }
+                        @foreach (var r in Model.Lists)
+                        {
+                            <tr data-href="/PriceLists/View/@r.List.Id">
+                                <td class="fw-medium"><a href="/PriceLists/View/@r.List.Id">@r.List.Name</a></td>
+                                <td>@r.List.RegionCode</td>
+                                <td class="text-nowrap">@r.List.EffectiveDate.ToString("MMM d, yyyy")</td>
+                                <td><span class="badge @(r.List.Status == PriceListStatuses.Active ? "bg-success-subtle text-success" : r.List.Status == PriceListStatuses.Draft ? "bg-warning-subtle text-warning" : "bg-secondary-subtle text-secondary")">@Fmt.Cap(r.List.Status)</span></td>
+                                <td class="text-end">@r.ItemCount.ToString("N0")</td>
+                                <td class="text-end">@r.EstimateCount.ToString("N0")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#copy-@r.List.Id">Copy</button>
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="copy-@r.List.Id"><td colspan="7" class="bg-light">
+                                <form method="post" asp-page-handler="Copy" class="d-flex flex-wrap gap-2 align-items-center">
+                                    <input type="hidden" name="sourceId" value="@r.List.Id">
+                                    <span class="small">Start a new draft list from <strong>@r.List.Name</strong>:</span>
+                                    <input name="name" class="form-control form-control-sm w-auto" placeholder="New list name" required maxlength="150" aria-label="New list name">
+                                    <input type="date" name="effectiveDate" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" class="form-control form-control-sm w-auto" aria-label="Effective date">
+                                    <button class="btn btn-sm btn-primary" type="submit">Copy prices</button>
+                                </form>
+                            </td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="text-end mt-2"><a class="small" href="?showArchived=@(!Model.ShowArchived)">@(Model.ShowArchived ? "Hide archived" : "Show archived")</a></div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">New price list</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Create">
+                    <div class="mb-2"><label class="form-label" for="pn">Name</label><input id="pn" name="input.Name" class="form-control" required maxlength="150" placeholder="NE Lincoln – Nov 2026"></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><label class="form-label" for="pr">Region code</label><input id="pr" name="input.RegionCode" class="form-control" maxlength="30" placeholder="NELI8X"></div>
+                        <div class="col-6"><label class="form-label" for="pe">Effective</label><input id="pe" type="date" name="input.EffectiveDate" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" class="form-control" required></div>
+                    </div>
+                    <input type="hidden" name="input.Status" value="@PriceListStatuses.Draft">
+                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>Create</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

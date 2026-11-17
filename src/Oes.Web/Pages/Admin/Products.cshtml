@@ -1,0 +1,59 @@
+@page
+@model Oes.Web.Pages.Admin.ProductsModel
+@{
+    ViewData["Title"] = "Products";
+}
+<div class="page-header">
+    <div>
+        <h1>Products</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Products</li></ol></nav>
+    </div>
+</div>
+<p class="small text-muted">Products are priced items for line-item estimates (and order sheets later). Each line copies the product's price when added.</p>
+
+<form method="get" class="mb-2 d-flex gap-2 align-items-center">
+    <input name="q" value="@Model.Q" class="form-control form-control-sm list-search" placeholder="SKU or name" aria-label="Search products">
+    <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="showInactive" value="true" id="si" checked="@Model.ShowInactive" data-autosubmit-check><label class="form-check-label small" for="si">Show inactive</label></div>
+    <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle small">
+            <thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th>Trade</th><th>Cost</th><th>Price</th><th>Material</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var p in Model.Products)
+                {
+                    var fid = "prod-" + p.Id.ToString("N");
+                    <tr>
+                        <td><form method="post" asp-page-handler="Save" id="@fid"><input type="hidden" name="id" value="@p.Id"><input type="hidden" name="q" value="@Model.Q"></form>
+                            <input form="@fid" name="input.Sku" value="@p.Sku" class="form-control form-control-sm" style="max-width:120px" required maxlength="60" aria-label="SKU"></td>
+                        <td><input form="@fid" name="input.Name" value="@p.Name" class="form-control form-control-sm" required maxlength="200" aria-label="Name"></td>
+                        <td><input form="@fid" name="input.Unit" value="@p.Unit" class="form-control form-control-sm" style="max-width:70px" maxlength="10" aria-label="Unit"></td>
+                        <td><select form="@fid" name="input.TradeTypeId" class="form-select form-select-sm" aria-label="Trade"><option value="">—</option>
+                            @foreach (var t in Model.Trades) { <option value="@t.Id" selected="@(p.TradeTypeId == t.Id)">@t.Name</option> }</select></td>
+                        <td><input form="@fid" type="number" step="0.01" min="0" name="input.DefaultCost" value="@p.DefaultCost?.ToString("0.00")" class="form-control form-control-sm" style="max-width:100px" aria-label="Cost"></td>
+                        <td><input form="@fid" type="number" step="0.01" min="0" name="input.DefaultPrice" value="@p.DefaultPrice.ToString("0.00")" class="form-control form-control-sm" style="max-width:100px" required aria-label="Price"></td>
+                        <td><input form="@fid" class="form-check-input" type="checkbox" name="input.IsMaterial" value="true" checked="@p.IsMaterial" aria-label="Material (taxable)"></td>
+                        <td><input form="@fid" class="form-check-input" type="checkbox" name="input.IsActive" value="true" checked="@p.IsActive" aria-label="Active"></td>
+                        <td><button form="@fid" class="btn btn-sm btn-outline-primary" type="submit">Save</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body border-top">
+        <form method="post" asp-page-handler="Save" class="row g-2 align-items-end">
+            <input type="hidden" name="input.IsActive" value="true">
+            <div class="col-md-2"><label class="form-label small" for="ns">SKU</label><input id="ns" name="input.Sku" class="form-control form-control-sm" required maxlength="60"></div>
+            <div class="col-md-3"><label class="form-label small" for="nn">Name</label><input id="nn" name="input.Name" class="form-control form-control-sm" required maxlength="200"></div>
+            <div class="col-md-1"><label class="form-label small" for="nu">Unit</label><input id="nu" name="input.Unit" value="EA" class="form-control form-control-sm" maxlength="10"></div>
+            <div class="col-md-2"><label class="form-label small" for="nt">Trade</label><select id="nt" name="input.TradeTypeId" class="form-select form-select-sm"><option value="">—</option>
+                @foreach (var t in Model.Trades) { <option value="@t.Id">@t.Name</option> }</select></div>
+            <div class="col-md-1"><label class="form-label small" for="nc">Cost</label><input id="nc" type="number" step="0.01" min="0" name="input.DefaultCost" class="form-control form-control-sm"></div>
+            <div class="col-md-1"><label class="form-label small" for="np">Price</label><input id="np" type="number" step="0.01" min="0" name="input.DefaultPrice" class="form-control form-control-sm" required></div>
+            <div class="col-md-1"><div class="form-check"><input class="form-check-input" type="checkbox" name="input.IsMaterial" value="true" id="nm" checked><label class="form-check-label small" for="nm">Material</label></div></div>
+            <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit">Add</button></div>
+        </form>
+    </div>
+</div>

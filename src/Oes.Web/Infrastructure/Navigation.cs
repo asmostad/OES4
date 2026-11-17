@@ -8,7 +8,8 @@ namespace Oes.Web.Infrastructure;
 public sealed record NavItem(string Label, string Icon, string? Href, string? Permission = null, string[]? Match = null)
 {
     public bool IsActive(PathString path) =>
-        Href is not null && (Match ?? [Href]).Any(m => m == "/" ? path == "/" : path.StartsWithSegments(m));
+        Href is not null && (path.Equals(Href, StringComparison.OrdinalIgnoreCase)
+                             || (Match ?? [Href]).Any(m => m == "/" ? path == "/" : path.StartsWithSegments(m)));
 }
 
 public sealed record NavGroup(string Key, string Title, string Icon, IReadOnlyList<NavItem> Items);
@@ -38,8 +39,8 @@ public static class Navigation
             new("Contacts", "bi-people", "/Contacts"),
             new("Opportunities", "bi-funnel", "/Opportunities"),
             new("Measurements", "bi-rulers", "/Measurements"),
-            new("Estimates", "bi-file-earmark-text", null),
-            new("Price Approvals", "bi-patch-check", null, Permissions.PricingApprove),
+            new("Estimates", "bi-file-earmark-text", "/Estimates", Match: ["/Estimates/View", "/Estimates/New", "/Estimates/Index"]),
+            new("Price Approvals", "bi-patch-check", "/Estimates/Approvals", Permissions.PricingApprove),
         ]),
         new("Insurance",
         [
@@ -79,8 +80,8 @@ public static class Navigation
             ]),
             new("products", "Products & Estimating", "bi-box-seam",
             [
-                new("Catalog", "bi-box-seam", null, Permissions.ProductsManage),
-                new("Price Lists", "bi-tags", null, Permissions.PriceListsManage),
+                new("Products", "bi-box-seam", "/Admin/Products", Permissions.ProductsManage),
+                new("Price Lists", "bi-tags", "/PriceLists", Permissions.PriceListsManage),
                 new("Trades & Measurements", "bi-hammer", "/Admin/Trades", Permissions.ProductsManage),
                 new("Takeoff Rules", "bi-rulers", null, Permissions.ProductsManage),
             ]),
