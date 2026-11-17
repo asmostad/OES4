@@ -126,6 +126,40 @@ else if (o.Outcome == Outcomes.Won)
             </div>
         }
 
+        @if (o.IsInsurance || Model.Claim is not null)
+        {
+            <div class="card mb-3 record-header level-claim">
+                <div class="card-header d-flex align-items-center"><i class="bi bi-shield-check text-level-claim me-2"></i>Insurance claim
+                    @if (Model.Claim is not null) { <a class="btn btn-sm btn-link ms-auto" href="/Claims/View/@Model.Claim.Claim.Id">Open</a> }</div>
+                <div class="card-body small">
+                    @if (Model.Claim is { } cl)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="fw-semibold fs-6">@(cl.Claim.ClaimNumber ?? "Not filed yet")</span>
+                            <span class="claim-status claim-@cl.Claim.Status">@Oes.Infrastructure.Insurance.ClaimService.Label(cl.Claim.Status)</span>
+                        </div>
+                        <div class="text-muted">@(cl.Carrier?.Name ?? "Carrier not set")@(cl.Adjuster is null ? "" : " · Adjuster " + cl.Adjuster.DisplayName)</div>
+                        @if (cl.Claim.InspectionOn is not null) { <div><i class="bi bi-calendar-event me-1"></i>Inspection @cl.Claim.InspectionOn.Value.ToString("ddd, MMM d")</div> }
+                        @if (cl.TotalApproved is not null) { <div><i class="bi bi-cash-stack me-1"></i>Approved @Fmt.Money(cl.TotalApproved)</div> }
+                        @if (cl.Supplements.Count > 0) { <div class="text-muted">@cl.Supplements.Count supplement@(cl.Supplements.Count == 1 ? "" : "s")</div> }
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-2">No claim yet. Start one now, or once the homeowner files. Every field can wait.</p>
+                        <a class="btn btn-sm btn-primary" href="/Claims/Edit?opportunityId=@o.Id"><i class="bi bi-plus-lg me-1"></i>Start claim</a>
+                    }
+                </div>
+                @if (Model.Storm is not null)
+                {
+                    <div class="card-footer small"><i class="bi bi-cloud-lightning-rain me-1"></i>Storm: <a href="/Storms/View/@Model.Storm.Id">@Model.Storm.Name</a></div>
+                }
+                else if (Model.SuggestedStorm is not null)
+                {
+                    <div class="card-footer small text-muted"><i class="bi bi-lightbulb me-1"></i>Possibly <a href="/Storms/View/@Model.SuggestedStorm.Id">@Model.SuggestedStorm.Name</a>. Set it on Edit.</div>
+                }
+            </div>
+        }
+
         <div class="card mb-3">
             <div class="card-header"><i class="bi bi-person text-level-contact me-2"></i>Contact</div>
             <div class="card-body">

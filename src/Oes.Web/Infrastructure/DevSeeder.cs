@@ -78,7 +78,53 @@ public static class DevSeeder
             await tdb.SaveChangesAsync(ct);
         }
 
-        if (tenantIds.Count > 0) await SampleDataAsync(root, tenantIds[0], log, ct);
+        if (tenantIds.Count > 0)
+        {
+            await SampleDataAsync(root, tenantIds[0], log, ct);
+            await SampleInsuranceAsync(root, tenantIds[0], log, ct);
+        }
+    }
+
+    /// <summary>A storm plus a claim on the Smith hail opportunity.</summary>
+    private static async Task SampleInsuranceAsync(IServiceProvider root, Guid tenantId, ILogger log, CancellationToken ct)
+    {
+        using var scope = root.CreateScope();
+        scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<OesDbContext>();
+        if (await db.StormEvents.AnyAsync(ct)) return;
+
+        var storm = new Oes.Domain.Insurance.StormEvent
+        {
+            Name = "May 14 2026 hail – Lincoln", EventDate = new DateOnly(2026, 5, 14), PerilKey = "hail",
+            MaxHailSizeIn = 1.75m, MaxWindMph = 60, ZipCodes = "68502, 68508, 68510, 68516",
+            Notes = "Golf-ball hail across south and central Lincoln, 4:10–4:45 pm.",
+        };
+        db.StormEvents.Add(storm);
+
+        foreach (var o in await db.Opportunities.Where(o => o.IsInsurance).ToListAsync(ct)) o.StormEventId = storm.Id;
+
+        var smith = await db.Opportunities.FirstOrDefaultAsync(o => o.Name.StartsWith("Smith hail"), ct);
+        if (smith is not null)
+        {
+            var stateFarm = Guid.Parse("00000000-0000-7000-8000-000000000022");
+            var tc = new Oes.Domain.Insurance.TenantCarrier { CarrierId = stateFarm, Notes = "Sample: supplements go to the desk adjuster by email with photos attached." };
+            db.TenantCarriers.Add(tc);
+            var claim = new Oes.Domain.Insurance.InsuranceClaim
+            {
+                OpportunityId = smith.Id, PropertyId = smith.PropertyId, TenantCarrierId = tc.Id, StormEventId = storm.Id,
+                ClaimNumber = "13-48B2-77X", PolicyNumber = "SF-99-1234", DateOfLoss = storm.EventDate, PerilKey = "hail",
+                Deductible = 1000m, Status = Oes.Domain.Insurance.ClaimStatuses.Approved, FiledOn = new DateOnly(2026, 5, 20),
+                InspectionOn = new DateOnly(2026, 6, 2), ApprovedAmount = 16850m,
+            };
+            db.Claims.Add(claim);
+            db.Supplements.Add(new Oes.Domain.Insurance.Supplement
+            {
+                ClaimId = claim.Id, Reason = "Drip edge and starter course", Status = Oes.Domain.Insurance.SupplementStatuses.Sent,
+                RequestedAmount = 1240m, SentOn = new DateOnly(2026, 6, 10),
+            });
+        }
+        await db.SaveChangesAsync(ct);
+        log.LogInformation("Seeded sample insurance data");
     }
 
     /// <summary>A handful of contacts, properties and opportunities so the CRM screens have something to show.</summary>

@@ -1,0 +1,104 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Storms.ViewModel
+@using Oes.Infrastructure.Insurance
+@inject Shell ShellService
+@{
+    var s = Model.Storm;
+    ViewData["Title"] = s.Name;
+    var shell = await ShellService.GetAsync();
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Storm,
+        Title = s.Name,
+        Subtitle = $"{s.EventDate:dddd, MMM d, yyyy} · {Fmt.Cap(s.PerilKey)}"
+                   + (s.MaxHailSizeIn is null ? "" : $" · up to {s.MaxHailSizeIn:0.##}\" hail")
+                   + (s.MaxWindMph is null ? "" : $" · {s.MaxWindMph} mph wind"),
+        Chips = s.Zips.Take(12).Select(z => new RecordChip("bi-geo", z, null)).ToList(),
+        Status = s.ArchivedAt is null ? null : "Archived",
+    };
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (shell?.Can(Permissions.StormsManage) == true) { <a class="btn btn-sm btn-outline-secondary" href="/Storms/Edit/@s.Id"><i class="bi bi-pencil me-1"></i>Edit</a> }
+    <a class="btn btn-sm btn-outline-primary" href="/Opportunities?storm=@s.Id"><i class="bi bi-kanban me-1"></i>Pipeline for this storm</a>
+    <a class="btn btn-sm btn-primary" href="/Opportunities/New?stormId=@s.Id"><i class="bi bi-plus-lg me-1"></i>New lead for this storm</a>
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (label, value, icon) in new[]
+    {
+        ("Leads", Model.Stats.Opportunities.ToString(), "bi-funnel"),
+        ("Claims", Model.Stats.Claims.ToString(), "bi-shield-check"),
+        ("Pipeline (not lost)", Fmt.Money(Model.Stats.PipelineValue), "bi-currency-dollar"),
+        ("Properties not yet worked", Model.Untouched.Count.ToString() + (Model.Untouched.Count == 100 ? "+" : ""), "bi-door-open"),
+    })
+    {
+        <div class="col-sm-6 col-xl-3"><div class="card stat-card"><div class="d-flex align-items-center">
+            <div class="stat-icon bg-primary-subtle text-primary"><i class="bi @icon"></i></div>
+            <div class="ms-3"><div class="stat-value fs-5">@value</div><div class="stat-label">@label</div></div>
+        </div></div></div>
+    }
+</div>
+
+@if (s.Notes is not null) { <div class="alert alert-light border pre-wrap">@s.Notes</div> }
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-funnel text-level-opportunity me-2"></i>Leads from this storm</div>
+            <div class="table-responsive">
+                <table class="table table-clickable mb-0 align-middle small">
+                    <tbody>
+                        @if (Model.Opportunities.Count == 0) { <tr><td class="text-muted">No leads tagged with this storm yet.</td></tr> }
+                        @foreach (var o in Model.Opportunities)
+                        {
+                            <tr data-href="/Opportunities/View/@o.Id">
+                                <td><a href="/Opportunities/View/@o.Id" class="fw-medium">@o.Name</a><div class="text-muted">@o.ContactName · @(o.Address ?? "no address")</div></td>
+                                <td class="text-nowrap"><span class="stage-pill" style="--stage-color:@o.StageColor">@o.StageName</span></td>
+                                <td class="text-end">@Fmt.Money(o.ExpectedValue)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-shield-check text-level-claim me-2"></i>Claims</div>
+            <div class="table-responsive">
+                <table class="table table-clickable mb-0 align-middle small">
+                    <tbody>
+                        @if (Model.Claims.Count == 0) { <tr><td class="text-muted">No claims on this storm yet.</td></tr> }
+                        @foreach (var c in Model.Claims)
+                        {
+                            <tr data-href="/Claims/View/@c.Id">
+                                <td><a href="/Claims/View/@c.Id" class="fw-medium">@(c.ClaimNumber ?? "Not filed")</a><div class="text-muted">@c.ContactName</div></td>
+                                <td>@c.CarrierName</td>
+                                <td><span class="claim-status claim-@c.Status">@ClaimService.Label(c.Status)</span></td>
+                                <td class="text-end">@Fmt.Money(c.ApprovedAmount)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-door-open me-2"></i>Canvass list</div>
+            <div class="card-body small text-muted pb-0">Properties you already know in this storm's ZIPs that have no lead on this storm yet.</div>
+            <ul class="list-group list-group-flush small">
+                @if (Model.Untouched.Count == 0) { <li class="list-group-item text-muted">@(s.Zips.Any() ? "Every known property here has a lead." : "Add ZIP codes to the storm to build this list.")</li> }
+                @foreach (var p in Model.Untouched)
+                {
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <i class="bi bi-house-door text-level-property"></i>
+                        <div class="flex-grow-1"><a href="/Properties/View/@p.Id">@p.Line1</a><div class="text-muted">@p.CityLine</div></div>
+                        <a class="btn btn-sm btn-outline-primary" href="/Opportunities/New?propertyId=@p.Id&stormId=@s.Id">Lead</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>

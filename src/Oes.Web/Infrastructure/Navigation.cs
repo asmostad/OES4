@@ -1,4 +1,4 @@
-﻿using Oes.Application.Security;
+using Oes.Application.Security;
 
 namespace Oes.Web.Infrastructure;
 
@@ -42,8 +42,8 @@ public static class Navigation
         ]),
         new("Insurance",
         [
-            new("Claims", "bi-shield-check", null),
-            new("Storm Events", "bi-cloud-lightning-rain", null),
+            new("Claims", "bi-shield-check", "/Claims"),
+            new("Storm Events", "bi-cloud-lightning-rain", "/Storms"),
         ]),
         new("Production",
         [
@@ -88,10 +88,11 @@ public static class Navigation
                 new("Users", "bi-person-gear", "/Admin/Users", Permissions.UsersManage),
                 new("Roles & Permissions", "bi-shield-lock", "/Admin/Roles", Permissions.RolesManage),
                 new("Subcontractors", "bi-people-fill", null, Permissions.SubcontractorsManage),
-                new("Insurance Carriers", "bi-shield-check", null, Permissions.CarriersManage),
+                new("Insurance Carriers", "bi-shield-check", "/Admin/Carriers", Permissions.CarriersManage),
             ]),
             new("system", "System", "bi-gear",
             [
+                new("Pipeline & Lists", "bi-list-check", "/Admin/Lists", Permissions.SettingsManage),
                 new("Settings", "bi-gear", null, Permissions.SettingsManage),
                 new("Audit Log", "bi-journal-check", "/Admin/Audit", Permissions.AuditView),
                 new("AI Knowledge Base", "bi-journal-text", null, Permissions.AiManage),

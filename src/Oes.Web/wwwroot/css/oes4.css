@@ -18,7 +18,15 @@
     --level-project-bg:    #ecfdf5;
     --level-trade:         #0d9488;  /* teal */
     --level-trade-bg:      #f0fdfa;
+    --level-claim:         #0891b2;  /* cyan */
+    --level-claim-bg:      #ecfeff;
+    --level-storm:         #334155;  /* storm slate-blue */
+    --level-storm-bg:      #e0e7ff;
 }
+.level-claim        { --level-accent: var(--level-claim);        --level-bg: var(--level-claim-bg); }
+.level-storm        { --level-accent: var(--level-storm);        --level-bg: var(--level-storm-bg); }
+.text-level-claim   { color: var(--level-claim) !important; }
+.text-level-storm   { color: var(--level-storm) !important; }
 
 .level-property     { --level-accent: var(--level-property);     --level-bg: var(--level-property-bg); }
 .level-contact      { --level-accent: var(--level-contact);      --level-bg: var(--level-contact-bg); }
@@ -96,6 +104,23 @@
 
 .divider-text { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; color: var(--oes-text-muted); font-size: 0.75rem; }
 .divider-text::before, .divider-text::after { content: ""; flex: 1; border-top: 1px solid var(--oes-border); }
+
+/* Claim and supplement status pills */
+.claim-status { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: 999px; background: var(--oes-body-bg); color: var(--oes-text-secondary); }
+.claim-not_filed { background: #f1f5f9; color: #64748b; }
+.claim-open, .supp-sent { background: var(--oes-info-bg); color: #0e7490; }
+.claim-approved, .supp-approved { background: var(--oes-success-bg); color: #047857; }
+.claim-denied, .supp-denied { background: var(--oes-danger-bg); color: #b91c1c; }
+.claim-closed { background: #e2e8f0; color: #334155; }
+.supp-needed { background: var(--oes-warning-bg); color: #b45309; }
+.supp-partial { background: #fef9c3; color: #854d0e; }
+
+/* Storm cards */
+.storm-card { border-left: 4px solid var(--level-storm); }
+.storm-card .record-icon { width: 40px; height: 40px; font-size: 1.15rem; background: var(--level-storm); }
+.storm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem; text-align: center; }
+.storm-stats strong { display: block; color: var(--oes-text); font-size: 0.95rem; }
+.storm-stats span { font-size: 0.7rem; color: var(--oes-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Stage pill */
 .stage-pill {

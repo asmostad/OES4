@@ -12,7 +12,8 @@ namespace Oes.Web.Pages.Opportunities;
 /// arrive without one) and, when given, reuses an existing property instead of duplicating it.
 /// </summary>
 [HasPermission(Permissions.RecordsCreate)]
-public class NewModel(OpportunityService opportunities, ContactService contacts, PropertyService properties, CrmLookups lookups, RecordScope scope)
+public class NewModel(OpportunityService opportunities, ContactService contacts, PropertyService properties, CrmLookups lookups, RecordScope scope,
+    Oes.Infrastructure.Insurance.StormService storms)
     : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid? ContactId { get; set; }
@@ -31,11 +32,23 @@ public class NewModel(OpportunityService opportunities, ContactService contacts,
     public List<Option> Users { get; private set; } = [];
     public List<Option> Sources { get; private set; } = [];
     public List<Option> Perils { get; private set; } = [];
+    public List<Oes.Infrastructure.Insurance.StormRow> Storms { get; private set; } = [];
+    [BindProperty(SupportsGet = true)] public Guid? StormId { get; set; }
     public List<PipelineStage> Stages { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync() => Guard(async () =>
     {
         Input.OwnerUserId = scope.Me;
+        if (StormId is { } stormId)
+        {
+            // Coming from a storm's page or canvass list: it's an insurance lead on that storm.
+            var storm = await storms.GetAsync(stormId);
+            Input.IsInsurance = true;
+            Input.StormEventId = storm.Id;
+            Input.PerilKey = storm.PerilKey;
+            Input.DateOfLoss = storm.EventDate;
+            Input.SourceKey = "storm_canvass";
+        }
         if (ContactId is { } cid) ContactLabel = (await contacts.GetAsync(cid)).Contact.DisplayName;
         if (PropertyId is { } pid)
         {
@@ -97,6 +110,7 @@ public class NewModel(OpportunityService opportunities, ContactService contacts,
         Users = await lookups.UsersAsync();
         Sources = await lookups.ValuesAsync(LookupTypes.LeadSource);
         Perils = await lookups.ValuesAsync(LookupTypes.Peril);
+        Storms = await storms.ListAsync();
         Stages = (await opportunities.StagesAsync()).Where(s => s.Outcome == Outcomes.Open).ToList();
     }
 }

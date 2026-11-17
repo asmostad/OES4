@@ -1,4 +1,4 @@
-@model (Oes.Infrastructure.Crm.OpportunityInput Input, List<Oes.Infrastructure.Crm.Option> Users, List<Oes.Infrastructure.Crm.Option> Sources, List<Oes.Infrastructure.Crm.Option> Perils, List<Oes.Domain.Crm.PipelineStage>? Stages)
+@model (Oes.Infrastructure.Crm.OpportunityInput Input, List<Oes.Infrastructure.Crm.Option> Users, List<Oes.Infrastructure.Crm.Option> Sources, List<Oes.Infrastructure.Crm.Option> Perils, List<Oes.Domain.Crm.PipelineStage>? Stages, List<Oes.Infrastructure.Insurance.StormRow> Storms)
 @{
     var i = Model.Input;
 }
@@ -54,7 +54,14 @@
                 <label class="form-label" for="odol">Date of loss</label>
                 <input id="odol" name="Input.DateOfLoss" type="date" value="@i.DateOfLoss?.ToString("yyyy-MM-dd")" class="form-control">
             </div>
-            <div class="col-md-4 small text-muted align-self-end">Claim number, carrier and adjuster are added once a claim is filed.</div>
+            <div class="col-md-4">
+                <label class="form-label" for="ostorm">Storm</label>
+                <select id="ostorm" name="Input.StormEventId" class="form-select">
+                    <option value="">—</option>
+                    @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(i.StormEventId == s.Id)">@s.Name</option> }
+                </select>
+            </div>
+            <div class="col-12 small text-muted">Claim number, carrier and adjusters go on the claim, which you can start from the opportunity page.</div>
         </div>
     </div>
     <div class="col-12">

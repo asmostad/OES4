@@ -4,7 +4,7 @@ namespace Oes.Web.Infrastructure;
 /// The record levels. Each gets its own accent, icon and header band so users always know
 /// which level they're on (design decision 6).
 /// </summary>
-public enum RecordLevel { Property, Contact, Organization, Opportunity, Estimate, Project, Trade }
+public enum RecordLevel { Property, Contact, Organization, Opportunity, Claim, Estimate, Project, Trade, Storm }
 
 public static class RecordLevels
 {
@@ -14,6 +14,8 @@ public static class RecordLevels
         RecordLevel.Contact => "bi-person",
         RecordLevel.Organization => "bi-building",
         RecordLevel.Opportunity => "bi-funnel",
+        RecordLevel.Claim => "bi-shield-check",
+        RecordLevel.Storm => "bi-cloud-lightning-rain",
         RecordLevel.Estimate => "bi-calculator",
         RecordLevel.Project => "bi-hammer",
         RecordLevel.Trade => "bi-layers",

@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = "Opportunities";
     var isBoard = Model.View != "list";
-    string Toggle(string view) => $"?view={view}&q={Uri.EscapeDataString(Model.Q ?? "")}&mine={Model.Mine.ToString().ToLowerInvariant()}";
+    string Toggle(string view) => $"?view={view}&q={Uri.EscapeDataString(Model.Q ?? "")}&mine={Model.Mine.ToString().ToLowerInvariant()}&storm={Model.StormId}";
 }
 <div class="page-header">
     <div>
@@ -34,6 +34,13 @@
             <select name="outcome" class="form-select form-select-sm w-auto" data-autosubmit>
                 <option value="">Any outcome</option>
                 @foreach (var o in new[] { Outcomes.Open, Outcomes.Won, Outcomes.Lost }) { <option value="@o" selected="@(Model.Outcome == o)">@Fmt.Cap(o)</option> }
+            </select>
+        }
+        @if (Model.Storms.Count > 0)
+        {
+            <select name="storm" class="form-select form-select-sm w-auto" data-autosubmit aria-label="Storm">
+                <option value="">Any storm</option>
+                @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(Model.StormId == s.Id)">@s.Name</option> }
             </select>
         }
         <div class="form-check mb-0 ms-1">

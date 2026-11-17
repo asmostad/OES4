@@ -59,11 +59,22 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
                             || db.PropertyContacts.Any(pc => pc.PropertyId == p.Id && contacts.Any(c => c.Id == pc.ContactId)));
     }
 
+    /// <summary>Claims follow their opportunity's visibility.</summary>
+    public async Task<IQueryable<Domain.Insurance.InsuranceClaim>> ClaimsAsync(bool includeArchived = false)
+    {
+        var q = db.Claims.AsQueryable();
+        if (!includeArchived) q = q.Where(c => c.ArchivedAt == null);
+        if (await ViewAllAsync()) return q;
+        var opps = await OpportunitiesAsync(includeArchived: true);
+        return q.Where(c => opps.Any(o => o.Id == c.OpportunityId));
+    }
+
     public async Task<bool> CanSeeAsync(string entityType, Guid id) => entityType switch
     {
         EntityTypes.Contact => await (await ContactsAsync(true)).AnyAsync(c => c.Id == id),
         EntityTypes.Property => await (await PropertiesAsync(true)).AnyAsync(p => p.Id == id),
         EntityTypes.Opportunity => await (await OpportunitiesAsync(true)).AnyAsync(o => o.Id == id),
+        EntityTypes.Claim => await (await ClaimsAsync(true)).AnyAsync(c => c.Id == id),
         _ => false,
     };
 
@@ -94,6 +105,7 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         EntityTypes.Contact => "Contact",
         EntityTypes.Property => "Property",
         EntityTypes.Opportunity => "Opportunity",
+        EntityTypes.Claim => "Claim",
         _ => "Record",
     };
 }

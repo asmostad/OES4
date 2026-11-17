@@ -149,7 +149,12 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
      - Saved views, campaigns, the property/contact merge tool.
      - Contact mailing addresses and consents (needed before SMS and blasts).
      - Admin screens for pipeline stages and pick lists (defaults are seeded).
-3. **Insurance** — carriers (platform + tenant), claims, supplements.
+3. **Insurance** (done 2026-11-17)
+   - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
+   - Claims: optional until filed, and visibility follows the opportunity; notes roll up to the opportunity, property and contact.
+   - Supplements with status, amounts and dates.
+   - Storm events with ZIP codes, a canvass list and storm suggestions; storm filters on the pipeline and claims.
+   - Admin screens for pipeline stages and pick lists.
 4. **Measurements** — measurement page, sets/versions, field definitions, AI report extraction.
 5. **Estimating**
    - Catalog, price lists and importer, products.

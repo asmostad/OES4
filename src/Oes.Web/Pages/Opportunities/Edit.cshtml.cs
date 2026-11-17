@@ -5,7 +5,7 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Opportunities;
 
-public class EditModel(OpportunityService opportunities, CrmLookups lookups) : CrmPageModel
+public class EditModel(OpportunityService opportunities, CrmLookups lookups, Oes.Infrastructure.Insurance.StormService storms) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
     [BindProperty] public OpportunityInput Input { get; set; } = new();
@@ -14,6 +14,7 @@ public class EditModel(OpportunityService opportunities, CrmLookups lookups) : C
     public List<Option> Users { get; private set; } = [];
     public List<Option> Sources { get; private set; } = [];
     public List<Option> Perils { get; private set; } = [];
+    public List<Oes.Infrastructure.Insurance.StormRow> Storms { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync() => Guard(async () =>
     {
@@ -24,6 +25,7 @@ public class EditModel(OpportunityService opportunities, CrmLookups lookups) : C
         {
             Name = o.Name, OwnerUserId = o.OwnerUserId, SourceKey = o.SourceKey, ExpectedValue = o.ExpectedValue,
             IsInsurance = o.IsInsurance, PerilKey = o.PerilKey, DateOfLoss = o.DateOfLoss, Description = o.Description,
+            StormEventId = o.StormEventId,
             PrimaryContactId = o.PrimaryContactId, PropertyId = o.PropertyId,
         };
         Title = o.Name;
@@ -56,5 +58,6 @@ public class EditModel(OpportunityService opportunities, CrmLookups lookups) : C
         Users = await lookups.UsersAsync();
         Sources = await lookups.ValuesAsync(LookupTypes.LeadSource);
         Perils = await lookups.ValuesAsync(LookupTypes.Peril);
+        Storms = await storms.ListAsync();
     }
 }

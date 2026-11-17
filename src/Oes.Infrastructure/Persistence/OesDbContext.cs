@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oes.Application.Abstractions;
 using Oes.Domain.Common;
 using Oes.Domain.Crm;
+using Oes.Domain.Insurance;
 using Oes.Domain.Tenancy;
 using Oes.Infrastructure.Identity;
 
@@ -44,6 +45,13 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
     public DbSet<RecordLink> RecordLinks => Set<RecordLink>();
+
+    // Insurance
+    public DbSet<Carrier> Carriers => Set<Carrier>();
+    public DbSet<TenantCarrier> TenantCarriers => Set<TenantCarrier>();
+    public DbSet<StormEvent> StormEvents => Set<StormEvent>();
+    public DbSet<InsuranceClaim> Claims => Set<InsuranceClaim>();
+    public DbSet<Supplement> Supplements => Set<Supplement>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -148,7 +156,88 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         });
 
         ConfigureCrm(b);
+        ConfigureInsurance(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureInsurance(ModelBuilder b)
+    {
+        b.Entity<Carrier>(e =>
+        {
+            e.ToTable("carriers");
+            e.Property(c => c.Name).HasMaxLength(150);
+            e.Property(c => c.Phone).HasMaxLength(40);
+            e.Property(c => c.ClaimsEmail).HasMaxLength(254);
+            e.Property(c => c.ClaimsFax).HasMaxLength(40);
+            e.Property(c => c.Website).HasMaxLength(200);
+            e.Property(c => c.PreferredSubmission).HasMaxLength(30);
+            e.Property(c => c.Address).HasMaxLength(300);
+            e.HasIndex(c => c.Name).IsUnique();
+            e.HasData(PlatformCarriers.Seed());
+        });
+
+        b.Entity<TenantCarrier>(e =>
+        {
+            e.ToTable("tenant_carriers");
+            e.Property(c => c.Name).HasMaxLength(150);
+            e.Property(c => c.Phone).HasMaxLength(40);
+            e.Property(c => c.ClaimsEmail).HasMaxLength(254);
+            e.Property(c => c.ClaimsFax).HasMaxLength(40);
+            e.Property(c => c.Website).HasMaxLength(200);
+            e.Property(c => c.PreferredSubmission).HasMaxLength(30);
+            e.Property(c => c.Address).HasMaxLength(300);
+            e.Property(c => c.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(c => new { c.TenantId, c.CarrierId });
+            e.HasOne<Carrier>().WithMany().HasForeignKey(c => c.CarrierId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<StormEvent>(e =>
+        {
+            e.ToTable("storm_events");
+            e.Property(s => s.Name).HasMaxLength(150);
+            e.Property(s => s.PerilKey).HasMaxLength(60);
+            e.Property(s => s.MaxHailSizeIn).HasPrecision(4, 2);
+            e.Property(s => s.ZipCodes).HasMaxLength(2000);
+            e.Property(s => s.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(s => new { s.TenantId, s.EventDate });
+            e.Ignore(s => s.Zips);
+        });
+
+        b.Entity<InsuranceClaim>(e =>
+        {
+            e.ToTable("insurance_claims");
+            e.Property(c => c.ClaimNumber).HasMaxLength(60);
+            e.Property(c => c.PolicyNumber).HasMaxLength(60);
+            e.Property(c => c.PerilKey).HasMaxLength(60);
+            e.Property(c => c.Status).HasMaxLength(20);
+            e.Property(c => c.Deductible).HasPrecision(12, 2);
+            e.Property(c => c.ApprovedAmount).HasPrecision(12, 2);
+            e.Property(c => c.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(c => new { c.TenantId, c.OpportunityId });
+            e.HasIndex(c => new { c.TenantId, c.PropertyId });
+            e.HasIndex(c => new { c.TenantId, c.ClaimNumber });
+            e.HasIndex(c => new { c.TenantId, c.StormEventId });
+            e.HasOne<Opportunity>().WithMany().HasForeignKey(c => c.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Property>().WithMany().HasForeignKey(c => c.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<TenantCarrier>().WithMany().HasForeignKey(c => c.TenantCarrierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StormEvent>().WithMany().HasForeignKey(c => c.StormEventId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Contact>().WithMany().HasForeignKey(c => c.AdjusterContactId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Contact>().WithMany().HasForeignKey(c => c.DeskAdjusterContactId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Supplement>(e =>
+        {
+            e.ToTable("supplements");
+            e.Property(s => s.Status).HasMaxLength(20);
+            e.Property(s => s.Reason).HasMaxLength(500);
+            e.Property(s => s.RequestedAmount).HasPrecision(12, 2);
+            e.Property(s => s.ApprovedAmount).HasPrecision(12, 2);
+            e.Property(s => s.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(s => new { s.TenantId, s.ClaimId });
+            e.HasOne<InsuranceClaim>().WithMany().HasForeignKey(s => s.ClaimId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Opportunity>().HasOne<StormEvent>().WithMany().HasForeignKey(o => o.StormEventId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureCrm(ModelBuilder b)

@@ -19,6 +19,7 @@ public sealed class OpportunityInput
     public bool IsInsurance { get; set; }
     public string? PerilKey { get; set; }
     public DateOnly? DateOfLoss { get; set; }
+    public Guid? StormEventId { get; set; }
     public string? Description { get; set; }
 }
 
@@ -64,19 +65,19 @@ public sealed class OpportunityService(
         await db.PipelineStages.Where(s => s.IsActive).OrderBy(s => s.Sort).ToListAsync(ct);
 
     public async Task<PagedResult<OpportunityRow>> SearchAsync(string? q, Guid? stageId, string? outcome, bool mine, int page = 1,
-        int pageSize = 25, CancellationToken ct = default)
+        int pageSize = 25, CancellationToken ct = default, Guid? stormId = null)
     {
-        var opps = await Filter(q, stageId, outcome, mine);
+        var opps = await Filter(q, stageId, outcome, mine, stormId);
         var total = await opps.CountAsync(ct);
         page = Math.Max(1, page);
         var rows = await Rows(opps.OrderByDescending(o => o.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize), ct);
         return new PagedResult<OpportunityRow>(rows, total, page, pageSize);
     }
 
-    public async Task<List<BoardColumn>> BoardAsync(string? q, bool mine, CancellationToken ct = default)
+    public async Task<List<BoardColumn>> BoardAsync(string? q, bool mine, CancellationToken ct = default, Guid? stormId = null)
     {
         var stages = await StagesAsync(ct);
-        var opps = await Filter(q, null, null, mine);
+        var opps = await Filter(q, null, null, mine, stormId);
         // Open work, plus anything closed in the last 30 days so wins and losses stay visible for a while.
         var cutoff = clock.UtcNow.AddDays(-30);
         opps = opps.Where(o => o.Outcome == Outcomes.Open || o.ClosedAt >= cutoff);
@@ -84,9 +85,10 @@ public sealed class OpportunityService(
         return stages.Select(s => new BoardColumn(s, rows.Where(r => r.StageId == s.Id).ToList())).ToList();
     }
 
-    private async Task<IQueryable<Opportunity>> Filter(string? q, Guid? stageId, string? outcome, bool mine)
+    private async Task<IQueryable<Opportunity>> Filter(string? q, Guid? stageId, string? outcome, bool mine, Guid? stormId)
     {
         var opps = await scope.OpportunitiesAsync();
+        if (stormId is { } storm) opps = opps.Where(o => o.StormEventId == storm);
         if (stageId is { } sid) opps = opps.Where(o => o.StageId == sid);
         if (!string.IsNullOrWhiteSpace(outcome)) opps = opps.Where(o => o.Outcome == outcome);
         if (mine) opps = opps.Where(o => o.OwnerUserId == scope.Me);
@@ -145,6 +147,8 @@ public sealed class OpportunityService(
     {
         await scope.EnsurePermissionAsync(Permissions.RecordsCreate);
         await scope.EnsureCanSeeAsync(EntityTypes.Contact, input.PrimaryContactId);
+        if (input.StormEventId is { } stormId && !await db.StormEvents.AnyAsync(s => s.Id == stormId, ct))
+            throw new CrmRuleException("Unknown storm.");
         if (input.PropertyId is { } pid) await scope.EnsureCanSeeAsync(EntityTypes.Property, pid);
         await contacts.EnsureOwnerIsMemberAsync(input.OwnerUserId, ct);
 
@@ -202,6 +206,7 @@ public sealed class OpportunityService(
         o.IsInsurance = input.IsInsurance;
         o.PerilKey = input.IsInsurance ? ContactService.Clean(input.PerilKey) : null;
         o.DateOfLoss = input.IsInsurance ? input.DateOfLoss : null;
+        o.StormEventId = input.IsInsurance ? input.StormEventId : null;
         o.Description = ContactService.Clean(input.Description);
     }
 
@@ -247,6 +252,8 @@ public sealed class OpportunityService(
         if (o.PropertyId is not null) throw new CrmRuleException("This opportunity already has a property.");
 
         o.PropertyId = propertyId;
+        foreach (var claim in await db.Claims.Where(c => c.OpportunityId == id && c.PropertyId == null).ToListAsync(ct))
+            claim.PropertyId = propertyId;
         await EnsureContactOnPropertyAsync(propertyId, o.PrimaryContactId, ct);
         await items.PropagateLinksAsync(EntityTypes.Opportunity, id, EntityTypes.Property, propertyId, ct);
         var address = (await db.Properties.FirstAsync(p => p.Id == propertyId, ct)).SingleLine;

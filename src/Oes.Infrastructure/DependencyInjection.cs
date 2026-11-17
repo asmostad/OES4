@@ -44,6 +44,11 @@ public static class DependencyInjection
         services.AddScoped<Crm.PropertyService>();
         services.AddScoped<Crm.OpportunityService>();
         services.AddScoped<Crm.CrmLookups>();
+        services.AddScoped<Crm.ListSettingsService>();
+
+        services.AddScoped<Insurance.CarrierService>();
+        services.AddScoped<Insurance.StormService>();
+        services.AddScoped<Insurance.ClaimService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

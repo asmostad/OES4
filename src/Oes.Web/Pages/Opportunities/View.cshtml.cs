@@ -5,7 +5,8 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Opportunities;
 
-public class ViewModel(OpportunityService opportunities, RecordItems items, CrmLookups lookups) : CrmPageModel
+public class ViewModel(OpportunityService opportunities, RecordItems items, CrmLookups lookups,
+    Oes.Infrastructure.Insurance.ClaimService claims, Oes.Infrastructure.Insurance.StormService storms) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
@@ -15,6 +16,9 @@ public class ViewModel(OpportunityService opportunities, RecordItems items, CrmL
     public string? SourceLabel { get; private set; }
     public string? PerilLabel { get; private set; }
     public string? LostReasonLabel { get; private set; }
+    public Oes.Infrastructure.Insurance.ClaimDetail? Claim { get; private set; }
+    public Oes.Domain.Insurance.StormEvent? Storm { get; private set; }
+    public Oes.Domain.Insurance.StormEvent? SuggestedStorm { get; private set; }
 
     public Task<IActionResult> OnGetAsync(string? tab) => Guard(async () =>
     {
@@ -24,6 +28,11 @@ public class ViewModel(OpportunityService opportunities, RecordItems items, CrmL
         SourceLabel = await lookups.LabelAsync(LookupTypes.LeadSource, Detail.Opportunity.SourceKey);
         PerilLabel = await lookups.LabelAsync(LookupTypes.Peril, Detail.Opportunity.PerilKey);
         LostReasonLabel = await lookups.LabelAsync(LookupTypes.LostReason, Detail.Opportunity.LostReasonKey);
+        if (await claims.ForOpportunityAsync(Id) is { } claimId) Claim = await claims.GetAsync(claimId);
+        var o = Detail.Opportunity;
+        if (o.StormEventId is { } stormId) Storm = await storms.GetAsync(stormId);
+        else if (o.IsInsurance && Detail.Property is not null)
+            SuggestedStorm = await storms.SuggestAsync(Detail.Property.PostalCode, o.DateOfLoss);
         return Page();
     });
 

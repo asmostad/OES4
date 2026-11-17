@@ -342,7 +342,7 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<DateOnly?>("EndedOn")
+                    b.Property<DateTime?>("EndedOn")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsPrimary")
@@ -563,7 +563,7 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<byte[]>("CreatedByUserId")
                         .HasColumnType("binary(16)");
 
-                    b.Property<DateOnly?>("DateOfLoss")
+                    b.Property<DateTime?>("DateOfLoss")
                         .HasColumnType("date");
 
                     b.Property<string>("Description")
@@ -643,6 +643,8 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasIndex("PropertyId");
 
                     b.HasIndex("StageId");
+
+                    b.HasIndex("StormEventId");
 
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
@@ -844,7 +846,7 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<DateOnly?>("EndedOn")
+                    b.Property<DateTime?>("EndedOn")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsPrimary")
@@ -859,7 +861,7 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("varchar(60)");
 
-                    b.Property<DateOnly?>("StartedOn")
+                    b.Property<DateTime?>("StartedOn")
                         .HasColumnType("date");
 
                     b.Property<byte[]>("TenantId")
@@ -966,6 +968,550 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("record_links", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.Carrier", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("ClaimsEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)");
+
+                    b.Property<string>("ClaimsFax")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("PreferredSubmission")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("carriers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 1 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Allstate",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 2 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "American Family Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 3 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Auto-Owners Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 4 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Chubb",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 5 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Cincinnati Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 6 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Citizens Property Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 7 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "COUNTRY Financial",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 8 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Encompass Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 9 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Erie Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 16 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Farmers Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 17 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Foremost Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 18 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Grange Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 19 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Hippo",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 20 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Homesite",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 21 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Kemper",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 22 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Lemonade",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 23 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Liberty Mutual",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 24 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Nationwide",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 25 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Progressive",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 32 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Safeco",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 33 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Shelter Insurance",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 34 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "State Farm",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 35 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "The Hartford",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 36 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Travelers",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 37 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Universal Property",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 38 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "USAA",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new byte[] { 0, 0, 0, 0, 0, 0, 112, 0, 128, 0, 0, 0, 0, 0, 0, 39 },
+                            CreatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Westfield",
+                            UpdatedAt = new DateTime(2026, 11, 17, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.InsuranceClaim", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("AdjusterContactId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ClaimNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DateOfLoss")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Deductible")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<byte[]>("DeskAdjusterContactId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("FiledOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("InspectionOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("OpportunityId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("PerilKey")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("PolicyNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<byte[]>("PropertyId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("StormEventId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantCarrierId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdjusterContactId");
+
+                    b.HasIndex("DeskAdjusterContactId");
+
+                    b.HasIndex("OpportunityId");
+
+                    b.HasIndex("PropertyId");
+
+                    b.HasIndex("StormEventId");
+
+                    b.HasIndex("TenantCarrierId");
+
+                    b.HasIndex("TenantId", "ClaimNumber");
+
+                    b.HasIndex("TenantId", "OpportunityId");
+
+                    b.HasIndex("TenantId", "PropertyId");
+
+                    b.HasIndex("TenantId", "StormEventId");
+
+                    b.ToTable("insurance_claims", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.StormEvent", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EventDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("MaxHailSizeIn")
+                        .HasPrecision(4, 2)
+                        .HasColumnType("decimal(4,2)");
+
+                    b.Property<int?>("MaxWindMph")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PerilKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ZipCodes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EventDate");
+
+                    b.ToTable("storm_events", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.Supplement", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<byte[]>("ClaimId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal?>("RequestedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("RespondedOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("SentOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("SubmittedByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimId");
+
+                    b.HasIndex("TenantId", "ClaimId");
+
+                    b.ToTable("supplements", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.TenantCarrier", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<byte[]>("CarrierId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("ClaimsEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)");
+
+                    b.Property<string>("ClaimsFax")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("PreferredSubmission")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId");
+
+                    b.HasIndex("TenantId", "CarrierId");
+
+                    b.ToTable("tenant_carriers", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Tenancy.MembershipRole", b =>
@@ -1322,6 +1868,11 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasForeignKey("StageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Oes.Domain.Insurance.StormEvent", null)
+                        .WithMany()
+                        .HasForeignKey("StormEventId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Oes.Domain.Crm.PropertyContact", b =>
@@ -1346,6 +1897,57 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.InsuranceClaim", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("AdjusterContactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Crm.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("DeskAdjusterContactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Crm.Opportunity", null)
+                        .WithMany()
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Crm.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Insurance.StormEvent", null)
+                        .WithMany()
+                        .HasForeignKey("StormEventId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Insurance.TenantCarrier", null)
+                        .WithMany()
+                        .HasForeignKey("TenantCarrierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.Supplement", b =>
+                {
+                    b.HasOne("Oes.Domain.Insurance.InsuranceClaim", null)
+                        .WithMany()
+                        .HasForeignKey("ClaimId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Insurance.TenantCarrier", b =>
+                {
+                    b.HasOne("Oes.Domain.Insurance.Carrier", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Oes.Domain.Tenancy.MembershipRole", b =>

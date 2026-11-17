@@ -1,0 +1,55 @@
+@page
+@model Oes.Web.Pages.Admin.CarriersModel
+@using Oes.Infrastructure.Insurance
+@{
+    ViewData["Title"] = "Insurance Carriers";
+}
+<div class="page-header">
+    <div>
+        <h1>Insurance Carriers</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Insurance Carriers</li></ol></nav>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Admin/CarrierEdit"><i class="bi bi-plus-lg me-1"></i> Add carrier</a>
+</div>
+
+<div class="alert alert-light border small">
+    <i class="bi bi-info-circle me-1"></i>The list starts with OES's default carriers. Edit any of them to add your own claims email, fax,
+    portal and notes. Your edits are kept separate, and blank fields fall back to the default. Hide carriers you never see.
+</div>
+
+<div class="d-flex justify-content-end mb-2">
+    <a class="small" href="?showHidden=@(!Model.ShowHidden)">@(Model.ShowHidden ? "Hide hidden carriers" : "Show hidden carriers")</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead><tr><th>Carrier</th><th>Submit by</th><th>Claims email</th><th>Phone</th><th></th><th class="text-end"></th></tr></thead>
+            <tbody>
+                @foreach (var c in Model.Carriers)
+                {
+                    var choice = CarrierService.ChoiceFor(c);
+                    <tr class="@(c.IsHidden ? "text-muted" : "")">
+                        <td class="fw-medium">@c.Name
+                            @if (c.IsCustom) { <span class="badge bg-primary-subtle text-primary ms-1">Yours</span> }
+                            else if (c.HasOverrides) { <span class="badge bg-info-subtle text-info ms-1">Edited</span> }
+                            @if (c.IsHidden) { <span class="badge bg-secondary-subtle text-secondary ms-1">Hidden</span> }</td>
+                        <td>@Fmt.Cap(c.PreferredSubmission)</td>
+                        <td>@c.ClaimsEmail</td>
+                        <td class="text-nowrap">@c.Phone</td>
+                        <td class="small text-muted text-truncate" style="max-width:220px">@c.Notes</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="/Admin/CarrierEdit?choice=@Uri.EscapeDataString(choice)"><i class="bi bi-pencil"></i> Edit</a>
+                            <form method="post" asp-page-handler="Hide" class="d-inline">
+                                <input type="hidden" name="choice" value="@choice">
+                                <input type="hidden" name="hidden" value="@((!c.IsHidden).ToString().ToLowerInvariant())">
+                                <input type="hidden" name="showHidden" value="@Model.ShowHidden.ToString().ToLowerInvariant()">
+                                <button class="btn btn-sm btn-link text-muted" type="submit">@(c.IsHidden ? "Show" : "Hide")</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,63 @@
+@page
+@model Oes.Web.Pages.Claims.IndexModel
+@using Oes.Domain.Insurance
+@using Oes.Infrastructure.Insurance
+@{
+    ViewData["Title"] = "Claims";
+}
+<div class="page-header">
+    <div>
+        <h1>Insurance Claims</h1>
+        <p class="page-subtitle">Every claim, filed or not, with its carrier, storm and supplements. Start a claim from an opportunity.</p>
+    </div>
+</div>
+
+<form method="get" class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <div class="input-group input-group-sm list-search">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input name="q" value="@Model.Q" class="form-control" placeholder="Claim #, policy #, homeowner or OPP number">
+        </div>
+        <select name="status" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">Any status</option>
+            @foreach (var s in ClaimStatuses.All) { <option value="@s" selected="@(Model.Status == s)">@ClaimService.Label(s)</option> }
+        </select>
+        <select name="carrier" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">Any carrier</option>
+            @foreach (var c in Model.Carriers) { <option value="@CarrierService.ChoiceFor(c)" selected="@(Model.Carrier == CarrierService.ChoiceFor(c))">@c.Name</option> }
+        </select>
+        <select name="storm" class="form-select form-select-sm w-auto" data-autosubmit>
+            <option value="">Any storm</option>
+            @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(Model.Storm == s.Id)">@s.Name</option> }
+        </select>
+        <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-clickable mb-0 align-middle">
+            <thead><tr><th>Claim #</th><th>Homeowner / opportunity</th><th>Carrier</th><th>Status</th><th>Date of loss</th><th>Inspection</th><th class="text-end">Approved</th><th class="text-center">Open supps</th></tr></thead>
+            <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="8"><div class="empty-state"><i class="bi bi-shield-check"></i><h5>No claims yet</h5>
+                        <p>Open an insurance opportunity and choose <strong>Start claim</strong>.</p></div></td></tr>
+                }
+                @foreach (var c in Model.Rows)
+                {
+                    <tr data-href="/Claims/View/@c.Id">
+                        <td><a href="/Claims/View/@c.Id" class="fw-medium">@(c.ClaimNumber ?? "Not filed")</a></td>
+                        <td>@c.ContactName<div class="small text-muted"><code>@c.OpportunityNumber</code> · @(c.Address ?? "no address")</div></td>
+                        <td>@(c.CarrierName ?? "—")</td>
+                        <td><span class="claim-status claim-@c.Status">@ClaimService.Label(c.Status)</span></td>
+                        <td class="text-nowrap">@c.DateOfLoss?.ToString("MMM d, yyyy")@if (c.StormName is not null) { <div class="small text-muted"><i class="bi bi-cloud-lightning-rain"></i> @c.StormName</div> }</td>
+                        <td class="text-nowrap">@c.InspectionOn?.ToString("MMM d")</td>
+                        <td class="text-end">@Fmt.Money(c.ApprovedAmount)</td>
+                        <td class="text-center">@(c.OpenSupplements > 0 ? c.OpenSupplements.ToString() : "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
