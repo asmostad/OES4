@@ -68,4 +68,7 @@ public class Notification : TenantEntity
     /// <summary>App-relative link (always local; validated before redirecting).</summary>
     public string? Url { get; set; }
     public DateTime? ReadAt { get; set; }
+
+    /// <summary>Set for automatic alerts so each one is sent once (e.g. "task.overdue:{id}:{due}").</summary>
+    public string? DedupeKey { get; set; }
 }

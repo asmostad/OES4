@@ -26,6 +26,26 @@ public sealed class NotificationService(OesDbContext db, ICurrentUser user, IClo
         foreach (var id in userIds) Notify(id, kind, title, body, url);
     }
 
+    /// <summary>
+    /// Queues an automatic alert unless this user already had one with the same key (ever).
+    /// Returns true when it was queued. Saved with the caller's unit of work.
+    /// </summary>
+    public async Task<bool> NotifyOnceAsync(Guid? userId, string dedupeKey, string kind, string title, string? body, string? url, CancellationToken ct = default)
+    {
+        if (userId is not { } uid) return false;
+        var key = Trim(dedupeKey, 200)!;
+        if (db.Notifications.Local.Any(n => n.UserId == uid && n.DedupeKey == key)
+            || await db.Notifications.AnyAsync(n => n.UserId == uid && n.DedupeKey == key, ct)) return false;
+        db.Notifications.Add(new Notification { UserId = uid, Kind = kind, Title = Trim(title, 300)!, Body = Trim(body, 1000), Url = SafeUrl(url), DedupeKey = key });
+        return true;
+    }
+
+    public async Task<List<Guid>> UsersWithPermissionAsync(string permission, CancellationToken ct = default) =>
+        await (from m in db.Memberships where m.Status == MembershipStatus.Active
+               from mr in db.MembershipRoles.Where(r => r.MembershipId == m.Id)
+               from rp in db.RolePermissions.Where(p => p.RoleId == mr.RoleId && p.PermissionKey == permission)
+               select m.UserId).Distinct().ToListAsync(ct);
+
     public async Task<int> UnreadCountAsync(CancellationToken ct = default) =>
         user.UserId is { } me ? await db.Notifications.CountAsync(n => n.UserId == me && n.ReadAt == null, ct) : 0;
 

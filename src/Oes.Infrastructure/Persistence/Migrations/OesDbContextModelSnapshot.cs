@@ -196,6 +196,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("ReviewStatus")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -4344,6 +4347,10 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("DedupeKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -4373,6 +4380,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasColumnType("binary(16)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "UserId", "DedupeKey")
+                        .IsUnique();
 
                     b.HasIndex("TenantId", "UserId", "ReadAt", "CreatedAt");
 

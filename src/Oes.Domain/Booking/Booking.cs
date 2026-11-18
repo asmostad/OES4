@@ -87,6 +87,8 @@ public class Booking : TenantEntity
     public Guid? ReviewedByUserId { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public DateTime? CancelledAt { get; set; }
+    /// <summary>When the day-before reminder email went out.</summary>
+    public DateTime? ReminderSentAt { get; set; }
     public string? SourceIp { get; set; }
 
     /// <summary>"{host}|{start ticks}" while booked, null once cancelled. Unique: one booking per host per start.</summary>

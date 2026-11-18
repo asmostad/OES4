@@ -60,6 +60,8 @@ public static class DependencyInjection
         services.AddScoped<Work.TenantTime>();
         services.AddScoped<Work.NotificationService>();
         services.AddScoped<Work.WorkService>();
+        services.AddScoped<Work.ScheduledChecks>();
+        services.AddScoped<Work.NightlyCleanup>();
 
         services.Configure<Communication.MessagingOptions>(config.GetSection(Communication.MessagingOptions.Section));
         var messaging = config.GetSection(Communication.MessagingOptions.Section).Get<Communication.MessagingOptions>() ?? new Communication.MessagingOptions();

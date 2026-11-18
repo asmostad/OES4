@@ -14,5 +14,7 @@ builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProvider
 builder.Services.AddHostedService<Heartbeat>();
 builder.Services.AddHostedService<BlastJob>();
 builder.Services.AddHostedService<NurtureJob>();
+builder.Services.AddHostedService<ChecksJob>();
+builder.Services.AddHostedService<CleanupJob>();
 
 builder.Build().Run();

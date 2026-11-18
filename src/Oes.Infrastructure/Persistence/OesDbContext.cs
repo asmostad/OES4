@@ -265,6 +265,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(n => n.Body).HasMaxLength(1000);
             e.Property(n => n.Url).HasMaxLength(500);
             e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
+            e.Property(n => n.DedupeKey).HasMaxLength(200);
+            e.HasIndex(n => new { n.TenantId, n.UserId, n.DedupeKey }).IsUnique(); // NULLs (ordinary notifications) never collide
         });
     }
 
