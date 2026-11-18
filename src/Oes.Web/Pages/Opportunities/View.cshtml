@@ -186,6 +186,7 @@ else if (o.Outcome == Outcomes.Won)
             </ul>
         </div>
         @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Opportunity, entityId = Model.Id })
+        @await Component.InvokeAsync("RecordNurture", new { entityType = Oes.Domain.Crm.EntityTypes.Opportunity, entityId = Model.Id })
         @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Opportunity, entityId = Model.Id })
     </div>
 

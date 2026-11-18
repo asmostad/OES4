@@ -231,27 +231,43 @@ public sealed class BlastService(
 
     // ---------------- Unsubscribe (public link) ----------------
 
-    private async Task<(BlastRecipient R, ExternalAccessToken T)?> ResolveTokenAsync(string? raw, CancellationToken ct)
+    /// <summary>Unsubscribe tokens point at a blast recipient or (for nurture emails) the email message itself.</summary>
+    private async Task<(Guid TenantId, Guid ContactId, string Address)?> ResolveTokenAsync(string? raw, CancellationToken ct)
     {
         var t = await tokens.ResolveAsync(raw, TokenPurposes.Unsubscribe, ct);
-        if (t is null || t.EntityType != "blast_recipient") return null;
-        var r = await db.BlastRecipients.FirstOrDefaultAsync(x => x.Id == t.EntityId, ct);
-        return r is null ? null : (r, t);
+        if (t is null) return null;
+        if (t.EntityType == "blast_recipient")
+        {
+            var r = await db.BlastRecipients.FirstOrDefaultAsync(x => x.Id == t.EntityId, ct);
+            return r is null ? null : (r.TenantId, r.ContactId, r.Address);
+        }
+        if (t.EntityType == "email_message")
+        {
+            var r = await db.EmailRecipients.FirstOrDefaultAsync(x => x.EmailMessageId == t.EntityId && x.ContactId != null, ct);
+            return r is null ? null : (r.TenantId, r.ContactId!.Value, r.Address);
+        }
+        return null;
     }
 
     public async Task<UnsubscribeView?> UnsubscribeViewAsync(string? raw, CancellationToken ct = default)
     {
         if (await ResolveTokenAsync(raw, ct) is not { } x) return null;
-        var company = await db.Tenants.Where(t => t.Id == x.R.TenantId).Select(t => t.Name).FirstAsync(ct);
-        var done = await db.Suppressions.AnyAsync(s => s.Channel == Channels.Email && s.Address == x.R.Address && s.RemovedAt == null, ct);
-        return new UnsubscribeView(company, Mask(x.R.Address), done);
+        var company = await db.Tenants.Where(t => t.Id == x.TenantId).Select(t => t.Name).FirstAsync(ct);
+        var done = await db.Suppressions.AnyAsync(s => s.Channel == Channels.Email && s.Address == x.Address && s.RemovedAt == null, ct);
+        return new UnsubscribeView(company, Mask(x.Address), done);
     }
 
     public async Task<bool> UnsubscribeAsync(string? raw, CancellationToken ct = default)
     {
         if (await ResolveTokenAsync(raw, ct) is not { } x) return false;
-        await consent.SuppressAsync(Channels.Email, x.R.Address, SuppressionReasons.Unsubscribe, ct, "marketing");
-        consent.Add(x.R.ContactId, Channels.Email, MessagePurposes.Marketing, ConsentStatuses.OptedOut, "unsubscribe_link", $"Unsubscribed from a blast email ({x.R.Address})");
+        await consent.SuppressAsync(Channels.Email, x.Address, SuppressionReasons.Unsubscribe, ct, "marketing");
+        consent.Add(x.ContactId, Channels.Email, MessagePurposes.Marketing, ConsentStatuses.OptedOut, "unsubscribe_link", $"Unsubscribed from a marketing email ({x.Address})");
+        // Marketing nurture for this contact stops too.
+        var marketing = db.Sequences.Where(s => s.Category == MessagePurposes.Marketing).Select(s => s.Id);
+        foreach (var e in await db.Enrollments.Where(e => e.ContactId == x.ContactId && e.Status == EnrollmentStatuses.Active && marketing.Contains(e.SequenceId)).ToListAsync(ct))
+        {
+            e.Status = EnrollmentStatuses.Stopped; e.StopReason = "Unsubscribed."; e.NextRunAt = null; e.FinishedAt = clock.UtcNow;
+        }
         await db.SaveChangesAsync(ct);
         return true;
     }

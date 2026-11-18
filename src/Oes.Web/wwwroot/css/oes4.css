@@ -362,3 +362,6 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .blast-sent { background: var(--oes-success-bg, #d1fae5); color: #047857; }
 .blast-cancelled { background: var(--oes-danger-bg, #fee2e2); color: #b91c1c; }
 .blast-progress { height: .6rem; accent-color: var(--bs-primary); }
+
+/* Nurture */
+.nurture-steps > li { list-style: none; }

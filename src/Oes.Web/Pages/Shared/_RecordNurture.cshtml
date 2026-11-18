@@ -1,0 +1,42 @@
+@model Oes.Web.ViewComponents.NurtureCardModel
+@using Oes.Domain.Communication
+@{
+    var self = Context.Request.Path + Context.Request.QueryString;
+}
+<div class="card mb-3 record-nurture">
+    <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Nurture</div>
+    <ul class="list-group list-group-flush small">
+        @foreach (var e in Model.Enrollments)
+        {
+            <li class="list-group-item d-flex align-items-center gap-2 @(e.Status == EnrollmentStatuses.Active ? "" : "text-muted")">
+                <div class="me-auto">
+                    <div class="fw-medium">@e.SequenceName</div>
+                    <div>@(e.Status switch
+                    {
+                        EnrollmentStatuses.Active => $"Step {Math.Min(e.StepIndex + 1, e.StepCount)} of {e.StepCount}" + (Model.NextLocal.TryGetValue(e.Id, out var n) ? $" · next {n:MMM d, h:mm tt}" : ""),
+                        EnrollmentStatuses.Completed => "Finished",
+                        _ => $"Stopped{(e.StopReason is null ? "" : ": " + e.StopReason)}",
+                    })</div>
+                </div>
+                @if (e.Status == EnrollmentStatuses.Active)
+                {
+                    <form method="post" asp-antiforgery="true" action="/Nurture/Items?handler=Stop"><input type="hidden" name="id" value="@e.Id"><input type="hidden" name="returnUrl" value="@self">
+                        <button class="btn btn-link btn-sm p-0 text-danger" type="submit" data-confirm="Stop this workflow for them?">Stop</button></form>
+                }
+            </li>
+        }
+        @if (Model.Enrollments.Count == 0) { <li class="list-group-item text-muted">Not in any workflow.</li> }
+    </ul>
+    @if (Model.Available.Count > 0)
+    {
+        <div class="card-body border-top">
+            <form method="post" asp-antiforgery="true" action="/Nurture/Items?handler=Enroll" class="d-flex gap-2">
+                <input type="hidden" name="contactId" value="@Model.ContactId"><input type="hidden" name="opportunityId" value="@Model.OpportunityId"><input type="hidden" name="returnUrl" value="@self">
+                <select name="sequenceId" class="form-select form-select-sm" aria-label="Workflow">
+                    @foreach (var s in Model.Available) { <option value="@s.Id">@s.Name</option> }
+                </select>
+                <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">Enroll</button>
+            </form>
+        </div>
+    }
+</div>

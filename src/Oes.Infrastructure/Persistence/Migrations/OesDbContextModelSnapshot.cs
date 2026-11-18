@@ -796,6 +796,122 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("email_recipients", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Communication.Enrollment", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("ContactId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("EnrolledByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("NextRunAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("OpportunityId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("SequenceId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int>("StepIndex")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StopReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "NextRunAt");
+
+                    b.HasIndex("TenantId", "OpportunityId");
+
+                    b.HasIndex("TenantId", "ContactId", "SequenceId");
+
+                    b.ToTable("enrollments", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Communication.EnrollmentStepRun", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<byte[]>("EnrollmentId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ItemId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("StepId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("StepIndex")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentId", "CreatedAt");
+
+                    b.ToTable("enrollment_step_runs", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Communication.MessageTemplate", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -844,6 +960,98 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("message_templates", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Communication.Sequence", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<bool>("StopOnReply")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("StopWhenClosed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("sequences", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Communication.SequenceStep", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("DelayMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<byte[]>("SequenceId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SequenceId", "Sort");
+
+                    b.ToTable("sequence_steps", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Communication.SmsMessage", b =>
@@ -4372,6 +4580,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Oes.Domain.Communication.SequenceStep", b =>
+                {
+                    b.HasOne("Oes.Domain.Communication.Sequence", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("SequenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Oes.Domain.Crm.ContactMethod", b =>
                 {
                     b.HasOne("Oes.Domain.Crm.Contact", null)
@@ -4801,6 +5018,11 @@ namespace Oes.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Oes.Domain.Communication.EmailMessage", b =>
                 {
                     b.Navigation("Recipients");
+                });
+
+            modelBuilder.Entity("Oes.Domain.Communication.Sequence", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("Oes.Domain.Crm.Contact", b =>

@@ -103,6 +103,10 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Communication.TenantPhoneNumber> TenantPhoneNumbers => Set<Domain.Communication.TenantPhoneNumber>();
     public DbSet<Domain.Communication.Blast> Blasts => Set<Domain.Communication.Blast>();
     public DbSet<Domain.Communication.BlastRecipient> BlastRecipients => Set<Domain.Communication.BlastRecipient>();
+    public DbSet<Domain.Communication.Sequence> Sequences => Set<Domain.Communication.Sequence>();
+    public DbSet<Domain.Communication.SequenceStep> SequenceSteps => Set<Domain.Communication.SequenceStep>();
+    public DbSet<Domain.Communication.Enrollment> Enrollments => Set<Domain.Communication.Enrollment>();
+    public DbSet<Domain.Communication.EnrollmentStepRun> EnrollmentStepRuns => Set<Domain.Communication.EnrollmentStepRun>();
 
     public DbSet<Domain.Booking.BookingType> BookingTypes => Set<Domain.Booking.BookingType>();
     public DbSet<Domain.Booking.BookingTypeHost> BookingTypeHosts => Set<Domain.Booking.BookingTypeHost>();
@@ -412,6 +416,44 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(x => x.Error).HasMaxLength(1000);
             e.HasIndex(x => new { x.BlastId, x.Status });
             e.HasIndex(x => new { x.BlastId, x.ContactId }).IsUnique();
+        });
+
+        b.Entity<Domain.Communication.Sequence>(e =>
+        {
+            e.ToTable("sequences");
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.Category).HasMaxLength(20);
+            e.HasMany(x => x.Steps).WithOne().HasForeignKey(s => s.SequenceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        });
+
+        b.Entity<Domain.Communication.SequenceStep>(e =>
+        {
+            e.ToTable("sequence_steps");
+            e.Property(x => x.Kind).HasMaxLength(10);
+            e.Property(x => x.Subject).HasMaxLength(300);
+            e.Property(x => x.Body).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.SequenceId, x.Sort });
+        });
+
+        b.Entity<Domain.Communication.Enrollment>(e =>
+        {
+            e.ToTable("enrollments");
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.StopReason).HasMaxLength(300);
+            e.HasIndex(x => new { x.Status, x.NextRunAt }); // the runner looks across tenants
+            e.HasIndex(x => new { x.TenantId, x.ContactId, x.SequenceId });
+            e.HasIndex(x => new { x.TenantId, x.OpportunityId });
+        });
+
+        b.Entity<Domain.Communication.EnrollmentStepRun>(e =>
+        {
+            e.ToTable("enrollment_step_runs");
+            e.Property(x => x.Kind).HasMaxLength(10);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Detail).HasMaxLength(1000);
+            e.HasIndex(x => new { x.EnrollmentId, x.CreatedAt });
         });
     }
 

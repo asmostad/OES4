@@ -73,6 +73,8 @@ public static class DependencyInjection
         services.AddScoped<Communication.MessagingService>();
         services.AddScoped<Communication.BlastService>();
         services.AddScoped<Communication.BlastSender>();
+        services.AddScoped<Communication.NurtureService>();
+        services.AddScoped<Communication.NurtureRunner>();
         services.AddScoped<Admin.SettingsService>();
         services.AddScoped<Scheduling.BookingService>();
 

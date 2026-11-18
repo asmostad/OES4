@@ -69,7 +69,7 @@ public static class Navigation
                 new("Lead Import", "bi-cloud-upload", null, Permissions.LeadsImport),
                 new("Lead Campaigns", "bi-megaphone", null, Permissions.LeadsCampaigns),
                 new("Online Booking", "bi-calendar-plus", "/Admin/BookingTypes", Permissions.BookingManage),
-                new("Nurture Workflows", "bi-arrow-repeat", null, Permissions.NurtureManage),
+                new("Nurture Workflows", "bi-arrow-repeat", "/Admin/Nurture", Permissions.NurtureManage),
                 new("Email Blasts", "bi-send", "/Blasts", Permissions.BlastsManage),
                 new("Email Suppressions", "bi-envelope-slash", "/Admin/Suppressions", Permissions.BlastsManage),
             ]),

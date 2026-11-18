@@ -172,6 +172,7 @@
         }
         @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Contact, entityId = Model.Id })
         @await Component.InvokeAsync("ContactConsent", new { contactId = Model.Id })
+        @await Component.InvokeAsync("RecordNurture", new { entityType = Oes.Domain.Crm.EntityTypes.Contact, entityId = Model.Id })
         @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Contact, entityId = Model.Id })
     </div>
 

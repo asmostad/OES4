@@ -207,6 +207,8 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 
 `sequences` (TenantId, Name, AppliesTo (contact/opportunity), Active, StopOnReply, StopOnWon), `sequence_steps` (Order, Kind (email/sms/task/wait), DelayMinutes, ConfigJson), `enrollments` (Status, CurrentStep, NextRunAt, EnrolledBy), `enrollment_step_runs` (Status, Attempt, Detail, At). Retries with backoff. Consent and suppression are checked before every send.
 
+**Built in M9:** `sequences` (Name, Description, Category transactional/marketing, IsActive, StopOnReply, StopWhenClosed), `sequence_steps` (Sort, Kind email/sms/task, DelayMinutes, Subject, Body — waits are a delay on each step rather than a separate step), `enrollments` (ContactId, OpportunityId, Status, StepIndex, NextRunAt as the lease, Attempts, StopReason), `enrollment_step_runs` (StepIndex, Kind, Status, Detail, Attempt, ItemId).
+
 ## 15. AI assistant
 
 `ai_conversations` (TenantId, UserId, EntityType, EntityId, FocusId, Model, SystemPromptHash, CostCents), `ai_messages`, `ai_tool_calls` (tool, input, output summary, authorized: yes/no), `ai_drafts`, `ai_knowledge_docs` + `ai_knowledge_chunks` (per tenant), `ai_usage_daily` (TenantId, UserId, Date, CostCents). Limits are checked per tenant and per user **inside** the tool loop. Every tool call re-checks record access.

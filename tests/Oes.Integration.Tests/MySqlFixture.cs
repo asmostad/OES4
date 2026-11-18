@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,9 @@ public sealed class MySqlFixture : IAsyncLifetime
     public string ConnectionString { get; private set; } = "";
     public TestApp App { get; private set; } = null!;
     public string FilesRoot { get; } = Path.Combine(Path.GetTempPath(), "oes4-it-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>The app's clock: real time unless a test pins it (always unpin in a finally).</summary>
+    public TestClock Clock { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -141,6 +146,7 @@ public sealed class TestApp(MySqlFixture fx) : WebApplicationFactory<Program>
         {
             builder.UseSetting(key, value);
         }
+        builder.ConfigureTestServices(s => { s.RemoveAll<IClock>(); s.AddSingleton<IClock>(fx.Clock); });
     }
 
     public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions
@@ -155,4 +161,11 @@ internal static class ScopeExtensions
 {
     public static T Get<T>(this AsyncServiceScope s) where T : notnull => s.ServiceProvider.GetRequiredService<T>();
     public static ITenantContext Tenant(this AsyncServiceScope s) => s.Get<ITenantContext>();
+}
+
+/// <summary>Real time, or a pinned instant for tests about schedules and quiet hours.</summary>
+public sealed class TestClock : IClock
+{
+    public DateTime? Pinned { get; set; }
+    public DateTime UtcNow => Pinned is { } p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : DateTime.UtcNow;
 }

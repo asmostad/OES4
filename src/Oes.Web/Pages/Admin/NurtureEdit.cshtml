@@ -1,0 +1,115 @@
+@page
+@model Oes.Web.Pages.Admin.NurtureEditModel
+@using Oes.Domain.Communication
+@using Oes.Infrastructure.Communication
+@{
+    var s = Model.Sequence;
+    ViewData["Title"] = s.Name;
+    string Wait(int minutes) => minutes == 0 ? "Right away" : $"Wait {(minutes / 1440 > 0 ? $"{minutes / 1440} day{(minutes / 1440 == 1 ? "" : "s")}" : "")}{(minutes / 1440 > 0 && minutes % 1440 / 60 > 0 ? ", " : "")}{(minutes % 1440 / 60 > 0 ? $"{minutes % 1440 / 60} h" : "")}";
+    string Icon(string kind) => kind switch { StepKinds.Email => "bi-envelope", StepKinds.Sms => "bi-chat-dots", _ => "bi-check2-square" };
+    string KindLabel(string kind) => kind switch { StepKinds.Email => "Email", StepKinds.Sms => "Text", _ => "Task for the owner" };
+}
+<div class="page-header">
+    <div>
+        <h1>@s.Name</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item"><a href="/Admin/Nurture">Nurture Workflows</a></li><li class="breadcrumb-item active">Edit</li></ol></nav>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <ol class="nurture-steps list-unstyled">
+            @for (var i = 0; i < s.Steps.Count; i++)
+            {
+                var step = s.Steps[i];
+                <li class="card mb-2">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary-subtle text-secondary">@(i + 1)</span>
+                        <i class="bi @Icon(step.Kind)"></i><span class="fw-medium">@KindLabel(step.Kind)</span>
+                        <span class="text-muted small">· @Wait(step.DelayMinutes)@(i == 0 ? " after enrolling" : "")</span>
+                        <div class="ms-auto d-flex gap-1">
+                            <form method="post" asp-page-handler="MoveStep"><input type="hidden" name="stepId" value="@step.Id"><input type="hidden" name="direction" value="-1"><input type="hidden" name="Id" value="@s.Id">
+                                <button class="btn btn-sm btn-link p-0" type="submit" disabled="@(i == 0)" aria-label="Move up"><i class="bi bi-arrow-up"></i></button></form>
+                            <form method="post" asp-page-handler="MoveStep"><input type="hidden" name="stepId" value="@step.Id"><input type="hidden" name="direction" value="1"><input type="hidden" name="Id" value="@s.Id">
+                                <button class="btn btn-sm btn-link p-0" type="submit" disabled="@(i == s.Steps.Count - 1)" aria-label="Move down"><i class="bi bi-arrow-down"></i></button></form>
+                            <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#step-@step.Id">Edit</button>
+                        </div>
+                    </div>
+                    <div class="card-body small">
+                        @if (step.Subject is not null) { <div class="fw-medium">@step.Subject</div> }
+                        @if (step.Body is not null) { <div class="pre-wrap text-muted">@step.Body</div> }
+                    </div>
+                    <div class="collapse" id="step-@step.Id"><div class="card-body border-top bg-light">
+                        <partial name="_NurtureStepForm" model="(s.Id, (Guid?)step.Id, new StepInput { Kind = step.Kind, DelayDays = step.DelayMinutes / 1440, DelayHours = step.DelayMinutes % 1440 / 60, Subject = step.Subject, Body = step.Body })" />
+                        <form method="post" asp-page-handler="DeleteStep" class="text-end mt-2"><input type="hidden" name="stepId" value="@step.Id"><input type="hidden" name="Id" value="@s.Id">
+                            <button class="btn btn-sm btn-link text-danger" type="submit" data-confirm="Remove this step? People already in the workflow continue from the same position.">Remove step</button></form>
+                    </div></div>
+                </li>
+            }
+        </ol>
+        @if (s.Steps.Count < NurtureService.MaxSteps)
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-plus-lg me-1"></i>Add a step</div>
+                <div class="card-body"><partial name="_NurtureStepForm" model="(s.Id, (Guid?)null, new StepInput { DelayDays = s.Steps.Count == 0 ? 0 : 2 })" /></div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-header">People in this workflow</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>Contact</th><th>Status</th><th>Step</th><th>Next</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var e in Model.Enrollments)
+                        {
+                            <tr>
+                                <td><a href="@(e.OpportunityId is { } o ? $"/Opportunities/View/{o}" : $"/Contacts/View/{e.ContactId}")">@e.ContactName</a></td>
+                                <td>@Fmt.Cap(e.Status)@(e.StopReason is null ? "" : $": {e.StopReason}")</td>
+                                <td>@Math.Min(e.StepIndex + 1, e.StepCount) of @e.StepCount</td>
+                                <td class="small text-nowrap">@(Model.NextLocal.TryGetValue(e.Id, out var n) ? n.ToString("MMM d, h:mm tt") : "")</td>
+                                <td class="text-end">@if (e.Status == EnrollmentStatuses.Active)
+                                    {
+                                        <form method="post" asp-page-handler="Stop"><input type="hidden" name="enrollmentId" value="@e.Id"><input type="hidden" name="Id" value="@s.Id">
+                                            <button class="btn btn-link btn-sm p-0 text-danger" type="submit">Stop</button></form>
+                                    }</td>
+                            </tr>
+                        }
+                        @if (Model.Enrollments.Count == 0) { <tr><td colspan="5" class="small text-muted">No one yet. Enroll people from their contact or opportunity page.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header">Settings</div>
+            <div class="card-body">
+                <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+                <form method="post" class="row g-2">
+                    <input type="hidden" name="Id" value="@s.Id">
+                    <div class="col-12"><label class="form-label small" asp-for="Input.Name">Name</label><input asp-for="Input.Name" class="form-control form-control-sm" required maxlength="150"></div>
+                    <div class="col-12"><label class="form-label small" asp-for="Input.Description">Description</label><textarea asp-for="Input.Description" class="form-control form-control-sm" rows="2" maxlength="1000"></textarea></div>
+                    <div class="col-12"><label class="form-label small" asp-for="Input.Category">Kind</label>
+                        <select asp-for="Input.Category" class="form-select form-select-sm">
+                            <option value="@MessagePurposes.Transactional">Everyday (about their job)</option>
+                            <option value="@MessagePurposes.Marketing">Marketing</option></select></div>
+                    <div class="col-12">
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.StopOnReply"><label class="form-check-label small" asp-for="Input.StopOnReply">Stop when they reply</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.StopWhenClosed"><label class="form-check-label small" asp-for="Input.StopWhenClosed">Stop when the opportunity is won or lost</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.IsActive"><label class="form-check-label small" asp-for="Input.IsActive">On (turning it off stops everyone in it)</label></div>
+                    </div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Save settings</button></div>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">How it runs</div>
+            <div class="card-body small text-muted">
+                Steps run in order, each after its wait. Emails come from the opportunity's (or contact's) owner; tasks go to them.
+                Texts only go out 8 am–8 pm. Consent and opt-outs are checked before every message, and a blocked message is skipped, not retried.
+                Merge fields like <code>{{contact.first_name}}</code> work in every step.
+            </div>
+        </div>
+    </div>
+</div>

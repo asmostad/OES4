@@ -212,7 +212,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
      - Appointment attendees, all-day events, editing tasks/appointments in place, insurance-expiry notifications (needs the Worker), configurable automation rules.
-9. **Marketing** (in progress: email blasts, unsubscribe, suppressions and online booking done 2026-11-17)
+9. **Marketing** (done 2026-11-17: email blasts, unsubscribe, suppressions, online booking, nurture workflows; provider-dependent parts listed below)
    - Done:
      - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.
      - Scheduling locks the audience in as recipients (left-out people recorded with the reason). The worker's `BlastJob` sends each due blast in batches of its emails-per-minute setting, claims each recipient with a conditional update (pending to sending) so nothing is sent twice, re-checks consent just before sending, and marks interrupted sends failed instead of resending.
@@ -226,9 +226,12 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - **Decided 2026-11-17:** a booking goes straight onto the host's calendar (and pings them), but contacts, properties and opportunities are only created when staff accept it in the Bookings inbox: link to an existing contact matched by email or phone, add as new, or dismiss as spam. Anonymous input never writes onto existing records, and spam never reaches the CRM. The visitor's "text me" tick box becomes a texting opt-in (source web_form) only for the number they typed.
      - Confirmation email (platform mail) with a manage link (`/portal/b/{token}`, hashed, 120 days) to see or cancel; cancelling frees the slot, cancels the appointment and notifies the host.
      - `/portal` and `/book` pages always act as an anonymous visitor, even in a signed-in staff browser.
+     - Nurture workflows: ordered steps (email, text, or a task for the owner), each after a wait; everyday or marketing (marketing adds the mailing address, an unsubscribe link and needs marketing consent for texts). Enroll a contact or opportunity from its page (`nurture.enroll`); build workflows under Administration (`nurture.manage`).
+     - The worker's `NurtureJob` runs due steps every minute. Each enrollment is leased with a conditional update before its step runs. Before every step it stops the enrollment if the contact replied (`StopOnReply`), the opportunity was won or lost (`StopWhenClosed`), the workflow was turned off or the contact archived. Consent is checked per message (blocked = skipped, not retried); provider failures retry 3 times with backoff. Texts wait for 8 am–8 pm company time. Emails come from the opportunity's (or contact's) owner and tasks go to them. Unsubscribing from any marketing email stops that contact's marketing workflows.
+     - Every step run is recorded (done / skipped with the reason / failed) and the messages land on the record's timeline.
    - Still to do:
      - Busy calendars (ICS feeds blocking booking times), rescheduling from the manage link, booking reminders.
-     - Nurture sequences (email/text/task steps, enrollments, stop on reply or won).
+     - Enroll automatically on pipeline/workflow stage entry (with configurable automation rules); stop on inbound email replies once mail sync exists.
      - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.
 11. **Reports** — pipeline, conversion, production, stale, tasks, with charts and CSV.

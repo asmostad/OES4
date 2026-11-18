@@ -13,5 +13,6 @@ builder.Services.AddOesInfrastructure(builder.Configuration);
 builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false }));
 builder.Services.AddHostedService<Heartbeat>();
 builder.Services.AddHostedService<BlastJob>();
+builder.Services.AddHostedService<NurtureJob>();
 
 builder.Build().Run();
