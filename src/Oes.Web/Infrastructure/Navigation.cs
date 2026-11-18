@@ -33,6 +33,7 @@ public static class Navigation
             new("Work Orders", "bi-clipboard-check", "/WorkOrders", Permissions.WorkOrdersManage),
             new("Calendar", "bi-calendar3", "/Calendar"),
             new("Bookings", "bi-calendar-check", "/Bookings", Permissions.BookingManage),
+            new("Assistant", "bi-stars", "/Assistant", Permissions.AiAssistant),
         ]),
         new("CRM",
         [
@@ -99,7 +100,7 @@ public static class Navigation
                 new("Settings", "bi-gear", "/Admin/Settings", Permissions.SettingsManage),
                 new("Audit Log", "bi-journal-check", "/Admin/Audit", Permissions.AuditView),
                 new("AI Knowledge Base", "bi-journal-text", null, Permissions.AiManage),
-                new("AI Usage", "bi-graph-up", null, Permissions.AiManage),
+                new("AI Usage", "bi-graph-up", "/Admin/AiUsage", Permissions.AiManage),
             ]),
         ]),
     ];

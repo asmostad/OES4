@@ -374,6 +374,15 @@
         });
     });
 
+    // ---------------- busy buttons ----------------
+    // A submit button with data-busy-text shows it (and can't be pressed twice) while the form posts.
+    document.addEventListener('submit', function (e) {
+        const b = e.target.querySelector('button[data-busy-text]');
+        if (!b || e.defaultPrevented) return;
+        b.disabled = true;
+        b.textContent = b.getAttribute('data-busy-text');
+    });
+
     // ---------------- character counters ----------------
     document.querySelectorAll('textarea[data-char-count]').forEach(function (t) {
         const out = document.createElement('div');

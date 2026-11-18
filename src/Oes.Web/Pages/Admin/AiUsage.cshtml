@@ -1,0 +1,35 @@
+@page
+@model Oes.Web.Pages.Admin.AiUsageModel
+@{
+    ViewData["Title"] = "AI Usage";
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+}
+<div class="page-header">
+    <div>
+        <h1>AI Usage</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">AI Usage</li></ol></nav>
+    </div>
+</div>
+<div class="row g-3 mb-3">
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body"><div class="stat-value">@Model.Rows.Sum(r => r.CostUsd).ToString("C2", us)</div><div class="stat-label">Last 30 days</div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body"><div class="stat-value">@Model.Rows.Sum(r => r.Requests)</div><div class="stat-label">Model calls</div></div></div></div>
+    <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body small">
+        <div><strong>@(Model.Connected ? "Connected" : "Not connected")</strong> · model <code>@Model.Settings.Model</code> · effort @Model.Settings.Effort</div>
+        <div class="text-muted">Daily limits: @Model.Settings.DailyUserBudgetUsd.ToString("C2", us) per person, @Model.Settings.DailyTenantBudgetUsd.ToString("C2", us) for the company. Checked before every model call.</div>
+    </div></div></div>
+</div>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Day</th><th>Person</th><th class="text-end">Calls</th><th class="text-end">Input tokens</th><th class="text-end">From cache</th><th class="text-end">Output tokens</th><th class="text-end">Cost</th></tr></thead>
+            <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    <tr><td>@r.Date.ToString("MMM d")</td><td>@r.UserName</td><td class="text-end">@r.Requests</td><td class="text-end">@r.InputTokens.ToString("N0")</td>
+                        <td class="text-end">@r.CacheReadTokens.ToString("N0")</td><td class="text-end">@r.OutputTokens.ToString("N0")</td><td class="text-end">@r.CostUsd.ToString("C2", us)</td></tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-muted small">No assistant use in the last 30 days.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

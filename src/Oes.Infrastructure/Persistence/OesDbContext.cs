@@ -95,6 +95,10 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
     public DbSet<Domain.Work.AutomationRule> AutomationRules => Set<Domain.Work.AutomationRule>();
     public DbSet<Domain.Work.AutomationRun> AutomationRuns => Set<Domain.Work.AutomationRun>();
+    public DbSet<Domain.Ai.AiConversation> AiConversations => Set<Domain.Ai.AiConversation>();
+    public DbSet<Domain.Ai.AiChatMessage> AiMessages => Set<Domain.Ai.AiChatMessage>();
+    public DbSet<Domain.Ai.AiToolCall> AiToolCalls => Set<Domain.Ai.AiToolCall>();
+    public DbSet<Domain.Ai.AiUsageDaily> AiUsageDaily => Set<Domain.Ai.AiUsageDaily>();
 
     public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
     public DbSet<Domain.Communication.EmailMessage> EmailMessages => Set<Domain.Communication.EmailMessage>();
@@ -289,6 +293,42 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(r => r.Detail).HasMaxLength(500);
             e.HasIndex(r => new { r.RuleId, r.StageChangeId }).IsUnique();
             e.HasIndex(r => new { r.TenantId, r.CreatedAt });
+        });
+
+        b.Entity<Domain.Ai.AiConversation>(e =>
+        {
+            e.ToTable("ai_conversations");
+            e.Property(x => x.Title).HasMaxLength(150);
+            e.Property(x => x.EntityType).HasMaxLength(30);
+            e.Property(x => x.Model).HasMaxLength(60);
+            e.Property(x => x.CostUsd).HasPrecision(12, 6);
+            e.HasIndex(x => new { x.TenantId, x.UserId, x.LastMessageAt });
+        });
+
+        b.Entity<Domain.Ai.AiChatMessage>(e =>
+        {
+            e.ToTable("ai_messages");
+            e.Property(x => x.Role).HasMaxLength(10);
+            e.Property(x => x.BlocksJson).HasColumnType("mediumtext").Metadata.SetMaxLength(null);
+            e.Property(x => x.Text).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.ConversationId, x.Seq }).IsUnique();
+        });
+
+        b.Entity<Domain.Ai.AiToolCall>(e =>
+        {
+            e.ToTable("ai_tool_calls");
+            e.Property(x => x.Tool).HasMaxLength(60);
+            e.Property(x => x.InputJson).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(x => x.OutputSummary).HasMaxLength(500);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.HasIndex(x => new { x.TenantId, x.ConversationId });
+        });
+
+        b.Entity<Domain.Ai.AiUsageDaily>(e =>
+        {
+            e.ToTable("ai_usage_daily");
+            e.Property(x => x.CostUsd).HasPrecision(12, 6);
+            e.HasIndex(x => new { x.TenantId, x.UserId, x.Date }).IsUnique();
         });
     }
 

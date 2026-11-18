@@ -371,3 +371,13 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .report-bar-col { width: 32%; min-width: 120px; }
 .report-bar { height: .7rem; width: var(--bar, 0%); min-width: 2px; background: var(--bar-color, var(--bs-primary)); border-radius: .2rem; }
 @media (max-width: 575.98px) { .report-bar-col { display: none; } }
+
+/* ---------------- M10: assistant ---------------- */
+.assistant-list .list-group-item.active { color: #fff; }
+.assistant-lines { max-height: 62vh; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; }
+.assistant-line { max-width: 85%; }
+.assistant-user { align-self: flex-end; text-align: right; }
+.assistant-bubble { display: inline-block; text-align: left; padding: .5rem .75rem; border-radius: .75rem; background: var(--bs-tertiary-bg); }
+.assistant-user .assistant-bubble { background: var(--bs-primary); color: #fff; }
+.assistant-time { font-size: .7rem; color: var(--bs-secondary-color); margin-top: .15rem; }
+.assistant-tools { margin-bottom: .25rem; }

@@ -65,6 +65,13 @@ public static class DependencyInjection
         services.AddScoped<Work.AutomationService>();
         services.AddScoped<Work.AutomationRunner>();
 
+        services.Configure<Ai.AiOptions>(config.GetSection(Ai.AiOptions.Section));
+        var aiProvider = config.GetSection(Ai.AiOptions.Section)["Provider"];
+        if (string.Equals(aiProvider, "Anthropic", StringComparison.OrdinalIgnoreCase)) services.AddSingleton<IAiClient, Ai.AnthropicAiClient>();
+        else services.AddSingleton<IAiClient, Ai.NotConfiguredAiClient>();
+        services.AddScoped<Ai.AssistantTools>();
+        services.AddScoped<Ai.AssistantService>();
+
         services.Configure<Communication.MessagingOptions>(config.GetSection(Communication.MessagingOptions.Section));
         var messaging = config.GetSection(Communication.MessagingOptions.Section).Get<Communication.MessagingOptions>() ?? new Communication.MessagingOptions();
         if (string.Equals(messaging.MailProvider, "Dev", StringComparison.OrdinalIgnoreCase)) services.AddScoped<IMailProvider, Communication.DevMailProvider>();

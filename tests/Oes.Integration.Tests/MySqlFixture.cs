@@ -36,6 +36,9 @@ public sealed class MySqlFixture : IAsyncLifetime
     /// <summary>The app's clock: real time unless a test pins it (always unpin in a finally).</summary>
     public TestClock Clock { get; } = new();
 
+    /// <summary>The model behind the assistant: scripted per test, never the real API.</summary>
+    public ScriptedAiClient Ai { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _mysql.StartAsync();
@@ -146,7 +149,11 @@ public sealed class TestApp(MySqlFixture fx) : WebApplicationFactory<Program>
         {
             builder.UseSetting(key, value);
         }
-        builder.ConfigureTestServices(s => { s.RemoveAll<IClock>(); s.AddSingleton<IClock>(fx.Clock); });
+        builder.ConfigureTestServices(s =>
+        {
+            s.RemoveAll<IClock>(); s.AddSingleton<IClock>(fx.Clock);
+            s.RemoveAll<IAiClient>(); s.AddSingleton<IAiClient>(fx.Ai);
+        });
     }
 
     public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions

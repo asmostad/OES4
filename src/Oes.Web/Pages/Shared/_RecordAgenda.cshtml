@@ -1,11 +1,16 @@
 @* Tasks and appointments on a record (and everything under it), with quick-add forms. *@
 @model AgendaModel
+@inject Oes.Application.Abstractions.ICurrentUser CurrentUser
 @{
     var self = Context.Request.Path + Context.Request.QueryString;
     var key = Model.EntityId.ToString("N")[..8];
     var today = Model.Today.ToString("yyyy-MM-dd");
 }
 <div class="record-agenda">
+@if (Model.EntityType is "opportunity" or "contact" or "property" or "project" && await CurrentUser.HasPermissionAsync(Oes.Application.Security.Permissions.AiAssistant))
+{
+    <a class="btn btn-sm btn-outline-primary w-100 mb-3" href="/Assistant?entityType=@Model.EntityType&amp;entityId=@Model.EntityId"><i class="bi bi-stars me-1"></i>Ask the assistant about this</a>
+}
 <div class="card mb-3">
     <div class="card-header d-flex align-items-center"><i class="bi bi-check2-square me-2"></i>Tasks
         <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#addtask-@key"><i class="bi bi-plus-lg"></i> Add</button></div>
