@@ -107,6 +107,7 @@
                 </form>
             </div>
         </div>
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Property, entityId = Model.Id })
         @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Property, entityId = Model.Id })
     </div>
 

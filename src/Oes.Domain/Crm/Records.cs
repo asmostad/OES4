@@ -22,6 +22,8 @@ public static class ItemTypes
     public const string Activity = "activity";
     public const string Task = "task";
     public const string Appointment = "appointment";
+    public const string Email = "email";
+    public const string Sms = "sms";
 }
 
 public class Note : TenantEntity

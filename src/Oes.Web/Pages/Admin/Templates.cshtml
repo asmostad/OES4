@@ -1,0 +1,65 @@
+@page "{channel=email}"
+@model Oes.Web.Pages.Admin.TemplatesModel
+@using Oes.Domain.Crm
+@{
+    var title = Model.IsSms ? "Texting & SMS Templates" : "Email Templates";
+    ViewData["Title"] = title;
+}
+<div class="page-header">
+    <div>
+        <h1>@title</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">@title</li></ol></nav>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Admin/TemplateEdit?channel=@Model.Channel"><i class="bi bi-plus-lg me-1"></i> New template</a>
+</div>
+
+@if (Model.IsSms)
+{
+    <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-phone me-2"></i>Texting number</div>
+        <div class="card-body">
+            @if (Model.CanSetNumber)
+            {
+                <form method="post" asp-page-handler="Number" class="row g-2 align-items-end">
+                    <div class="col-sm-5 col-lg-4">
+                        <label class="form-label small" for="number">Company texting number</label>
+                        <input id="number" name="number" class="form-control form-control-sm" value="@(Model.PhoneNumber is null ? "" : ContactValue.FormatPhone(Model.PhoneNumber, Model.PhoneNumber))" placeholder="(402) 555-0100" maxlength="30">
+                    </div>
+                    <div class="col-auto"><button class="btn btn-sm btn-primary" type="submit">Save</button></div>
+                </form>
+            }
+            else
+            {
+                <div>@(Model.PhoneNumber is null ? "Not set up." : ContactValue.FormatPhone(Model.PhoneNumber, Model.PhoneNumber))</div>
+            }
+            <div class="form-text">Texts go out from this number and replies come back to it. Clear it to turn texting off.
+                People who text STOP are opted out automatically; START opts them back in. Texts need an opt-in recorded on the contact.</div>
+        </div>
+    </div>
+}
+
+<div class="card">
+    @if (Model.Templates.Count == 0)
+    {
+        <div class="empty-state"><i class="bi bi-envelope-paper"></i><h5>No templates yet</h5><p>Templates fill in names and addresses for you with merge fields.</p></div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-clickable mb-0 align-middle">
+                <thead><tr><th>Name</th><th>@(Model.IsSms ? "Message" : "Subject")</th><th>Category</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var t in Model.Templates)
+                    {
+                        <tr data-href="/Admin/TemplateEdit?id=@t.Id" class="@(t.IsActive ? "" : "text-muted")">
+                            <td class="fw-medium"><a href="/Admin/TemplateEdit?id=@t.Id">@t.Name</a></td>
+                            <td class="small text-truncate template-preview">@(Model.IsSms ? t.Body : t.Subject)</td>
+                            <td>@(t.Category == Oes.Domain.Communication.MessagePurposes.Marketing ? "Marketing" : "Everyday")</td>
+                            <td>@if (!t.IsActive) { <span class="badge bg-secondary-subtle text-secondary">Inactive</span> }</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

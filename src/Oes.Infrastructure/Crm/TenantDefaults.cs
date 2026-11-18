@@ -118,5 +118,26 @@ public static class TenantDefaults
                 db.LookupValues.Add(new LookupValue { TenantId = tenantId, Type = type, Key = key, Label = label, Sort = sort, IsSystem = true });
             }
         }
+
+        // Starter templates, only for a company that has none yet (they're the company's to edit or delete).
+        if (!await db.MessageTemplates.IgnoreQueryFilters(filter).AnyAsync(t => t.TenantId == tenantId, ct))
+            foreach (var (channel, name, subject, body) in Templates)
+                db.MessageTemplates.Add(new Domain.Communication.MessageTemplate
+                {
+                    TenantId = tenantId, Channel = channel, Name = name, Subject = subject, Body = body,
+                    Category = Domain.Communication.MessagePurposes.Transactional,
+                });
     }
+
+    public static readonly (string Channel, string Name, string? Subject, string Body)[] Templates =
+    [
+        (Domain.Communication.Channels.Sms, "Inspection reminder", null,
+            "Hi {{contact.first_name}}, this is {{user.first_name}} with {{company.name}}. Just confirming your roof inspection at {{property.street}}. Reply here with any questions."),
+        (Domain.Communication.Channels.Sms, "On my way", null,
+            "Hi {{contact.first_name}}, {{user.first_name}} from {{company.name}} here. I'm on my way to {{property.street}}."),
+        (Domain.Communication.Channels.Email, "Thanks for meeting", "Thanks for meeting with {{company.name}}",
+            "Hi {{contact.first_name}},\n\nThanks for taking the time to meet with me about {{property.address}}. I'll follow up shortly with next steps.\n\n{{user.name}}\n{{company.name}}\n{{user.phone}}"),
+        (Domain.Communication.Channels.Email, "Estimate follow-up", "Your estimate from {{company.name}}",
+            "Hi {{contact.first_name}},\n\nI wanted to follow up on the estimate for {{property.address}}. Let me know if you have any questions or would like to go over it together.\n\n{{user.name}}\n{{company.name}}\n{{user.phone}}"),
+    ];
 }

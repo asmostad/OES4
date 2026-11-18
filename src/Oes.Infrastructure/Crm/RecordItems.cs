@@ -8,7 +8,13 @@ namespace Oes.Infrastructure.Crm;
 
 public sealed record TimelineItem(
     string ItemType, Guid Id, DateTime At, string? AuthorName, string Text, bool IsPinned,
-    string EntityType, Guid EntityId, string? FileName, long? SizeBytes, string? CategoryKey, bool CanEdit);
+    string EntityType, Guid EntityId, string? FileName, long? SizeBytes, string? CategoryKey, bool CanEdit)
+{
+    /// <summary>Set for email and text items.</summary>
+    public TimelineMessage? Message { get; init; }
+}
+
+public sealed record TimelineMessage(string Direction, string Status, string? Subject, string Counterparty);
 
 public enum TimelineScope { ThisRecord, Everything }
 
@@ -229,8 +235,62 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
                           select new TimelineItem(ItemTypes.Activity, a.Id, a.CreatedAt, u == null ? null : u.FirstName + " " + u.LastName,
                               a.Summary, false, a.EntityType, a.EntityId, null, null, null, false)).ToListAsync(ct);
 
-        return notes.Concat(docs).Concat(acts)
+        var messages = await MessagesAsync(ids.Where(i => i.ItemType == ItemTypes.Email).Select(i => i.ItemId).ToList(),
+            ids.Where(i => i.ItemType == ItemTypes.Sms).Select(i => i.ItemId).ToList(), ct);
+
+        return notes.Concat(docs).Concat(acts).Concat(messages)
             .OrderByDescending(i => i.IsPinned).ThenByDescending(i => i.At).Take(take).ToList();
+    }
+
+    /// <summary>
+    /// Emails and texts for the timeline. Without email/sms view_all you see messages you sent and
+    /// replies that came in; teammates' outgoing messages stay private.
+    /// </summary>
+    private async Task<List<TimelineItem>> MessagesAsync(List<Guid> emailIds, List<Guid> smsIds, CancellationToken ct)
+    {
+        var result = new List<TimelineItem>();
+        var all_ = emailIds.Concat(smsIds).ToList();
+        var home = (await db.RecordLinks.Where(l => l.IsPrimary && all_.Contains(l.ItemId)).Select(l => new { l.ItemId, l.EntityType, l.EntityId }).ToListAsync(ct))
+            .GroupBy(l => l.ItemId).ToDictionary(g => g.Key, g => (g.First().EntityType, g.First().EntityId));
+        var me = user.UserId;
+        if (emailIds.Count > 0)
+        {
+            var all = await user.HasPermissionAsync(Oes.Application.Security.Permissions.EmailViewAll, ct);
+            var emails = await (from m in db.EmailMessages where emailIds.Contains(m.Id)
+                                    && (all || m.SentByUserId == null || m.SentByUserId == me || m.Direction == Domain.Communication.Directions.Inbound)
+                                join u in db.Users on m.SentByUserId equals u.Id into us from u in us.DefaultIfEmpty()
+                                select new { m.Id, m.SentAt, m.Subject, m.Body, m.Direction, m.Status, m.EntityType, m.EntityId, m.FromAddress,
+                                    Sender = u == null ? null : u.FirstName + " " + u.LastName,
+                                    To = m.Recipients.Select(r => r.Address).FirstOrDefault() }).ToListAsync(ct);
+            result.AddRange(emails.Select(m => new TimelineItem(ItemTypes.Email, m.Id, m.SentAt, m.Sender ?? m.FromAddress, Preview(m.Body), false,
+                home.GetValueOrDefault(m.Id).EntityType ?? "", home.GetValueOrDefault(m.Id).EntityId, null, null, null, false)
+            { Message = new TimelineMessage(m.Direction, m.Status, m.Subject, m.Direction == Domain.Communication.Directions.Inbound ? m.FromAddress : m.To ?? "") }));
+        }
+        if (smsIds.Count > 0)
+        {
+            var all = await user.HasPermissionAsync(Oes.Application.Security.Permissions.SmsViewAll, ct);
+            var texts = await (from m in db.SmsMessages where smsIds.Contains(m.Id)
+                                   && (all || m.SentByUserId == null || m.SentByUserId == me || m.Direction == Domain.Communication.Directions.Inbound)
+                               join u in db.Users on m.SentByUserId equals u.Id into us from u in us.DefaultIfEmpty()
+                               join c in db.Contacts on m.ContactId equals c.Id into cs from c in cs.DefaultIfEmpty()
+                               select new { m.Id, m.At, m.Body, m.Direction, m.Status, m.EntityType, m.EntityId, m.FromNumber, m.ToNumber,
+                                   Sender = u == null ? null : u.FirstName + " " + u.LastName, Contact = c == null ? null : c.DisplayName }).ToListAsync(ct);
+            result.AddRange(texts.Select(m =>
+            {
+                var inbound = m.Direction == Domain.Communication.Directions.Inbound;
+                var number = inbound ? m.FromNumber : m.ToNumber;
+                return new TimelineItem(ItemTypes.Sms, m.Id, m.At, inbound ? m.Contact ?? ContactValue.FormatPhone(number, number) : m.Sender, m.Body, false,
+                    home.GetValueOrDefault(m.Id).EntityType ?? "", home.GetValueOrDefault(m.Id).EntityId, null, null, null, false)
+                { Message = new TimelineMessage(m.Direction, m.Status, null, ContactValue.FormatPhone(number, number)) };
+            }));
+        }
+        return result;
+    }
+
+    private static string Preview(string body)
+    {
+        var s = body.ReplaceLineEndings(" ").Trim();
+        return s.Length <= 280 ? s : s[..280] + "…";
     }
 
     /// <summary>Wraps a stream and feeds everything read through a hash.</summary>

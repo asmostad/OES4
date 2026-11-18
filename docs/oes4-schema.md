@@ -65,8 +65,8 @@
 | `contact_methods` | ContactId, Kind (email/phone/mobile/fax/website), Value, NormalizedValue, Label, IsPrimary | Many emails and phones per contact. `NormalizedValue` is indexed for email/SMS/webhook matching. |
 | `contact_addresses` | ContactId, Kind (mailing/billing), address fields | A contact's own mailing address, separate from the properties they're tied to |
 | `contact_relationships` | PersonContactId, OrganizationContactId, Title, IsPrimary, StartedOn, EndedOn | Person ↔ organization. One person can belong to several orgs. |
-| `contact_consents` | ContactId, Channel (email/sms/call), Purpose (marketing/transactional), Status (opted_in/opted_out/unknown), Source, At, Evidence | Required for SMS (STOP/HELP, A2P) and blasts |
-| `suppressions` | TenantId, Channel, Address (normalized), Scope (marketing/all), Reason (unsubscribe/bounce/complaint/manual/stop), At, RemovedAt | Checked on every send, including CC/BCC |
+| `contact_consents` | ContactId, Channel (email/sms/call), Purpose (marketing/transactional), Status (opted_in/opted_out/unknown), Source, At, Evidence | Required for SMS (STOP/HELP, A2P) and blasts. **Built in M8** (email/sms only, plus RecordedByUserId) |
+| `suppressions` | TenantId, Channel, Address (normalized), Scope (marketing/all), Reason (unsubscribe/bounce/complaint/manual/stop), At, RemovedAt | Checked on every send, including CC/BCC. **Built in M8** |
 
 ## 4. Properties, structures, measurements
 
@@ -191,12 +191,12 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 | Table | Key columns | Notes |
 |---|---|---|
 | `mail_accounts` | MembershipId, Provider (ms365), Address, DeltaToken, LastSyncAt, Status | The tenant user's own mailbox |
-| `email_messages` | TenantId, MailAccountId, ProviderMessageId (unique per account), ConversationId, InReplyTo, Direction, From, Subject, BodyDocumentId or BodyHtml, Preview, SentAt, BlastId | **One row per message**, linked to many records via `record_links` (OES3 duplicated the row per record) |
+| `email_messages` | TenantId, MailAccountId, ProviderMessageId (unique per account), ConversationId, InReplyTo, Direction, From, Subject, BodyDocumentId or BodyHtml, Preview, SentAt, BlastId | **One row per message**, linked to many records via `record_links` (OES3 duplicated the row per record) **Built in M8** as Direction, FromAddress, Subject, Body (plain text), SentAt, SentByUserId, Status, ProviderMessageId, Error, TemplateId, home EntityType/EntityId; mailbox, threading and blast columns come with Graph and M9 |
 | `email_recipients` | MessageId, Kind (to/cc/bcc), Address, ContactId | |
 | `email_attachments` | MessageId, DocumentId | |
-| `sms_messages` | TenantId, ProviderSid, Direction, FromNumber, ToNumber, Body, Status, MediaJson, At | Linked via `record_links` |
-| `phone_numbers` | TenantId, Provider (twilio), Number, MessagingServiceSid, A2PStatus | Inbound webhooks route to the tenant by "To" number |
-| `templates` | TenantId, Channel (email/sms), Name, Subject, Body, MergeFieldsJson, Category (marketing/transactional), Active | One merge-field resolver for email, SMS and PDFs |
+| `sms_messages` | TenantId, ProviderSid, Direction, FromNumber, ToNumber, Body, Status, MediaJson, At | Linked via `record_links`. **Built in M8** without MediaJson, plus SentByUserId, ContactId, TemplateId, Error, home EntityType/EntityId |
+| `phone_numbers` | TenantId, Provider (twilio), Number, MessagingServiceSid, A2PStatus | Inbound webhooks route to the tenant by "To" number. **Built in M8** as `tenant_phone_numbers` (Number unique platform-wide, Provider, IsActive) |
+| `templates` | TenantId, Channel (email/sms), Name, Subject, Body, MergeFieldsJson, Category (marketing/transactional), Active | One merge-field resolver for email, SMS and PDFs. **Built in M8** as `message_templates` (no MergeFieldsJson: fields are validated against the resolver) |
 | `blasts` | TenantId, Name, AudienceJson, TemplateId, SenderMailAccountId (verified), ThrottlePerMin, Status, ScheduledAt, Counters | Sender must be a mailbox the tenant actually owns |
 | `blast_recipients` | BlastId, ContactId, Address, Status, ClaimedAt, SentAt, Error | `ClaimedAt` prevents double sends |
 | `notifications` | TenantId, UserId, Type, Title, Body, EntityType, EntityId, DedupeKey, ReadAt, EmailedAt, PushedAt | **Built in M8** as UserId, Kind, Title, Body, Url (app-relative only), ReadAt; dedupe and email/push columns come with delivery |

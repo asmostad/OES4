@@ -63,3 +63,25 @@ public interface INumberSequence
     /// <summary>Issues the next display number for this tenant, e.g. P-2026-0311.</summary>
     Task<string> NextAsync((string Key, string Prefix) kind, CancellationToken ct = default);
 }
+
+public sealed record OutgoingEmail(string FromAddress, string? FromName, IReadOnlyList<string> To, IReadOnlyList<string> Cc,
+    string Subject, string HtmlBody, string TextBody);
+
+public sealed record ProviderResult(bool Ok, string? ProviderId, string? Error);
+
+/// <summary>
+/// Email to CRM contacts, sent from the user's own mailbox (Microsoft Graph in production).
+/// The development provider writes messages to a folder.
+/// </summary>
+public interface IMailProvider
+{
+    string Name { get; }
+    Task<ProviderResult> SendAsync(Guid userId, OutgoingEmail email, CancellationToken ct = default);
+}
+
+/// <summary>Texting (Twilio in production). The development provider writes messages to a folder.</summary>
+public interface ISmsProvider
+{
+    string Name { get; }
+    Task<ProviderResult> SendAsync(string fromNumber, string toNumber, string body, CancellationToken ct = default);
+}

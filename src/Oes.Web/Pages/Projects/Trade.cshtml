@@ -102,6 +102,7 @@
                 }
             </ul>
         </div>
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Trade, entityId = Model.Id })
         @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Trade, entityId = Model.Id })
     </div>
     <div class="col-xl-7">

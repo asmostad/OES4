@@ -10,7 +10,7 @@
 <div class="card" id="timeline">
     <div class="card-header d-flex flex-wrap align-items-center gap-2">
         <ul class="nav nav-pills nav-sm timeline-tabs me-auto">
-            @foreach (var (key, label, icon) in new[] { ("all", "All", "bi-list-ul"), ("note", "Notes", "bi-sticky"), ("document", "Documents", "bi-paperclip"), ("activity", "Activity", "bi-clock-history") })
+            @foreach (var (key, label, icon) in new[] { ("all", "All", "bi-list-ul"), ("note", "Notes", "bi-sticky"), ("document", "Documents", "bi-paperclip"), ("email", "Emails", "bi-envelope"), ("sms", "Texts", "bi-chat-dots"), ("activity", "Activity", "bi-clock-history") })
             {
                 <li class="nav-item">
                     <a class="nav-link @((Model.Filter ?? "all") == key ? "active" : "")" href="@Url(key, null)"><i class="bi @icon me-1"></i>@label</a>
@@ -60,10 +60,10 @@
         <ul class="timeline-list">
             @foreach (var i in Model.Items)
             {
-                var elsewhere = i.EntityType != Model.EntityType || i.EntityId != Model.EntityId;
+                var elsewhere = i.EntityType != "" && (i.EntityType != Model.EntityType || i.EntityId != Model.EntityId);
                 <li class="timeline-item timeline-@i.ItemType @(i.IsPinned ? "pinned" : "")">
                     <div class="timeline-icon">
-                        <i class="bi @(i.ItemType switch { ItemTypes.Note => "bi-sticky", ItemTypes.Document => "bi-paperclip", _ => "bi-lightning" })"></i>
+                        <i class="bi @(i.ItemType switch { ItemTypes.Note => "bi-sticky", ItemTypes.Document => "bi-paperclip", ItemTypes.Email => "bi-envelope", ItemTypes.Sms => "bi-chat-dots", _ => "bi-lightning" })"></i>
                     </div>
                     <div class="timeline-body">
                         <div class="timeline-meta">
@@ -82,11 +82,23 @@
                                 <span class="text-muted small ms-1">@Fmt.Size(i.SizeBytes)@(i.CategoryKey is null ? "" : " · " + Fmt.Cap(i.CategoryKey))</span>
                             </div>
                         }
+                        else if (i.Message is { } msg)
+                        {
+                            var inbound = msg.Direction == Oes.Domain.Communication.Directions.Inbound;
+                            <div class="small text-muted">
+                                <i class="bi @(inbound ? "bi-box-arrow-in-down-left" : "bi-box-arrow-up-right")"></i>
+                                @(inbound ? "From" : "To") @msg.Counterparty
+                                @if (msg.Status == Oes.Domain.Communication.MessageStatuses.Failed) { <span class="timeline-msg-failed fw-medium ms-1"><i class="bi bi-exclamation-triangle"></i> Not delivered</span> }
+                            </div>
+                            @if (msg.Subject is not null) { <div class="timeline-msg-subject">@msg.Subject</div> }
+                            <div class="timeline-text">@i.Text</div>
+                            <a class="small" href="/Messages/View?channel=@i.ItemType&amp;id=@i.Id&amp;returnUrl=@Uri.EscapeDataString(self)">Open</a>
+                        }
                         else
                         {
                             <div class="timeline-text">@i.Text</div>
                         }
-                        @if (i.ItemType != ItemTypes.Activity)
+                        @if (i.ItemType is ItemTypes.Note or ItemTypes.Document)
                         {
                             <div class="timeline-actions">
                                 @if (i.ItemType == ItemTypes.Note)

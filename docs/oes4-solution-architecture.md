@@ -147,7 +147,7 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
    - Still to do:
      - Dispositions and the prospecting back/next list with locks.
      - Saved views, campaigns, the property/contact merge tool.
-     - Contact mailing addresses and consents (needed before SMS and blasts).
+     - Contact mailing addresses (consents were added in milestone 8).
      - Admin screens for pipeline stages and pick lists (defaults are seeded).
 3. **Insurance** (done 2026-11-17)
    - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
@@ -194,15 +194,21 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
    - Issuing emails a hashed, 60-day, revocable portal link; revise, new link and cancel all revoke it.
    - Sub portal (no sign-in, rate limited, no-referrer, noindex): accept or decline, then report completion with photos that roll up to the trade and project.
    - Still to do: work order PDF, and insurance-expiry notifications (milestone 8).
-8. **Communication** (in progress: tasks, calendar and in-app notifications done 2026-11-17)
+8. **Communication** (in progress: tasks, calendar, notifications, templates, one-to-one email and texts, consent and STOP done 2026-11-17)
    - Done:
      - Tasks: standalone or on any record, rolled up through record_links (a task on an opportunity shows on its property and contact). Date-only tasks are stored at noon in the company time zone; overdue/today grouping; mine/everyone (`tasks.view_all`); done-toggle logs to the record and notifies the creator.
      - Appointments: typed (lookup `appointment_type`), on records or standalone, location defaults to the property address, assigning others needs `calendar.manage`. Week calendar (Sunday start) with tasks due that week.
      - Record pages (opportunity, property, contact, claim, project, trade) show a Tasks and Appointments card through the `RecordAgenda` view component.
      - In-app notifications: bell with unread count and mark-all-read; links are app-relative only. Sent for task assignment/completion, price approvals needed (to everyone with `pricing.approve` except the requester), and sub portal accept/decline/complete (to the project owner). Never to yourself.
      - Dashboard "My day": overdue, due today, today's appointments.
+     - Templates (email and text) with one merge-field resolver (`{{contact.first_name}}`, `{{property.address}}`, `{{user.name}}`…); unknown fields are rejected on save. Bodies are plain text; email is HTML-encoded on send, so no user HTML is ever mailed. Starter templates are seeded per company.
+     - Email and texts from record pages (the `RecordMessaging` card): only to the record's contacts' own addresses, one row per message linked through record_links, shown on the timeline (Emails / Texts tabs). Outgoing messages are private to the sender unless the user has `email.view_all` / `sms.view_all`.
+     - Consent and suppression: consent history per contact (latest wins), suppression per address. Texts need an opt-in; email is allowed unless opted out. Inbound STOP/START/HELP are handled with confirmation replies; a STOP can only be undone by the person (START), never by staff. The first text to a number adds "Reply STOP to opt out."
+     - Company texting number (unique across companies) routes inbound texts to the right tenant. Replies continue on the record the last text came from and notify its sender.
+     - Providers sit behind `IMailProvider` / `ISmsProvider`. Development writes to a pickup folder and has a secret-protected `/api/webhooks/sms/dev` endpoint; with no provider configured, sends fail with a clear message and nothing leaves the server.
    - Still to do (needs external credentials or later work):
-     - M365 mail + calendar sync, templates, SMS with consent/STOP, SignalR live updates, email/push delivery of notifications and preferences.
+     - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
+     - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
      - Appointment attendees, all-day events, editing tasks/appointments in place, insurance-expiry notifications (needs the Worker), configurable automation rules.
 9. **Marketing** — nurture, email blasts + suppressions, online booking + busy calendars.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.

@@ -61,6 +61,17 @@ public static class DependencyInjection
         services.AddScoped<Work.NotificationService>();
         services.AddScoped<Work.WorkService>();
 
+        services.Configure<Communication.MessagingOptions>(config.GetSection(Communication.MessagingOptions.Section));
+        var messaging = config.GetSection(Communication.MessagingOptions.Section).Get<Communication.MessagingOptions>() ?? new Communication.MessagingOptions();
+        if (string.Equals(messaging.MailProvider, "Dev", StringComparison.OrdinalIgnoreCase)) services.AddScoped<IMailProvider, Communication.DevMailProvider>();
+        else services.AddScoped<IMailProvider, Communication.NotConfiguredProvider>();
+        if (string.Equals(messaging.SmsProvider, "Dev", StringComparison.OrdinalIgnoreCase)) services.AddScoped<ISmsProvider, Communication.DevSmsProvider>();
+        else services.AddScoped<ISmsProvider, Communication.NotConfiguredProvider>();
+        services.AddScoped<Communication.MergeFields>();
+        services.AddScoped<Communication.TemplateService>();
+        services.AddScoped<Communication.ConsentService>();
+        services.AddScoped<Communication.MessagingService>();
+
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();
 

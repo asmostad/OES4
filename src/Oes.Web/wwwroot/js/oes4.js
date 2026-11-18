@@ -351,6 +351,42 @@
         }
     }
 
+    // ---------------- message compose ----------------
+    // [data-template-form]: picking a [data-template-picker] option fills [data-template-subject]/[data-template-body]
+    // (asking first if something was already typed); [data-recipient] keeps the hidden [data-contact-id] in step.
+    document.querySelectorAll('[data-template-form]').forEach(function (form) {
+        const picker = form.querySelector('[data-template-picker]');
+        const subject = form.querySelector('[data-template-subject]');
+        const body = form.querySelector('[data-template-body]');
+        const recipient = form.querySelector('[data-recipient]');
+        const contact = form.querySelector('[data-contact-id]');
+        let filled = '';
+        if (picker) picker.addEventListener('change', function () {
+            const o = picker.selectedOptions[0];
+            if (!o || !o.value) return;
+            if (body && body.value.trim() && body.value !== filled && !window.confirm('Replace what you’ve written with this template?')) { picker.value = ''; return; }
+            if (subject) subject.value = o.getAttribute('data-subject') || '';
+            if (body) { body.value = o.getAttribute('data-body') || ''; filled = body.value; body.dispatchEvent(new Event('input')); }
+        });
+        if (recipient && contact) recipient.addEventListener('change', function () {
+            const o = recipient.selectedOptions[0];
+            if (o) contact.value = o.getAttribute('data-contact');
+        });
+    });
+
+    // ---------------- character counters ----------------
+    document.querySelectorAll('textarea[data-char-count]').forEach(function (t) {
+        const out = document.createElement('div');
+        out.className = 'form-text text-end char-count';
+        t.insertAdjacentElement('afterend', out);
+        function update() {
+            const n = t.value.length;
+            out.textContent = n + ' characters' + (n > 160 ? ' · ' + Math.ceil(n / 153) + ' text parts' : '');
+        }
+        t.addEventListener('input', update);
+        update();
+    });
+
     function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function store(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
 })();

@@ -94,6 +94,14 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Work.Appointment> Appointments => Set<Domain.Work.Appointment>();
     public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
 
+    public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
+    public DbSet<Domain.Communication.EmailMessage> EmailMessages => Set<Domain.Communication.EmailMessage>();
+    public DbSet<Domain.Communication.EmailRecipient> EmailRecipients => Set<Domain.Communication.EmailRecipient>();
+    public DbSet<Domain.Communication.SmsMessage> SmsMessages => Set<Domain.Communication.SmsMessage>();
+    public DbSet<Domain.Communication.ContactConsent> ContactConsents => Set<Domain.Communication.ContactConsent>();
+    public DbSet<Domain.Communication.Suppression> Suppressions => Set<Domain.Communication.Suppression>();
+    public DbSet<Domain.Communication.TenantPhoneNumber> TenantPhoneNumbers => Set<Domain.Communication.TenantPhoneNumber>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
         b.Properties<Guid>().HaveConversion<GuidBinaryConverter>().HaveColumnType("binary(16)");
@@ -203,6 +211,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureProduction(b);
         ConfigureSubcontractors(b);
         ConfigureWork(b);
+        ConfigureCommunication(b);
         ApplyTenantFilters(b);
     }
 
@@ -242,6 +251,88 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(n => n.Body).HasMaxLength(1000);
             e.Property(n => n.Url).HasMaxLength(500);
             e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
+        });
+    }
+
+    private static void ConfigureCommunication(ModelBuilder b)
+    {
+        b.Entity<Domain.Communication.MessageTemplate>(e =>
+        {
+            e.ToTable("message_templates");
+            e.Property(t => t.Channel).HasMaxLength(10);
+            e.Property(t => t.Name).HasMaxLength(150);
+            e.Property(t => t.Subject).HasMaxLength(300);
+            e.Property(t => t.Body).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(t => t.Category).HasMaxLength(20);
+            e.HasIndex(t => new { t.TenantId, t.Channel, t.Name }).IsUnique();
+        });
+
+        b.Entity<Domain.Communication.EmailMessage>(e =>
+        {
+            e.ToTable("email_messages");
+            e.Property(m => m.Direction).HasMaxLength(10);
+            e.Property(m => m.FromAddress).HasMaxLength(320);
+            e.Property(m => m.Subject).HasMaxLength(300);
+            e.Property(m => m.Body).HasColumnType("mediumtext").Metadata.SetMaxLength(null);
+            e.Property(m => m.Status).HasMaxLength(20);
+            e.Property(m => m.ProviderMessageId).HasMaxLength(300);
+            e.Property(m => m.Error).HasMaxLength(1000);
+            e.Property(m => m.EntityType).HasMaxLength(30);
+            e.HasMany(m => m.Recipients).WithOne().HasForeignKey(r => r.EmailMessageId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => new { m.TenantId, m.SentAt });
+        });
+
+        b.Entity<Domain.Communication.EmailRecipient>(e =>
+        {
+            e.ToTable("email_recipients");
+            e.Property(r => r.Kind).HasMaxLength(5);
+            e.Property(r => r.Address).HasMaxLength(320);
+            e.HasIndex(r => new { r.TenantId, r.Address });
+            e.HasIndex(r => new { r.TenantId, r.ContactId });
+        });
+
+        b.Entity<Domain.Communication.SmsMessage>(e =>
+        {
+            e.ToTable("sms_messages");
+            e.Property(m => m.Direction).HasMaxLength(10);
+            e.Property(m => m.FromNumber).HasMaxLength(20);
+            e.Property(m => m.ToNumber).HasMaxLength(20);
+            e.Property(m => m.Body).HasMaxLength(1600);
+            e.Property(m => m.Status).HasMaxLength(20);
+            e.Property(m => m.ProviderSid).HasMaxLength(100);
+            e.Property(m => m.Error).HasMaxLength(1000);
+            e.Property(m => m.EntityType).HasMaxLength(30);
+            e.HasIndex(m => new { m.TenantId, m.ContactId, m.At });
+            e.HasIndex(m => new { m.TenantId, m.FromNumber, m.At });
+        });
+
+        b.Entity<Domain.Communication.ContactConsent>(e =>
+        {
+            e.ToTable("contact_consents");
+            e.Property(c => c.Channel).HasMaxLength(10);
+            e.Property(c => c.Purpose).HasMaxLength(20);
+            e.Property(c => c.Status).HasMaxLength(20);
+            e.Property(c => c.Source).HasMaxLength(30);
+            e.Property(c => c.Evidence).HasMaxLength(1000);
+            e.HasIndex(c => new { c.TenantId, c.ContactId, c.Channel, c.Purpose, c.At });
+        });
+
+        b.Entity<Domain.Communication.Suppression>(e =>
+        {
+            e.ToTable("suppressions");
+            e.Property(s => s.Channel).HasMaxLength(10);
+            e.Property(s => s.Address).HasMaxLength(320);
+            e.Property(s => s.Scope).HasMaxLength(20);
+            e.Property(s => s.Reason).HasMaxLength(20);
+            e.HasIndex(s => new { s.TenantId, s.Channel, s.Address });
+        });
+
+        b.Entity<Domain.Communication.TenantPhoneNumber>(e =>
+        {
+            e.ToTable("tenant_phone_numbers");
+            e.Property(p => p.Number).HasMaxLength(20);
+            e.Property(p => p.Provider).HasMaxLength(20);
+            e.HasIndex(p => p.Number).IsUnique(); // one tenant per number, across the platform
         });
     }
 

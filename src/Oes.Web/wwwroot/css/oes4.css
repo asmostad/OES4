@@ -343,3 +343,14 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .notification-dropdown { width: 22rem; max-height: 28rem; overflow-y: auto; }
 .notification-item { white-space: normal; border-left: 3px solid transparent; }
 .notification-item.unread { border-left-color: var(--bs-primary); background: var(--bs-tertiary-bg); }
+
+/* ---------------- M8: messaging ---------------- */
+.record-messaging:not(:first-child) { margin-top: 1rem; }
+.record-messaging + .record-agenda, .record-messaging + .card { margin-top: 0; }
+.record-messaging .nav-pills .nav-link { font-size: .8rem; }
+.template-preview { max-width: 420px; }
+.message-body { font-size: .95rem; }
+.timeline-email .timeline-icon { color: #0ea5e9; }
+.timeline-sms .timeline-icon { color: #10b981; }
+.timeline-msg-subject { font-weight: 600; }
+.timeline-msg-failed { color: var(--bs-danger); }
