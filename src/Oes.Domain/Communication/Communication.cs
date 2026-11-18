@@ -69,6 +69,7 @@ public class EmailMessage : TenantEntity
     public string? ProviderMessageId { get; set; }
     public string? Error { get; set; }
     public Guid? TemplateId { get; set; }
+    public Guid? BlastId { get; set; }
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
     public List<EmailRecipient> Recipients { get; set; } = [];
@@ -130,4 +131,69 @@ public class TenantPhoneNumber : TenantEntity
     public string Number { get; set; } = "";
     public string Provider { get; set; } = "dev";
     public bool IsActive { get; set; } = true;
+}
+
+public static class BlastStatuses
+{
+    public const string Draft = "draft";
+    public const string Scheduled = "scheduled";
+    public const string Sending = "sending";
+    public const string Sent = "sent";
+    public const string Cancelled = "cancelled";
+}
+
+public static class BlastRecipientStatuses
+{
+    public const string Pending = "pending";
+    public const string Sending = "sending";
+    public const string Sent = "sent";
+    public const string Failed = "failed";
+    public const string Skipped = "skipped";
+}
+
+/// <summary>Who a blast goes to. Stored as JSON on the blast; resolved into recipients when it's scheduled.</summary>
+public sealed class BlastAudience
+{
+    /// <summary>Contact statuses to include (lead/customer/past_customer). Empty = all.</summary>
+    public List<string> Statuses { get; set; } = [];
+    /// <summary>Only contacts on an opportunity tied to this storm.</summary>
+    public Guid? StormEventId { get; set; }
+    /// <summary>Only contacts from this lead source.</summary>
+    public string? SourceKey { get; set; }
+    public bool IncludeOrganizations { get; set; }
+}
+
+/// <summary>A marketing email to many contacts, sent by the worker in throttled batches.</summary>
+public class Blast : TenantEntity
+{
+    public string Name { get; set; } = "";
+    public Guid? TemplateId { get; set; }
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string AudienceJson { get; set; } = "{}";
+    /// <summary>The mailbox it's sent from (the user who created it, until shared mailboxes exist).</summary>
+    public Guid SenderUserId { get; set; }
+    public int ThrottlePerMinute { get; set; } = 30;
+    public string Status { get; set; } = BlastStatuses.Draft;
+    public DateTime? ScheduledAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+    public int Total { get; set; }
+    public int SentCount { get; set; }
+    public int FailedCount { get; set; }
+    public int SkippedCount { get; set; }
+    public Guid? CreatedByUserId { get; set; }
+}
+
+public class BlastRecipient : TenantEntity
+{
+    public Guid BlastId { get; set; }
+    public Guid ContactId { get; set; }
+    public string Address { get; set; } = "";
+    public string Status { get; set; } = BlastRecipientStatuses.Pending;
+    /// <summary>Set when the sender picks the row up; with the status change it stops two runs sending the same email.</summary>
+    public DateTime? ClaimedAt { get; set; }
+    public DateTime? SentAt { get; set; }
+    public string? Error { get; set; }
+    public Guid? EmailMessageId { get; set; }
 }

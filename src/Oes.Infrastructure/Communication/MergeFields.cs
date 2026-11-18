@@ -34,7 +34,11 @@ public sealed partial class MergeFields(OesDbContext db, ITenantContext tenant, 
             .Where(k => !Available.Any(a => a.Key == k)).ToList();
 
     /// <summary>Values for a record (walking up to its opportunity, contact and property) and a specific contact.</summary>
-    public async Task<Dictionary<string, string>> ForAsync(string? entityType, Guid? entityId, Guid? contactId, CancellationToken ct = default)
+    public async Task<Dictionary<string, string>> ForAsync(string? entityType, Guid? entityId, Guid? contactId, CancellationToken ct = default) =>
+        await ForAsync(entityType, entityId, contactId, user.UserId, ct);
+
+    /// <summary>As above, with the {{user.*}} fields for a given sender (the worker has no signed-in user).</summary>
+    public async Task<Dictionary<string, string>> ForAsync(string? entityType, Guid? entityId, Guid? contactId, Guid? asUserId, CancellationToken ct = default)
     {
         var v = new Dictionary<string, string>();
         void Set(string k, string? s) { if (!string.IsNullOrWhiteSpace(s)) v[k] = s.Trim(); }
@@ -96,7 +100,7 @@ public sealed partial class MergeFields(OesDbContext db, ITenantContext tenant, 
             var t = await db.Tenants.Where(x => x.Id == tid).Select(x => new { x.Name, x.PostalAddress }).FirstOrDefaultAsync(ct);
             Set("company.name", t?.Name); Set("company.address", t?.PostalAddress);
         }
-        if (user.UserId is { } uid)
+        if (asUserId is { } uid)
         {
             var u = await db.Users.Where(x => x.Id == uid).Select(x => new { x.FirstName, x.LastName, x.Email, x.PhoneNumber }).FirstOrDefaultAsync(ct);
             if (u is not null)

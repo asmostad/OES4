@@ -1,0 +1,34 @@
+@page
+@model Oes.Web.Pages.Admin.SettingsModel
+@using Oes.Infrastructure.Admin
+@{
+    ViewData["Title"] = "Settings";
+}
+<div class="page-header">
+    <div>
+        <h1>Settings</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Settings</li></ol></nav>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xl-7">
+        <div class="card">
+            <div class="card-header">Company</div>
+            <div class="card-body">
+                <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+                <form method="post" class="row g-3">
+                    <div class="col-md-7"><label class="form-label" asp-for="Input.Name">Company name</label>
+                        <input asp-for="Input.Name" class="form-control" maxlength="150" required></div>
+                    <div class="col-md-5"><label class="form-label" asp-for="Input.TimeZone">Time zone</label>
+                        <select asp-for="Input.TimeZone" class="form-select">
+                            @foreach (var (id, label) in SettingsService.TimeZones) { <option value="@id">@label</option> }
+                        </select></div>
+                    <div class="col-12"><label class="form-label" asp-for="Input.PostalAddress">Mailing address</label>
+                        <textarea asp-for="Input.PostalAddress" class="form-control" rows="2" maxlength="300" placeholder="123 Main St, Lincoln, NE 68502"></textarea>
+                        <div class="form-text">Printed at the bottom of every marketing email, as the law requires. A PO box is fine.</div></div>
+                    <div class="col-12"><button class="btn btn-primary" type="submit">Save settings</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

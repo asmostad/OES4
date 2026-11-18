@@ -69,8 +69,8 @@ public static class Navigation
                 new("Lead Campaigns", "bi-megaphone", null, Permissions.LeadsCampaigns),
                 new("Online Booking", "bi-calendar-plus", null, Permissions.BookingManage),
                 new("Nurture Workflows", "bi-arrow-repeat", null, Permissions.NurtureManage),
-                new("Email Blasts", "bi-send", null, Permissions.BlastsManage),
-                new("Email Suppressions", "bi-envelope-slash", null, Permissions.BlastsManage),
+                new("Email Blasts", "bi-send", "/Blasts", Permissions.BlastsManage),
+                new("Email Suppressions", "bi-envelope-slash", "/Admin/Suppressions", Permissions.BlastsManage),
             ]),
             new("templates", "Templates & Automation", "bi-lightning-charge",
             [
@@ -95,7 +95,7 @@ public static class Navigation
             new("system", "System", "bi-gear",
             [
                 new("Pipeline & Lists", "bi-list-check", "/Admin/Lists", Permissions.SettingsManage),
-                new("Settings", "bi-gear", null, Permissions.SettingsManage),
+                new("Settings", "bi-gear", "/Admin/Settings", Permissions.SettingsManage),
                 new("Audit Log", "bi-journal-check", "/Admin/Audit", Permissions.AuditView),
                 new("AI Knowledge Base", "bi-journal-text", null, Permissions.AiManage),
                 new("AI Usage", "bi-graph-up", null, Permissions.AiManage),

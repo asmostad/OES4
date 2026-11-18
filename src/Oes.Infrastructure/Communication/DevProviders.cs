@@ -29,7 +29,8 @@ public sealed class DevMailProvider(IOptions<MessagingOptions> options, ILogger<
         Directory.CreateDirectory(dir);
         var id = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
         var head = $"<!-- From: {WebUtility.HtmlEncode(email.FromAddress)}\n     To: {WebUtility.HtmlEncode(string.Join(", ", email.To))}" +
-                   $"{(email.Cc.Count > 0 ? "\n     Cc: " + WebUtility.HtmlEncode(string.Join(", ", email.Cc)) : "")}\n     Subject: {WebUtility.HtmlEncode(email.Subject)} -->\n";
+                   $"{(email.Cc.Count > 0 ? "\n     Cc: " + WebUtility.HtmlEncode(string.Join(", ", email.Cc)) : "")}\n     Subject: {WebUtility.HtmlEncode(email.Subject)}" +
+                   string.Concat((email.Headers ?? new Dictionary<string, string>()).Select(h => $"\n     {WebUtility.HtmlEncode(h.Key)}: {WebUtility.HtmlEncode(h.Value)}")) + " -->\n";
         await File.WriteAllTextAsync(Path.Combine(dir, id + ".html"), head + email.HtmlBody, ct);
         log.LogInformation("Email {Subject} written to the pickup folder as {Id}", email.Subject, id);
         return new ProviderResult(true, "dev-" + id, null);

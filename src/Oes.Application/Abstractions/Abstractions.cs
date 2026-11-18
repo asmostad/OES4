@@ -65,7 +65,7 @@ public interface INumberSequence
 }
 
 public sealed record OutgoingEmail(string FromAddress, string? FromName, IReadOnlyList<string> To, IReadOnlyList<string> Cc,
-    string Subject, string HtmlBody, string TextBody);
+    string Subject, string HtmlBody, string TextBody, IReadOnlyDictionary<string, string>? Headers = null);
 
 public sealed record ProviderResult(bool Ok, string? ProviderId, string? Error);
 

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Oes.Application.Abstractions;
+using Oes.Application.Security;
 using Oes.Domain.Communication;
 using Oes.Domain.Crm;
 using Oes.Infrastructure.Crm;
@@ -52,7 +53,9 @@ public sealed class ConsentService(OesDbContext db, RecordScope scope, IClock cl
         {
             var kinds = KindsFor(channel);
             var addresses = await db.ContactMethods.Where(m => m.ContactId == contactId && kinds.Contains(m.Kind)).Select(m => m.NormalizedValue).ToListAsync(ct);
-            if (await db.Suppressions.AnyAsync(s => s.RemovedAt == null && s.Channel == channel && addresses.Contains(s.Address) && PersonOnlyReasons.Contains(s.Reason), ct))
+            // A person's own STOP/unsubscribe covers its scope, and only they can undo it.
+            if (await db.Suppressions.AnyAsync(s => s.RemovedAt == null && s.Channel == channel && addresses.Contains(s.Address)
+                    && PersonOnlyReasons.Contains(s.Reason) && (s.Scope == "all" || purpose == MessagePurposes.Marketing), ct))
                 throw new CrmRuleException(channel == Channels.Sms
                     ? "This contact texted STOP. Only they can opt back in, by texting START."
                     : "This contact unsubscribed. Only they can opt back in.");
@@ -71,10 +74,12 @@ public sealed class ConsentService(OesDbContext db, RecordScope scope, IClock cl
         });
     }
 
-    internal async Task SuppressAsync(string channel, string address, string reason, CancellationToken ct)
+    /// <summary>Adds a suppression unless one already covers it. Saved with the caller's SaveChanges.</summary>
+    internal async Task SuppressAsync(string channel, string address, string reason, CancellationToken ct, string suppressionScope = "all")
     {
-        if (!await db.Suppressions.AnyAsync(s => s.Channel == channel && s.Address == address && s.RemovedAt == null && s.Scope == "all", ct))
-            db.Suppressions.Add(new Suppression { Channel = channel, Address = address, Scope = "all", Reason = reason });
+        var covered = await db.Suppressions.AnyAsync(s => s.Channel == channel && s.Address == address && s.RemovedAt == null
+                                                          && (s.Scope == "all" || s.Scope == suppressionScope), ct);
+        if (!covered) db.Suppressions.Add(new Suppression { Channel = channel, Address = address, Scope = suppressionScope, Reason = reason });
     }
 
     internal async Task UnsuppressAsync(string channel, string address, CancellationToken ct)
@@ -83,32 +88,102 @@ public sealed class ConsentService(OesDbContext db, RecordScope scope, IClock cl
             s.RemovedAt = clock.UtcNow;
     }
 
-    /// <summary>Null when the message may be sent; otherwise why it's blocked.</summary>
-    public async Task<string?> BlockReasonAsync(Guid contactId, string channel, string address, string purpose, CancellationToken ct = default)
+    // ---------------- Suppression list (admin) ----------------
+
+    public async Task<List<SuppressionRow>> SuppressionsAsync(string channel, string? q, int take = 500, CancellationToken ct = default)
     {
-        var suppressed = await db.Suppressions.Where(s => s.Channel == channel && s.Address == address && s.RemovedAt == null)
-            .Select(s => new { s.Scope, s.Reason }).ToListAsync(ct);
-        if (suppressed.FirstOrDefault(s => s.Scope == "all" || purpose == MessagePurposes.Marketing) is { } hit)
-            return hit.Reason == SuppressionReasons.Stop ? "This number texted STOP." : $"This address is suppressed ({hit.Reason}).";
-
-        var latest = await db.ContactConsents.Where(c => c.ContactId == contactId && c.Channel == channel)
-            .OrderByDescending(c => c.At).Select(c => new { c.Purpose, c.Status }).ToListAsync(ct);
-        string Status(string p) => latest.FirstOrDefault(c => c.Purpose == p)?.Status ?? ConsentStatuses.Unknown;
-        var transactional = Status(MessagePurposes.Transactional);
-        var marketing = Status(MessagePurposes.Marketing);
-
-        // Opting out of everyday messages on a channel also opts out of marketing on it.
-        if (transactional == ConsentStatuses.OptedOut) return "The contact opted out.";
-        if (purpose == MessagePurposes.Marketing && marketing == ConsentStatuses.OptedOut) return "The contact opted out of marketing.";
-        if (channel == Channels.Sms)
+        await scope.EnsurePermissionAsync(Permissions.BlastsManage);
+        var query = db.Suppressions.Where(s => s.Channel == channel && s.RemovedAt == null);
+        if (!string.IsNullOrWhiteSpace(q))
         {
-            var ok = purpose == MessagePurposes.Marketing
-                ? marketing == ConsentStatuses.OptedIn
-                : transactional == ConsentStatuses.OptedIn || marketing == ConsentStatuses.OptedIn;
-            if (!ok) return purpose == MessagePurposes.Marketing
-                ? "No marketing text opt-in on file."
-                : "No texting opt-in on file. Record their consent on the contact first.";
+            var t = q.Trim().ToLowerInvariant();
+            query = query.Where(s => s.Address.Contains(t));
         }
-        return null;
+        return await query.OrderByDescending(s => s.CreatedAt).Take(take)
+            .Select(s => new SuppressionRow(s.Id, s.Channel, s.Address, s.Scope, s.Reason, s.CreatedAt)).ToListAsync(ct);
+    }
+
+    public async Task AddManualSuppressionAsync(string channel, string address, string suppressionScope, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.BlastsManage);
+        if (!Channels.All.Contains(channel)) throw new CrmRuleException("Pick email or text.");
+        if (suppressionScope is not ("all" or "marketing")) throw new CrmRuleException("Pick what to block.");
+        var normalized = channel == Channels.Sms ? ContactValue.Phone(address ?? "") : (address ?? "").Trim().ToLowerInvariant();
+        if (channel == Channels.Email && (normalized.Length is < 3 or > 320 || !normalized.Contains('@'))) throw new CrmRuleException("Enter an email address.");
+        if (channel == Channels.Sms && normalized.Length < 11) throw new CrmRuleException("Enter a full phone number.");
+        await SuppressAsync(channel, normalized, SuppressionReasons.Manual, ct, suppressionScope);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Staff can lift manual and bounce blocks, never a person's own unsubscribe, STOP or complaint.</summary>
+    public async Task RemoveSuppressionAsync(Guid id, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.BlastsManage);
+        var s = await db.Suppressions.FirstOrDefaultAsync(x => x.Id == id && x.RemovedAt == null, ct) ?? throw new RecordNotFoundException("Suppression");
+        if (PersonOnlyReasons.Contains(s.Reason)) throw new CrmRuleException("Only the person can undo their own opt-out.");
+        s.RemovedAt = clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    // ---------------- Can we message them? ----------------
+
+    /// <summary>Null when the message may be sent; otherwise why it's blocked.</summary>
+    public async Task<string?> BlockReasonAsync(Guid contactId, string channel, string address, string purpose, CancellationToken ct = default) =>
+        (await BlockReasonsAsync([(contactId, address)], channel, purpose, ct)).GetValueOrDefault((contactId, address));
+
+    /// <summary>Block reasons for many (contact, address) pairs at once. Pairs that may be messaged are absent.</summary>
+    public async Task<Dictionary<(Guid ContactId, string Address), string>> BlockReasonsAsync(
+        IReadOnlyCollection<(Guid ContactId, string Address)> targets, string channel, string purpose, CancellationToken ct = default)
+    {
+        var result = new Dictionary<(Guid, string), string>();
+        if (targets.Count == 0) return result;
+        var contactIds = targets.Select(t => t.ContactId).Distinct().ToList();
+        var addresses = targets.Select(t => t.Address).Distinct().ToList();
+
+        var suppressed = new List<(string Address, string Scope, string Reason)>();
+        foreach (var chunk in addresses.Chunk(500))
+        {
+            var rows = await db.Suppressions.Where(s => s.Channel == channel && s.RemovedAt == null && chunk.Contains(s.Address))
+                .Select(s => new { s.Address, s.Scope, s.Reason }).ToListAsync(ct);
+            suppressed.AddRange(rows.Select(s => (s.Address, s.Scope, s.Reason)));
+        }
+        var consents = new List<(Guid ContactId, string Purpose, string Status, DateTime At)>();
+        foreach (var chunk in contactIds.Chunk(500))
+        {
+            var rows = await db.ContactConsents.Where(c => c.Channel == channel && chunk.Contains(c.ContactId))
+                .Select(c => new { c.ContactId, c.Purpose, c.Status, c.At }).ToListAsync(ct);
+            consents.AddRange(rows.Select(c => (c.ContactId, c.Purpose, c.Status, c.At)));
+        }
+        var latest = consents.GroupBy(c => (c.ContactId, c.Purpose)).ToDictionary(g => g.Key, g => g.MaxBy(c => c.At).Status);
+
+        foreach (var (contactId, address) in targets)
+        {
+            var hit = suppressed.FirstOrDefault(s => s.Address == address && (s.Scope == "all" || purpose == MessagePurposes.Marketing));
+            if (hit.Address is not null)
+            {
+                result[(contactId, address)] = hit.Reason switch
+                {
+                    SuppressionReasons.Stop => "This number texted STOP.",
+                    SuppressionReasons.Unsubscribe => "They unsubscribed.",
+                    _ => $"This address is suppressed ({hit.Reason}).",
+                };
+                continue;
+            }
+            var transactional = latest.GetValueOrDefault((contactId, MessagePurposes.Transactional), ConsentStatuses.Unknown);
+            var marketing = latest.GetValueOrDefault((contactId, MessagePurposes.Marketing), ConsentStatuses.Unknown);
+            // Opting out of everyday messages on a channel also opts out of marketing on it.
+            if (transactional == ConsentStatuses.OptedOut) { result[(contactId, address)] = "The contact opted out."; continue; }
+            if (purpose == MessagePurposes.Marketing && marketing == ConsentStatuses.OptedOut) { result[(contactId, address)] = "The contact opted out of marketing."; continue; }
+            if (channel == Channels.Sms)
+            {
+                var ok = purpose == MessagePurposes.Marketing
+                    ? marketing == ConsentStatuses.OptedIn
+                    : transactional == ConsentStatuses.OptedIn || marketing == ConsentStatuses.OptedIn;
+                if (!ok) result[(contactId, address)] = purpose == MessagePurposes.Marketing
+                    ? "No marketing text opt-in on file."
+                    : "No texting opt-in on file. Record their consent on the contact first.";
+            }
+        }
+        return result;
     }
 }

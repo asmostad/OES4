@@ -120,6 +120,8 @@ OES4/
 
 Every job is per tenant, retried with backoff, and visible on a super-admin dashboard (Hangfire dashboard behind super-admin auth).
 
+Today the worker runs plain timed hosted services, each job working per tenant in its own DI scope; the blast sender is the first. Hangfire (retries with backoff, dashboard) replaces the timers when more jobs arrive. The worker skips validate-on-build because the shared registrations include web-only services (user admin needs ASP.NET Identity).
+
 ## 8. Environments and deployment
 
 - **Dev:** local .NET + MySQL in Docker.
@@ -210,7 +212,19 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
      - Appointment attendees, all-day events, editing tasks/appointments in place, insurance-expiry notifications (needs the Worker), configurable automation rules.
-9. **Marketing** — nurture, email blasts + suppressions, online booking + busy calendars.
+9. **Marketing** (in progress: email blasts, unsubscribe and suppressions done 2026-11-17)
+   - Done:
+     - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.
+     - Scheduling locks the audience in as recipients (left-out people recorded with the reason). The worker's `BlastJob` sends each due blast in batches of its emails-per-minute setting, claims each recipient with a conditional update (pending to sending) so nothing is sent twice, re-checks consent just before sending, and marks interrupted sends failed instead of resending.
+     - Every blast email has the company name and mailing address (Settings; scheduling is refused without it) and an unsubscribe link plus `List-Unsubscribe` / one-click `List-Unsubscribe-Post` headers (RFC 8058). The link is a hashed external access token (`/portal/u/{token}`, 400 days); the page masks the address and asks for a click (link scanners can't unsubscribe people), while mail apps' one-click POST works without a form token.
+     - Unsubscribing adds a marketing-only suppression and a marketing opt-out: job email still goes out, and only the person can undo it.
+     - Suppressions admin (email and texts): search, block an address (marketing only or everything), unblock staff and bounce blocks.
+     - Company settings page: name, time zone, mailing address.
+     - Blast emails are stored as email messages on each contact's timeline.
+   - Still to do:
+     - Online booking (booking types, hosts, availability, public page, staff review of matches) and busy calendars (ICS).
+     - Nurture sequences (email/text/task steps, enrollments, stop on reply or won).
+     - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.
 11. **Reports** — pipeline, conversion, production, stale, tasks, with charts and CSV.
 12. **JRS migration** — `Oes.Migrator` dry runs, review queues (duplicate properties/contacts), cutover.

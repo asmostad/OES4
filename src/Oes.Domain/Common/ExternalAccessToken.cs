@@ -3,6 +3,7 @@ namespace Oes.Domain.Common;
 public static class TokenPurposes
 {
     public const string SubPortal = "sub_portal";
+    public const string Unsubscribe = "unsubscribe";
 }
 
 /// <summary>

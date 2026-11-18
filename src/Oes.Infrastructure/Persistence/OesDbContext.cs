@@ -101,6 +101,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Communication.ContactConsent> ContactConsents => Set<Domain.Communication.ContactConsent>();
     public DbSet<Domain.Communication.Suppression> Suppressions => Set<Domain.Communication.Suppression>();
     public DbSet<Domain.Communication.TenantPhoneNumber> TenantPhoneNumbers => Set<Domain.Communication.TenantPhoneNumber>();
+    public DbSet<Domain.Communication.Blast> Blasts => Set<Domain.Communication.Blast>();
+    public DbSet<Domain.Communication.BlastRecipient> BlastRecipients => Set<Domain.Communication.BlastRecipient>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -333,6 +335,28 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(p => p.Number).HasMaxLength(20);
             e.Property(p => p.Provider).HasMaxLength(20);
             e.HasIndex(p => p.Number).IsUnique(); // one tenant per number, across the platform
+        });
+
+        b.Entity<Domain.Communication.Blast>(e =>
+        {
+            e.ToTable("blasts");
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.Subject).HasMaxLength(300);
+            e.Property(x => x.Body).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(x => x.AudienceJson).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.HasIndex(x => new { x.Status, x.ScheduledAt }); // the sender looks across tenants
+            e.HasIndex(x => new { x.TenantId, x.CreatedAt });
+        });
+
+        b.Entity<Domain.Communication.BlastRecipient>(e =>
+        {
+            e.ToTable("blast_recipients");
+            e.Property(x => x.Address).HasMaxLength(320);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Error).HasMaxLength(1000);
+            e.HasIndex(x => new { x.BlastId, x.Status });
+            e.HasIndex(x => new { x.BlastId, x.ContactId }).IsUnique();
         });
     }
 

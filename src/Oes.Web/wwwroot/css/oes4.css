@@ -354,3 +354,11 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .timeline-sms .timeline-icon { color: #10b981; }
 .timeline-msg-subject { font-weight: 600; }
 .timeline-msg-failed { color: var(--bs-danger); }
+
+/* ---------------- M9: blasts ---------------- */
+.blast-draft { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.blast-scheduled { background: var(--oes-info-bg, #e0f2fe); color: #0e7490; }
+.blast-sending { background: #fef3c7; color: #b45309; }
+.blast-sent { background: var(--oes-success-bg, #d1fae5); color: #047857; }
+.blast-cancelled { background: var(--oes-danger-bg, #fee2e2); color: #b91c1c; }
+.blast-progress { height: .6rem; accent-color: var(--bs-primary); }

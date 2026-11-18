@@ -197,8 +197,8 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 | `sms_messages` | TenantId, ProviderSid, Direction, FromNumber, ToNumber, Body, Status, MediaJson, At | Linked via `record_links`. **Built in M8** without MediaJson, plus SentByUserId, ContactId, TemplateId, Error, home EntityType/EntityId |
 | `phone_numbers` | TenantId, Provider (twilio), Number, MessagingServiceSid, A2PStatus | Inbound webhooks route to the tenant by "To" number. **Built in M8** as `tenant_phone_numbers` (Number unique platform-wide, Provider, IsActive) |
 | `templates` | TenantId, Channel (email/sms), Name, Subject, Body, MergeFieldsJson, Category (marketing/transactional), Active | One merge-field resolver for email, SMS and PDFs. **Built in M8** as `message_templates` (no MergeFieldsJson: fields are validated against the resolver) |
-| `blasts` | TenantId, Name, AudienceJson, TemplateId, SenderMailAccountId (verified), ThrottlePerMin, Status, ScheduledAt, Counters | Sender must be a mailbox the tenant actually owns |
-| `blast_recipients` | BlastId, ContactId, Address, Status, ClaimedAt, SentAt, Error | `ClaimedAt` prevents double sends |
+| `blasts` | TenantId, Name, AudienceJson, TemplateId, SenderMailAccountId (verified), ThrottlePerMin, Status, ScheduledAt, Counters | Sender must be a mailbox the tenant actually owns. **Built in M9** with Subject/Body copied in, SenderUserId (until shared mailboxes), ThrottlePerMinute, Started/FinishedAt and Total/Sent/Failed/Skipped counts |
+| `blast_recipients` | BlastId, ContactId, Address, Status, ClaimedAt, SentAt, Error | `ClaimedAt` prevents double sends. **Built in M9** (+ EmailMessageId; unique per blast and contact) |
 | `notifications` | TenantId, UserId, Type, Title, Body, EntityType, EntityId, DedupeKey, ReadAt, EmailedAt, PushedAt | **Built in M8** as UserId, Kind, Title, Body, Url (app-relative only), ReadAt; dedupe and email/push columns come with delivery |
 | `notification_preferences` | MembershipId, Type, InApp, Email, Push | |
 | `system_email_log` | To, TemplateKey, SesMessageId, Status, At | Platform mail via **Amazon SES** (resets, invites, staff alerts) |
