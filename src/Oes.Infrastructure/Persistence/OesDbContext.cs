@@ -99,6 +99,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Ai.AiChatMessage> AiMessages => Set<Domain.Ai.AiChatMessage>();
     public DbSet<Domain.Ai.AiToolCall> AiToolCalls => Set<Domain.Ai.AiToolCall>();
     public DbSet<Domain.Ai.AiUsageDaily> AiUsageDaily => Set<Domain.Ai.AiUsageDaily>();
+    public DbSet<ScopeImport> ScopeImports => Set<ScopeImport>();
 
     public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
     public DbSet<Domain.Communication.EmailMessage> EmailMessages => Set<Domain.Communication.EmailMessage>();
@@ -329,6 +330,19 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.ToTable("ai_usage_daily");
             e.Property(x => x.CostUsd).HasPrecision(12, 6);
             e.HasIndex(x => new { x.TenantId, x.UserId, x.Date }).IsUnique();
+        });
+
+        b.Entity<ScopeImport>(e =>
+        {
+            e.ToTable("scope_imports");
+            e.Property(x => x.FileName).HasMaxLength(255);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Carrier).HasMaxLength(150);
+            e.Property(x => x.CarrierPriceList).HasMaxLength(60);
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.Property(x => x.ExtractedJson).HasColumnType("mediumtext").Metadata.SetMaxLength(null);
+            e.Property(x => x.LinesJson).HasColumnType("mediumtext").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.TenantId, x.EstimateId });
         });
     }
 

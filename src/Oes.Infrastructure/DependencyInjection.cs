@@ -71,6 +71,7 @@ public static class DependencyInjection
         else services.AddSingleton<IAiClient, Ai.NotConfiguredAiClient>();
         services.AddScoped<Ai.AiUsageMeter>();
         services.AddScoped<Ai.MeasurementExtractor>();
+        services.AddScoped<Ai.ScopeImportService>();
         services.AddScoped<Ai.AssistantTools>();
         services.AddScoped<Ai.AssistantService>();
 

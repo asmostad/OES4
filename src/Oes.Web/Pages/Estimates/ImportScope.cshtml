@@ -1,0 +1,66 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Estimates.ImportScopeModel
+@using Oes.Domain.Estimating
+@{
+    var e = Model.Detail.Estimate;
+    ViewData["Title"] = $"Import carrier scope · {e.Number}";
+}
+<div class="page-header">
+    <div>
+        <h1>Import carrier scope</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Estimates/View/@e.Id">@e.Number @e.Name</a></li>
+            <li class="breadcrumb-item active">Import carrier scope</li>
+        </ol></nav>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="alert alert-danger"></div> }
+                @if (!Model.Detail.CanEdit || e.Status == EstimateStatuses.Signed)
+                {
+                    <p class="mb-0 text-muted">@(e.Status == EstimateStatuses.Signed ? "This estimate is signed. Add carrier lines through a change order instead." : "You can't edit this estimate.")</p>
+                }
+                else if (Model.AiReady)
+                {
+                    <p class="small text-muted">Attach the insurance company's scope of loss (Xactimate or similar, as a PDF). The AI lists its line items and matches them to
+                        @(Model.Detail.PriceList is null ? "your catalog" : $"the {Model.Detail.PriceList.Name} price list"). You review every line before anything is added to the estimate.</p>
+                    <form method="post" enctype="multipart/form-data">
+                        <label class="form-label" for="scope">Scope PDF</label>
+                        <input id="scope" type="file" name="Scope" accept=".pdf" class="form-control mb-3" required>
+                        <button type="submit" class="btn btn-primary" data-busy-text="Reading the scope… (this can take a minute)"><i class="bi bi-stars me-1"></i>Read with AI</button>
+                        <a class="btn btn-outline-secondary" href="/Estimates/View/@e.Id">Cancel</a>
+                    </form>
+                }
+                else
+                {
+                    <p class="mb-0 text-muted">Reading carrier scopes turns on when an administrator adds the AI API key.</p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Earlier imports</div>
+            @if (Model.Imports.Count == 0)
+            {
+                <div class="card-body text-muted small">None yet.</div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var i in Model.Imports)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><a href="/Estimates/ScopeReview/@i.Id">@i.FileName</a> <span class="text-muted small">@(i.Carrier ?? "") · @Fmt.Ago(i.CreatedAt)</span></span>
+                            <span class="badge @(i.Status == ScopeImportStatuses.Review ? "text-bg-warning" : i.Status == ScopeImportStatuses.Imported ? "text-bg-success" : "text-bg-secondary")">@Fmt.Cap(i.Status)</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>

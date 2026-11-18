@@ -130,7 +130,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `estimate_versions` | EstimateId, VersionNo, Status (issued/sent/signed/declined/superseded), IssuedAt/By, RevisionReason, **TermsSnapshot**, TotalsJson, ContentHash, PdfDocumentId, SignedDocumentId, SignedAt, SignerName | Frozen on issue |
 | `estimate_version_lines` | VersionId + full copy of the line (incl. unit price, cost, price provenance, area path, product) | Everything needed to reprint or audit |
 | `estimate_version_measurements` | VersionId, MeasurementSetId, ValuesJson | Freezes the measurements used |
-| `scope_imports` | TenantId, EstimateId, ClaimId, DocumentId, Status, ExtractedJson, CarrierPriceListLabel, ImportedAt | AI carrier scope import |
+| `scope_imports` | TenantId, EstimateId, DocumentId, FileName, Status (review/imported/discarded), Carrier, CarrierPriceList, Notes, ExtractedJson, LinesJson (proposed lines with price-list matches), ImportedByUserId, ImportedAt | AI carrier scope import (built) |
 
 ## 9. Projects and production
 

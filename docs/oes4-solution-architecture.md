@@ -174,7 +174,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Still to do:
      - Server-side PDF (Playwright).
      - The takeoff rules engine and order sheet.
-     - Carrier scope import (AI).
+     - Supplement compare (carrier scope vs our estimate, line by line).
      - Tenant default terms.
 6. **Production** (core done 2026-11-17)
    - Done:
@@ -241,7 +241,8 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - The transcript is stored append-only, blocks exactly as received (thinking signatures included), so each turn replays the history unchanged. Every tool call is logged with its input and outcome (`ai_tool_calls`).
    - Budgets: per-user and per-company daily spend (`Ai:DailyUserBudgetUsd`, default $3; `Ai:DailyTenantBudgetUsd`, default $30), computed from token usage at list price and checked before every model call inside the loop; at most `Ai:MaxToolRounds` (8) lookups per message. AI Usage page (`ai.manage`) shows spend by person and day.
    - "Ask the assistant about this" on opportunity, contact, property and project pages starts a conversation about that record.
-   - Still to do: knowledge base (company documents), streaming replies, per-tenant API keys, AI import of carrier scopes. (AI reading of measurement reports is done; see milestone 4.)
+   - **Carrier scope import** (done 2026-11-18): "Import carrier scope" on an unsigned estimate uploads the carrier's PDF (kept on the estimate as `carrier_scope`), and one structured-output call lists its line items (category, code, activity, description, quantity, unit, unit price) plus carrier, price-list label and notes. Lines are matched to the estimate's price list by item code + category + activity (falling back to code + category when the scope gives no activity). A review page shows each line with the carrier price next to ours; the user unticks lines, fixes quantities and adds them as a new section. Matched lines use our price list; unmatched ones become custom lines at the carrier's price, so they go through approval by exception. Imports are kept (`scope_imports`: review, imported or discarded) with the raw AI answer for audit, and count toward the AI budget. OES3's prefix/similarity matching and area assignment are not ported yet.
+   - Still to do: knowledge base (company documents), streaming replies, per-tenant API keys, fuzzy matching for scope lines. (AI reading of measurement reports is done; see milestone 4.)
 11. **Reports** (done 2026-11-17)
    - Pipeline (open opportunities by stage and owner), Sales (new leads, won, lost, win rate and won value by month, lead source and owner; lost reasons), Production (active projects and open trades by stage and trade type, backlog, sold and completed), Stale (opportunities and projects past their stage's limit, linked to the record), Tasks (open, overdue and done by person).
    - Every report runs on the same record scope as the lists, so a report never counts records the user can't see; `records.view_all` users get an owner filter. Needs `reports.view` (managers and admins by default). Date ranges are whole days in the company time zone. Won value is the signed project contract where there is one, otherwise the expected value.

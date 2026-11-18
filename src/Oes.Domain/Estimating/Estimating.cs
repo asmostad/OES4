@@ -231,3 +231,29 @@ public class EstimateVersion : TenantEntity
     public DateTime? SignedAt { get; set; }
     public string? SignerName { get; set; }
 }
+
+public static class ScopeImportStatuses
+{
+    public const string Review = "review";
+    public const string Imported = "imported";
+    public const string Discarded = "discarded";
+}
+
+/// <summary>A carrier scope read by AI into proposed estimate lines, waiting for a person to review and add them.</summary>
+public class ScopeImport : TenantEntity
+{
+    public Guid EstimateId { get; set; }
+    public Guid DocumentId { get; set; }
+    public string FileName { get; set; } = "";
+    public string Status { get; set; } = ScopeImportStatuses.Review;
+    public string? Carrier { get; set; }
+    /// <summary>The carrier's price list as printed on the scope (e.g. NENE8X_NOV26).</summary>
+    public string? CarrierPriceList { get; set; }
+    public string? Notes { get; set; }
+    /// <summary>The AI's raw answer, kept for audit.</summary>
+    public string ExtractedJson { get; set; } = "{}";
+    /// <summary>The proposed lines with their price-list matches (JSON array).</summary>
+    public string LinesJson { get; set; } = "[]";
+    public Guid? ImportedByUserId { get; set; }
+    public DateTime? ImportedAt { get; set; }
+}

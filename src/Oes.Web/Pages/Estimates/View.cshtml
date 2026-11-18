@@ -36,6 +36,7 @@
     {
         <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#issue-form"><i class="bi bi-send-check me-1"></i>@(e.LatestVersionNo == 0 ? "Issue estimate" : "Issue revision")</button>
     }
+    @if (edit && e.Status != EstimateStatuses.Signed) { <a class="btn btn-sm btn-outline-secondary" href="/Estimates/ImportScope/@e.Id"><i class="bi bi-stars me-1"></i>Import carrier scope</a> }
     @if (latest is not null) { <a class="btn btn-sm btn-outline-secondary" href="/Estimates/Proposal/@latest.Id"><i class="bi bi-file-earmark-text me-1"></i>Proposal v@(latest.VersionNo)</a> }
     <span class="ms-auto fs-5 fw-semibold align-self-center">@M(e.Total)</span>
 </div>
