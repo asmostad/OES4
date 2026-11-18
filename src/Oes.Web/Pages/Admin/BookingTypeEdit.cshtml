@@ -1,0 +1,68 @@
+@page
+@model Oes.Web.Pages.Admin.BookingTypeEditModel
+@{
+    ViewData["Title"] = Model.Id is null ? "New booking type" : Model.Input.Name;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item"><a href="/Admin/BookingTypes">Online Booking</a></li><li class="breadcrumb-item active">@(Model.Id is null ? "New" : "Edit")</li></ol></nav>
+    </div>
+</div>
+<form method="post">
+    <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+    <div class="row g-3">
+        <div class="col-xl-7">
+            <div class="card">
+                <div class="card-body row g-3">
+                    <div class="col-md-7"><label class="form-label" asp-for="Input.Name">Name</label>
+                        <input asp-for="Input.Name" class="form-control" required maxlength="150" placeholder="Free roof inspection"></div>
+                    <div class="col-md-5"><label class="form-label" asp-for="Input.Slug">Link name</label>
+                        <input asp-for="Input.Slug" class="form-control" maxlength="60" placeholder="roof-inspection">
+                        <div class="form-text">Blank = from the name.</div></div>
+                    <div class="col-12"><label class="form-label" asp-for="Input.Description">Description (shown to customers)</label>
+                        <textarea asp-for="Input.Description" class="form-control" rows="2" maxlength="1000"></textarea></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.DurationMinutes">Length (min)</label>
+                        <input asp-for="Input.DurationMinutes" type="number" min="10" max="480" class="form-control"></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.SlotIntervalMinutes">Start every (min)</label>
+                        <input asp-for="Input.SlotIntervalMinutes" type="number" min="5" max="240" class="form-control"></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.AppointmentTypeKey">Calendar type</label>
+                        <select asp-for="Input.AppointmentTypeKey" class="form-select">
+                            @foreach (var o in Model.AppointmentTypes) { <option value="@o.Value">@o.Label</option> }</select></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.BufferBeforeMinutes">Gap before (min)</label>
+                        <input asp-for="Input.BufferBeforeMinutes" type="number" min="0" max="240" class="form-control"></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.BufferAfterMinutes">Gap after (min)</label>
+                        <input asp-for="Input.BufferAfterMinutes" type="number" min="0" max="240" class="form-control">
+                        <div class="form-text">Drive time to the next job.</div></div>
+                    <div class="col-sm-4"><label class="form-label" asp-for="Input.DailyCapPerHost">Max per host per day</label>
+                        <input asp-for="Input.DailyCapPerHost" type="number" min="1" max="50" class="form-control" placeholder="No limit"></div>
+                    <div class="col-sm-6"><label class="form-label" asp-for="Input.MinNoticeMinutes">Earliest booking (minutes from now)</label>
+                        <input asp-for="Input.MinNoticeMinutes" type="number" min="0" max="43200" class="form-control">
+                        <div class="form-text">720 = 12 hours, 1440 = a day.</div></div>
+                    <div class="col-sm-6"><label class="form-label" asp-for="Input.DaysAhead">Days ahead to show</label>
+                        <input asp-for="Input.DaysAhead" type="number" min="1" max="120" class="form-control"></div>
+                    <div class="col-12">
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.AsksAddress"><label class="form-check-label" asp-for="Input.AsksAddress">Ask for the property address</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.CreatesOpportunity"><label class="form-check-label" asp-for="Input.CreatesOpportunity">Create an opportunity when the booking is accepted</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.IsActive"><label class="form-check-label" asp-for="Input.IsActive">Open for booking</label></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5">
+            <div class="card">
+                <div class="card-header">Who takes these</div>
+                <div class="card-body">
+                    @foreach (var u in Model.Users)
+                    {
+                        var uid = Guid.Parse(u.Value);
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="Input.HostUserIds" value="@u.Value" id="h-@u.Value" checked="@Model.Input.HostUserIds.Contains(uid)">
+                            <label class="form-check-label" for="h-@u.Value">@u.Label</label></div>
+                    }
+                    <div class="form-text">New bookings go to whoever's free with the fewest upcoming bookings. Each host needs <a href="/Availability">weekly hours</a>.</div>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-outline-secondary" href="/Admin/BookingTypes">Cancel</a></div>
+        </div>
+    </div>
+</form>

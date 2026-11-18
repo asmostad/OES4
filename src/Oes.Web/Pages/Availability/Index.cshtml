@@ -1,0 +1,47 @@
+@page
+@model Oes.Web.Pages.Availability.IndexModel
+@{
+    ViewData["Title"] = "Weekly hours";
+    string V(TimeOnly? t) => t?.ToString("HH:mm") ?? "";
+}
+<div class="page-header">
+    <div>
+        <h1>Weekly hours</h1>
+        <p class="page-subtitle">When people can book you online, in the company's time zone. Anything already on your calendar is blocked out automatically.</p>
+    </div>
+    @if (Model.CanManage)
+    {
+        <form method="get"><select name="user" class="form-select form-select-sm" data-autosubmit aria-label="Whose hours">
+            @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Target.ToString())">@u.Label</option> }
+        </select></form>
+    }
+</div>
+<div class="row"><div class="col-xl-7">
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+            <form method="post">
+                <input type="hidden" name="user" value="@Model.UserId">
+                <table class="table table-sm align-middle mb-3 hours-table">
+                    <thead><tr><th>Day</th><th>From</th><th>To</th><th class="text-muted fw-normal">and from</th><th class="text-muted fw-normal">to</th></tr></thead>
+                    <tbody>
+                        @for (var d = 0; d < 7; d++)
+                        {
+                            <tr>
+                                <td class="fw-medium">@Oes.Web.Pages.Availability.IndexModel.Days[d]</td>
+                                @for (var n = 0; n < 2; n++)
+                                {
+                                    var i = d * 2 + n;
+                                    <td><input type="time" name="Start[@i]" value="@V(Model.Start.ElementAtOrDefault(i))" class="form-control form-control-sm" aria-label="Start"></td>
+                                    <td><input type="time" name="End[@i]" value="@V(Model.End.ElementAtOrDefault(i))" class="form-control form-control-sm" aria-label="End"></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="form-text mb-2">Leave a day blank to be unavailable. The second pair is for split days (say, a lunch break).</div>
+                <button class="btn btn-primary" type="submit">Save hours</button>
+            </form>
+        </div>
+    </div>
+</div></div>

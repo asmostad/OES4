@@ -1,0 +1,56 @@
+@page
+@model Oes.Web.Pages.Bookings.IndexModel
+@using Oes.Domain.Booking
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Bookings";
+}
+<div class="page-header">
+    <div>
+        <h1>Bookings</h1>
+        <p class="page-subtitle">Appointments people booked online. They're already on the calendar; add them to the CRM here.</p>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <a class="btn @(!Model.All ? "btn-secondary" : "btn-outline-secondary")" href="?all=false">To review</a>
+        <a class="btn @(Model.All ? "btn-secondary" : "btn-outline-secondary")" href="?all=true">All</a>
+    </div>
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card"><div class="empty-state"><i class="bi bi-calendar-check"></i><h5>Nothing to review</h5><p>Set up what people can book under Administration › Online Booking.</p></div></div>
+}
+@foreach (var r in Model.Rows)
+{
+    var b = r.Booking;
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-start">
+                <div class="me-auto">
+                    <div class="fw-medium">@b.FirstName @b.LastName
+                        @if (b.Status == BookingStatuses.Cancelled) { <span class="badge bg-danger-subtle text-danger ms-1">Cancelled</span> }
+                        @if (b.ReviewStatus != BookingReview.New) { <span class="badge bg-secondary-subtle text-secondary ms-1">@Fmt.Cap(b.ReviewStatus)</span> }</div>
+                    <div class="small text-muted">@r.TypeName · @r.StartsLocal.ToString("ddd MMM d, h:mm tt") · with @r.HostName</div>
+                    <div class="small">@b.Email · @ContactValue.FormatPhone(b.Phone, b.Phone)@(b.Line1 is null ? "" : $" · {b.Line1}, {b.City} {b.State} {b.PostalCode}")</div>
+                    @if (b.TextConsent) { <div class="small text-success"><i class="bi bi-check2"></i> OK to text</div> }
+                    @if (b.Notes is not null) { <div class="small pre-wrap mt-1">@b.Notes</div> }
+                    @if (b.OpportunityId is { } o) { <a class="small" href="/Opportunities/View/@o">Open opportunity</a> }
+                    else if (b.ContactId is { } c) { <a class="small" href="/Contacts/View/@c">Open contact</a> }
+                </div>
+                @if (b.ReviewStatus == BookingReview.New && b.Status == BookingStatuses.Booked)
+                {
+                    <div class="d-flex flex-column gap-1 booking-actions">
+                        @foreach (var m in r.Matches)
+                        {
+                            <form method="post" asp-page-handler="Accept"><input type="hidden" name="id" value="@b.Id"><input type="hidden" name="contactId" value="@m.ContactId"><input type="hidden" name="all" value="@Model.All">
+                                <button class="btn btn-sm btn-primary w-100" type="submit">Link to @m.Name <span class="opacity-75">(@m.Why)</span></button></form>
+                        }
+                        <form method="post" asp-page-handler="Accept"><input type="hidden" name="id" value="@b.Id"><input type="hidden" name="all" value="@Model.All">
+                            <button class="btn btn-sm @(r.Matches.Count == 0 ? "btn-primary" : "btn-outline-primary") w-100" type="submit">Add as a new contact</button></form>
+                        <form method="post" asp-page-handler="Dismiss"><input type="hidden" name="id" value="@b.Id"><input type="hidden" name="all" value="@Model.All">
+                            <button class="btn btn-sm btn-link text-danger w-100" type="submit" data-confirm="Dismiss this booking and cancel the appointment? Nothing is added to the CRM.">Dismiss (spam or mistake)</button></form>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}

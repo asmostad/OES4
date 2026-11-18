@@ -80,6 +80,8 @@ builder.Services.AddRazorPages(o => o.Conventions
     .AllowAnonymousToPage("/Account/ResetPassword")
     .AllowAnonymousToPage("/Portal/Index")
     .AllowAnonymousToPage("/Portal/Unsubscribe")
+    .AllowAnonymousToPage("/Portal/Booking")
+    .AllowAnonymousToFolder("/Book")
     .AllowAnonymousToPage("/Error"));
 builder.Services.AddControllers(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
 builder.Services.AddProblemDetails();

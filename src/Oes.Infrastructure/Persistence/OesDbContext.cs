@@ -104,12 +104,19 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Communication.Blast> Blasts => Set<Domain.Communication.Blast>();
     public DbSet<Domain.Communication.BlastRecipient> BlastRecipients => Set<Domain.Communication.BlastRecipient>();
 
+    public DbSet<Domain.Booking.BookingType> BookingTypes => Set<Domain.Booking.BookingType>();
+    public DbSet<Domain.Booking.BookingTypeHost> BookingTypeHosts => Set<Domain.Booking.BookingTypeHost>();
+    public DbSet<Domain.Booking.AvailabilityRule> AvailabilityRules => Set<Domain.Booking.AvailabilityRule>();
+    public DbSet<Domain.Booking.Booking> Bookings => Set<Domain.Booking.Booking>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
         b.Properties<Guid>().HaveConversion<GuidBinaryConverter>().HaveColumnType("binary(16)");
         b.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>().HaveColumnType("datetime(6)");
         // Oracle's MySQL driver returns DATE columns as DateTime and can't read them into DateOnly directly.
         b.Properties<DateOnly>().HaveConversion<DateOnlyConverter>().HaveColumnType("date");
+        // Times of day (weekly hours) as minutes since midnight: portable and easy to compare in SQL.
+        b.Properties<TimeOnly>().HaveConversion<TimeOnlyMinutesConverter>().HaveColumnType("int");
         b.Properties<string>().HaveMaxLength(255);
         b.Properties<decimal>().HavePrecision(18, 4);
     }
@@ -214,6 +221,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureSubcontractors(b);
         ConfigureWork(b);
         ConfigureCommunication(b);
+        ConfigureBooking(b);
         ApplyTenantFilters(b);
     }
 
@@ -253,6 +261,53 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(n => n.Body).HasMaxLength(1000);
             e.Property(n => n.Url).HasMaxLength(500);
             e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
+        });
+    }
+
+    private static void ConfigureBooking(ModelBuilder b)
+    {
+        b.Entity<Domain.Booking.BookingType>(e =>
+        {
+            e.ToTable("booking_types");
+            e.Property(x => x.Slug).HasMaxLength(60);
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.AppointmentTypeKey).HasMaxLength(60);
+            e.HasMany(x => x.Hosts).WithOne().HasForeignKey(h => h.BookingTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.TenantId, x.Slug }).IsUnique();
+        });
+
+        b.Entity<Domain.Booking.BookingTypeHost>(e =>
+        {
+            e.ToTable("booking_type_hosts");
+            e.HasIndex(x => new { x.BookingTypeId, x.UserId }).IsUnique();
+        });
+
+        b.Entity<Domain.Booking.AvailabilityRule>(e =>
+        {
+            e.ToTable("availability_rules");
+            e.HasIndex(x => new { x.TenantId, x.UserId, x.DayOfWeek });
+        });
+
+        b.Entity<Domain.Booking.Booking>(e =>
+        {
+            e.ToTable("bookings");
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.ReviewStatus).HasMaxLength(20);
+            e.Property(x => x.FirstName).HasMaxLength(100);
+            e.Property(x => x.LastName).HasMaxLength(100);
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.Phone).HasMaxLength(30);
+            e.Property(x => x.Line1).HasMaxLength(200);
+            e.Property(x => x.City).HasMaxLength(100);
+            e.Property(x => x.State).HasMaxLength(30);
+            e.Property(x => x.PostalCode).HasMaxLength(20);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.SourceIp).HasMaxLength(64);
+            e.Property(x => x.SlotKey).HasMaxLength(80);
+            e.HasIndex(x => x.SlotKey).IsUnique(); // NULLs (cancelled) don't collide in MySQL
+            e.HasIndex(x => new { x.TenantId, x.ReviewStatus, x.StartsAt });
+            e.HasIndex(x => new { x.TenantId, x.HostUserId, x.StartsAt });
         });
     }
 
@@ -952,3 +1007,8 @@ public sealed class DateOnlyConverter() : ValueConverter<DateOnly, DateTime>(
 public sealed class UtcDateTimeConverter() : ValueConverter<DateTime, DateTime>(
     v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
     v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+/// <summary>Time of day as whole minutes since midnight.</summary>
+public sealed class TimeOnlyMinutesConverter() : ValueConverter<TimeOnly, int>(
+    t => t.Hour * 60 + t.Minute,
+    m => new TimeOnly(m / 60, m % 60));

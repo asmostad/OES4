@@ -19,9 +19,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             && http.Features.Get<Microsoft.AspNetCore.Diagnostics.IStatusCodePagesFeature>() is { } pages)
             pages.Enabled = false;
 
-        // Public link pages get their tenant from the link's token, never from a staff sign-in.
-        if (http.Request.Path.StartsWithSegments("/portal"))
+        // Public pages get their tenant from the link's token or the booking URL, never from a staff sign-in.
+        if (http.Request.Path.StartsWithSegments("/portal") || http.Request.Path.StartsWithSegments("/book"))
         {
+            // They also act as an anonymous visitor even in a staff member's browser, so nothing
+            // done there is attributed to (or hidden from) that staff account.
+            http.User = new ClaimsPrincipal(new ClaimsIdentity());
             await next(http);
             return;
         }
@@ -53,7 +56,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 /// <summary>Signed-in users who haven't picked a tenant yet are sent to the tenant picker.</summary>
 public sealed class RequireTenantMiddleware(RequestDelegate next)
 {
-    private static readonly string[] Open = ["/Account", "/api/v1/health", "/health", "/css", "/js", "/img", "/favicon.ico", "/Error", "/portal"];
+    private static readonly string[] Open = ["/Account", "/api/v1/health", "/health", "/css", "/js", "/img", "/favicon.ico", "/Error", "/portal", "/book"];
 
     public async Task InvokeAsync(HttpContext http, TenantContext tenant)
     {

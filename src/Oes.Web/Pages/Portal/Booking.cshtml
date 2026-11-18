@@ -1,0 +1,46 @@
+@page "/portal/b/{token}"
+@model Oes.Web.Pages.Portal.BookingModel
+@{
+    Layout = "_PortalLayout";
+    var v = Model.View;
+    ViewData["Title"] = v is null ? "Link not available" : $"Your appointment with {v.Company}";
+}
+@if (v is null)
+{
+    <div class="portal-card text-center">
+        <i class="bi bi-link-45deg fs-1 text-muted"></i>
+        <h1 class="h4 mt-2">This link isn't available</h1>
+        <p class="text-muted mb-0">It may have expired. Please call the company to change your appointment.</p>
+    </div>
+}
+else
+{
+    <div class="portal-card">
+        @if (v.Cancelled)
+        {
+            <div class="text-center"><i class="bi bi-calendar-x fs-1 text-muted"></i><h1 class="h4 mt-2">Appointment cancelled</h1>
+                <p class="text-muted mb-0">Your @v.TypeName with @v.Company on @v.StartsLocal.ToString("dddd, MMMM d") is cancelled.</p></div>
+        }
+        else
+        {
+            <div class="text-center mb-3">
+                <i class="bi bi-calendar-check fs-1 text-success"></i>
+                <h1 class="h4 mt-2">@(Model.Booked ? "You're booked!" : "Your appointment")</h1>
+            </div>
+            <dl class="row mb-3">
+                <dt class="col-4">What</dt><dd class="col-8">@v.TypeName (@v.DurationMinutes min)</dd>
+                <dt class="col-4">When</dt><dd class="col-8">@v.StartsLocal.ToString("dddd, MMMM d 'at' h:mm tt")</dd>
+                @if (v.Address is not null) { <dt class="col-4">Where</dt><dd class="col-8">@v.Address</dd> }
+                <dt class="col-4">With</dt><dd class="col-8">@v.HostName, @v.Company</dd>
+            </dl>
+            @if (Model.Booked) { <p class="small text-muted">We've emailed you these details and this link. Keep it to cancel if plans change.</p> }
+            @if (Model.Error is not null) { <div class="alert alert-danger small py-2">@Model.Error</div> }
+            @if (!v.Past)
+            {
+                <form method="post" asp-page-handler="Cancel" class="text-center">
+                    <button class="btn btn-outline-danger btn-sm" type="submit" data-confirm="Cancel this appointment?">Cancel appointment</button>
+                </form>
+            }
+        }
+    </div>
+}

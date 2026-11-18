@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<Communication.BlastService>();
         services.AddScoped<Communication.BlastSender>();
         services.AddScoped<Admin.SettingsService>();
+        services.AddScoped<Scheduling.BookingService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

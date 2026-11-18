@@ -1,0 +1,23 @@
+@page "/book/{company}"
+@model Oes.Web.Pages.Book.CompanyModel
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = $"Book with {Model.Info!.Name}";
+}
+<div class="portal-card">
+    <h1 class="h4 mb-1">Book with @Model.Info.Name</h1>
+    <p class="text-muted">Pick what you'd like to schedule.</p>
+    @if (Model.Types.Count == 0)
+    {
+        <p class="mb-0">Online booking isn't open right now. Please call us.</p>
+    }
+    <div class="list-group">
+        @foreach (var t in Model.Types)
+        {
+            <a class="list-group-item list-group-item-action" href="/book/@Model.Info.Slug/@t.Slug">
+                <div class="fw-medium">@t.Name <span class="text-muted small fw-normal">· @t.DurationMinutes min</span></div>
+                @if (t.Description is not null) { <div class="small text-muted">@t.Description</div> }
+            </a>
+        }
+    </div>
+</div>

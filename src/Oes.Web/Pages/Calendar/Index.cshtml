@@ -13,6 +13,7 @@
     <div class="d-flex gap-2 align-items-center">
         <a class="btn btn-sm btn-outline-secondary" href="@Week(-1)" aria-label="Previous week"><i class="bi bi-chevron-left"></i></a>
         <a class="btn btn-sm btn-outline-secondary" href="?date=@Model.Today.ToString("yyyy-MM-dd")">This week</a>
+        <a class="btn btn-sm btn-link" href="/Availability"><i class="bi bi-clock me-1"></i>My hours</a>
         <a class="btn btn-sm btn-outline-secondary" href="@Week(1)" aria-label="Next week"><i class="bi bi-chevron-right"></i></a>
         <form method="get" class="d-inline">
             <input type="hidden" name="date" value="@Model.WeekStart.ToString("yyyy-MM-dd")">

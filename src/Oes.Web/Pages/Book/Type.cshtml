@@ -1,0 +1,60 @@
+@page "/book/{company}/{type}"
+@model Oes.Web.Pages.Book.TypeModel
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = $"{Model.Type.Name} · {Model.Info.Name}";
+    var basePath = $"/book/{Model.Info.Slug}/{Model.Type.Slug}";
+}
+<div class="portal-card">
+    <div class="small text-muted">@Model.Info.Name</div>
+    <h1 class="h4 mb-1">@Model.Type.Name</h1>
+    <p class="text-muted mb-3">@Model.Type.DurationMinutes minutes@(Model.Type.Description is null ? "" : " · " + Model.Type.Description)</p>
+    @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="alert alert-danger small py-2 mb-3" role="alert"></div> }
+
+    @if (!Model.Picked)
+    {
+        @if (Model.Slots.Count == 0)
+        {
+            <p class="mb-0">There are no open times right now. Please call us and we'll find one.</p>
+        }
+        @foreach (var (day, times) in Model.Slots)
+        {
+            <div class="book-day">
+                <div class="fw-medium mb-1">@day.ToString("dddd, MMMM d")</div>
+                <div class="book-times">
+                    @foreach (var t in times)
+                    {
+                        <a class="btn btn-sm btn-outline-primary" href="@basePath?date=@day.ToString("yyyy-MM-dd")&amp;time=@t.ToString("HH:mm")">@t.ToString("h:mm tt")</a>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-light border d-flex align-items-center">
+            <i class="bi bi-calendar-check me-2"></i>
+            <div><strong>@Model.Date!.Value.ToString("dddd, MMMM d")</strong> at <strong>@Model.Time!.Value.ToString("h:mm tt")</strong></div>
+            <a class="ms-auto small" href="@basePath">Change</a>
+        </div>
+        <form method="post" class="row g-2">
+            <input type="hidden" name="date" value="@Model.Date.Value.ToString("yyyy-MM-dd")"><input type="hidden" name="time" value="@Model.Time.Value.ToString("HH:mm")">
+            <div class="book-hp" aria-hidden="true"><label>Leave this empty <input name="Input.Website" tabindex="-1" autocomplete="off"></label></div>
+            <div class="col-6"><label class="form-label small" for="fn">First name</label><input id="fn" name="Input.FirstName" value="@Model.Input.FirstName" class="form-control" required maxlength="100" autocomplete="given-name"></div>
+            <div class="col-6"><label class="form-label small" for="ln">Last name</label><input id="ln" name="Input.LastName" value="@Model.Input.LastName" class="form-control" required maxlength="100" autocomplete="family-name"></div>
+            <div class="col-sm-6"><label class="form-label small" for="em">Email</label><input id="em" type="email" name="Input.Email" value="@Model.Input.Email" class="form-control" required maxlength="320" autocomplete="email"></div>
+            <div class="col-sm-6"><label class="form-label small" for="ph">Mobile phone</label><input id="ph" type="tel" name="Input.Phone" value="@Model.Input.Phone" class="form-control" required maxlength="30" autocomplete="tel"></div>
+            @if (Model.Type.AsksAddress)
+            {
+                <div class="col-12"><label class="form-label small" for="a1">Property address</label><input id="a1" name="Input.Line1" value="@Model.Input.Line1" class="form-control" required maxlength="200" autocomplete="address-line1"></div>
+                <div class="col-sm-5"><label class="form-label small" for="ci">City</label><input id="ci" name="Input.City" value="@Model.Input.City" class="form-control" required maxlength="100" autocomplete="address-level2"></div>
+                <div class="col-sm-3 col-6"><label class="form-label small" for="stt">State</label><input id="stt" name="Input.State" value="@Model.Input.State" class="form-control" maxlength="30" autocomplete="address-level1"></div>
+                <div class="col-sm-4 col-6"><label class="form-label small" for="zip">ZIP</label><input id="zip" name="Input.PostalCode" value="@Model.Input.PostalCode" class="form-control" required maxlength="20" autocomplete="postal-code"></div>
+            }
+            <div class="col-12"><label class="form-label small" for="nt">Anything we should know? (optional)</label><textarea id="nt" name="Input.Notes" class="form-control" rows="2" maxlength="2000">@Model.Input.Notes</textarea></div>
+            <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="Input.TextConsent" value="true" id="tc" checked="@Model.Input.TextConsent">
+                <label class="form-check-label small" for="tc">Text me about this appointment. Msg &amp; data rates may apply; reply STOP to opt out.</label></div></div>
+            <div class="col-12"><button class="btn btn-primary w-100" type="submit">Book appointment</button></div>
+        </form>
+    }
+</div>

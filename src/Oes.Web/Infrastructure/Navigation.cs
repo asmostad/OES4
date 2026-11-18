@@ -32,6 +32,7 @@ public static class Navigation
             new("Tasks", "bi-check2-square", "/Tasks"),
             new("Work Orders", "bi-clipboard-check", "/WorkOrders", Permissions.WorkOrdersManage),
             new("Calendar", "bi-calendar3", "/Calendar"),
+            new("Bookings", "bi-calendar-check", "/Bookings", Permissions.BookingManage),
         ]),
         new("CRM",
         [
@@ -67,7 +68,7 @@ public static class Navigation
             [
                 new("Lead Import", "bi-cloud-upload", null, Permissions.LeadsImport),
                 new("Lead Campaigns", "bi-megaphone", null, Permissions.LeadsCampaigns),
-                new("Online Booking", "bi-calendar-plus", null, Permissions.BookingManage),
+                new("Online Booking", "bi-calendar-plus", "/Admin/BookingTypes", Permissions.BookingManage),
                 new("Nurture Workflows", "bi-arrow-repeat", null, Permissions.NurtureManage),
                 new("Email Blasts", "bi-send", "/Blasts", Permissions.BlastsManage),
                 new("Email Suppressions", "bi-envelope-slash", "/Admin/Suppressions", Permissions.BlastsManage),

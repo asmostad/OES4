@@ -11,3 +11,8 @@ body.portal-body { background: #f1f5f9; font-family: 'Inter', -apple-system, Bli
 .portal-facts dd { margin: 0; }
 .portal-action { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
 .pre-wrap { white-space: pre-wrap; }
+
+/* Online booking */
+.book-day { margin-bottom: 1rem; }
+.book-times { display: flex; flex-wrap: wrap; gap: .4rem; }
+.book-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

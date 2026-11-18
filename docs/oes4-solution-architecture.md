@@ -212,7 +212,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
      - Appointment attendees, all-day events, editing tasks/appointments in place, insurance-expiry notifications (needs the Worker), configurable automation rules.
-9. **Marketing** (in progress: email blasts, unsubscribe and suppressions done 2026-11-17)
+9. **Marketing** (in progress: email blasts, unsubscribe, suppressions and online booking done 2026-11-17)
    - Done:
      - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.
      - Scheduling locks the audience in as recipients (left-out people recorded with the reason). The worker's `BlastJob` sends each due blast in batches of its emails-per-minute setting, claims each recipient with a conditional update (pending to sending) so nothing is sent twice, re-checks consent just before sending, and marks interrupted sends failed instead of resending.
@@ -221,8 +221,13 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Suppressions admin (email and texts): search, block an address (marketing only or everything), unblock staff and bounce blocks.
      - Company settings page: name, time zone, mailing address.
      - Blast emails are stored as email messages on each contact's timeline.
+     - Online booking: booking types (length, start interval, gaps before/after, notice, days ahead, per-host daily cap, calendar type, asks address, creates opportunity) with hosts; weekly hours per user (two windows a day, company time zone; people set their own, `booking.manage` sets anyone's).
+     - Public pages `/book/{company}` and `/book/{company}/{type}`: no JavaScript needed, rate limited, honeypot field. Open times are each host's hours minus anything on their calendar (with the gaps) and minus capped days; a booking goes to the free host with the fewest upcoming bookings. A unique slot key per host and start stops double-booking.
+     - **Decided 2026-11-17:** a booking goes straight onto the host's calendar (and pings them), but contacts, properties and opportunities are only created when staff accept it in the Bookings inbox: link to an existing contact matched by email or phone, add as new, or dismiss as spam. Anonymous input never writes onto existing records, and spam never reaches the CRM. The visitor's "text me" tick box becomes a texting opt-in (source web_form) only for the number they typed.
+     - Confirmation email (platform mail) with a manage link (`/portal/b/{token}`, hashed, 120 days) to see or cancel; cancelling frees the slot, cancels the appointment and notifies the host.
+     - `/portal` and `/book` pages always act as an anonymous visitor, even in a signed-in staff browser.
    - Still to do:
-     - Online booking (booking types, hosts, availability, public page, staff review of matches) and busy calendars (ICS).
+     - Busy calendars (ICS feeds blocking booking times), rescheduling from the manage link, booking reminders.
      - Nurture sequences (email/text/task steps, enrollments, stop on reply or won).
      - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.

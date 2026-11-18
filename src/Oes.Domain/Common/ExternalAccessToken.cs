@@ -4,6 +4,7 @@ public static class TokenPurposes
 {
     public const string SubPortal = "sub_portal";
     public const string Unsubscribe = "unsubscribe";
+    public const string BookingManage = "booking_manage";
 }
 
 /// <summary>
