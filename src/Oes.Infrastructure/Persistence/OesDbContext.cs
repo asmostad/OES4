@@ -93,6 +93,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Work.TaskItem> Tasks => Set<Domain.Work.TaskItem>();
     public DbSet<Domain.Work.Appointment> Appointments => Set<Domain.Work.Appointment>();
     public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
+    public DbSet<Domain.Work.AutomationRule> AutomationRules => Set<Domain.Work.AutomationRule>();
+    public DbSet<Domain.Work.AutomationRun> AutomationRuns => Set<Domain.Work.AutomationRun>();
 
     public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
     public DbSet<Domain.Communication.EmailMessage> EmailMessages => Set<Domain.Communication.EmailMessage>();
@@ -267,6 +269,26 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
             e.Property(n => n.DedupeKey).HasMaxLength(200);
             e.HasIndex(n => new { n.TenantId, n.UserId, n.DedupeKey }).IsUnique(); // NULLs (ordinary notifications) never collide
+        });
+
+        b.Entity<Domain.Work.AutomationRule>(e =>
+        {
+            e.ToTable("automation_rules");
+            e.Property(r => r.Name).HasMaxLength(150);
+            e.Property(r => r.Trigger).HasMaxLength(30);
+            e.Property(r => r.Action).HasMaxLength(30);
+            e.Property(r => r.Text).HasMaxLength(500);
+            e.HasIndex(r => new { r.TenantId, r.Trigger, r.StageId });
+        });
+
+        b.Entity<Domain.Work.AutomationRun>(e =>
+        {
+            e.ToTable("automation_runs");
+            e.Property(r => r.EntityType).HasMaxLength(30);
+            e.Property(r => r.Status).HasMaxLength(20);
+            e.Property(r => r.Detail).HasMaxLength(500);
+            e.HasIndex(r => new { r.RuleId, r.StageChangeId }).IsUnique();
+            e.HasIndex(r => new { r.TenantId, r.CreatedAt });
         });
     }
 

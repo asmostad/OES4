@@ -4334,6 +4334,122 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("appointments", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Work.AutomationRule", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("AssigneeUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("CreatedByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int?>("DueInDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<byte[]>("SequenceId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("StageId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Trigger", "StageId");
+
+                    b.ToTable("automation_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Work.AutomationRun", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<byte[]>("EntityId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<byte[]>("ItemId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("RuleId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("StageChangeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleId", "StageChangeId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("automation_runs", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Work.Notification", b =>
                 {
                     b.Property<byte[]>("Id")

@@ -120,7 +120,7 @@ OES4/
 
 Every job is per tenant, retried with backoff, and visible on a super-admin dashboard (Hangfire dashboard behind super-admin auth).
 
-Today the worker runs plain timed hosted services, each job working per tenant in its own DI scope: `BlastJob` and `NurtureJob` (every minute), `ChecksJob` (every 15 minutes: tasks due within the hour and newly overdue, opportunities that just went stale, issued estimates expiring within 3 days or just expired, sub insurance expiring within 30 days or expired, day-before booking reminder emails) and `CleanupJob` (daily: read notifications after 90 days, unread after 180, public links 30 days past expiry or revocation). Alerts carry a dedupe key (with the date they are about) so they fire once; only events from the last 2 days alert, so switching it on does not flood anyone. Hangfire (retries with backoff, dashboard) replaces the timers when more jobs arrive. The worker skips validate-on-build because the shared registrations include web-only services (user admin needs ASP.NET Identity).
+Today the worker runs plain timed hosted services, each job working per tenant in its own DI scope: `BlastJob` and `NurtureJob` (every minute), `AutomationJob` (every minute: automation rules, see milestone 8), `ChecksJob` (every 15 minutes: tasks due within the hour and newly overdue, opportunities that just went stale, issued estimates expiring within 3 days or just expired, sub insurance expiring within 30 days or expired, day-before booking reminder emails) and `CleanupJob` (daily: read notifications after 90 days, unread after 180, public links 30 days past expiry or revocation). Alerts carry a dedupe key (with the date they are about) so they fire once; only events from the last 2 days alert, so switching it on does not flood anyone. Hangfire (retries with backoff, dashboard) replaces the timers when more jobs arrive. The worker skips validate-on-build because the shared registrations include web-only services (user admin needs ASP.NET Identity).
 
 ## 8. Environments and deployment
 
@@ -185,7 +185,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Project and trade kanban boards (drag and drop), Remove from Board with reasons and restore.
      - Change orders with customer approval that adds to the contract (and to the trade amount).
    - Still to do:
-     - Configurable automation rules (tasks and notifications on stage entry) once tasks and notifications exist.
+     - Configurable automation rules: done in milestone 8 (Administration › Automation).
      - Order sheet (with the takeoff engine).
      - Line-level change orders.
 7. **Subcontractors** (done 2026-11-17)
@@ -203,6 +203,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Record pages (opportunity, property, contact, claim, project, trade) show a Tasks and Appointments card through the `RecordAgenda` view component.
      - In-app notifications: bell with unread count and mark-all-read; links are app-relative only. Sent for task assignment/completion, price approvals needed (to everyone with `pricing.approve` except the requester), and sub portal accept/decline/complete (to the project owner). Never to yourself.
      - Dashboard "My day": overdue, due today, today's appointments.
+     - Automation rules (Administration › Automation, `automation.manage`; done 2026-11-18): "when an opportunity / project / trade enters stage S, create a task (title with merge fields, due in N days, for the owner or a named user), send a notification, or enroll the contact in a nurture workflow." The worker's `AutomationJob` reads the stage-change history every minute, so every path that moves a record counts (board drag, record page, signing an estimate, production automation, a new record entering its first stage). Each rule runs once per move (unique rule + change), only for moves made after the rule was created and within the last two days; turning a rule off stops it. Every run is logged with its result on the Automation page.
      - Templates (email and text) with one merge-field resolver (`{{contact.first_name}}`, `{{property.address}}`, `{{user.name}}`…); unknown fields are rejected on save. Bodies are plain text; email is HTML-encoded on send, so no user HTML is ever mailed. Starter templates are seeded per company.
      - Email and texts from record pages (the `RecordMessaging` card): only to the record's contacts' own addresses, one row per message linked through record_links, shown on the timeline (Emails / Texts tabs). Outgoing messages are private to the sender unless the user has `email.view_all` / `sms.view_all`.
      - Consent and suppression: consent history per contact (latest wins), suppression per address. Texts need an opt-in; email is allowed unless opted out. Inbound STOP/START/HELP are handled with confirmation replies; a STOP can only be undone by the person (START), never by staff. The first text to a number adds "Reply STOP to opt out."
@@ -211,7 +212,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Still to do (needs external credentials or later work):
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
-     - Appointment attendees, all-day events, editing tasks/appointments in place, configurable automation rules. (Due/overdue, stale and expiry alerts are done: worker `ChecksJob`.)
+     - Appointment attendees, all-day events, editing tasks/appointments in place. (Due/overdue, stale and expiry alerts are done: worker `ChecksJob`; automation rules are done.)
 9. **Marketing** (done 2026-11-17: email blasts, unsubscribe, suppressions, online booking, nurture workflows; provider-dependent parts listed below)
    - Done:
      - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.
@@ -231,7 +232,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Every step run is recorded (done / skipped with the reason / failed) and the messages land on the record's timeline.
    - Still to do:
      - Busy calendars (ICS feeds blocking booking times), rescheduling from the manage link. (Day-before reminder emails are done.)
-     - Enroll automatically on pipeline/workflow stage entry (with configurable automation rules); stop on inbound email replies once mail sync exists.
+     - Stop on inbound email replies once mail sync exists. (Enrolling on stage entry is done through automation rules.)
      - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.
 11. **Reports** (done 2026-11-17)

@@ -41,3 +41,22 @@ public sealed class CleanupJob(IServiceScopeFactory scopes, ILogger<CleanupJob> 
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 }
+
+/// <summary>Every minute: apply automation rules to recent stage changes.</summary>
+public sealed class AutomationJob(IServiceScopeFactory scopes, ILogger<AutomationJob> log) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        do
+        {
+            try
+            {
+                var ran = await AutomationRunner.RunAllAsync(scopes, stoppingToken);
+                if (ran > 0) log.LogInformation("Automation ran {Count} rules", ran);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException) { log.LogError(ex, "Automation failed"); }
+        }
+        while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+}

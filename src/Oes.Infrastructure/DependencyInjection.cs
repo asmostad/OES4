@@ -62,6 +62,8 @@ public static class DependencyInjection
         services.AddScoped<Work.WorkService>();
         services.AddScoped<Work.ScheduledChecks>();
         services.AddScoped<Work.NightlyCleanup>();
+        services.AddScoped<Work.AutomationService>();
+        services.AddScoped<Work.AutomationRunner>();
 
         services.Configure<Communication.MessagingOptions>(config.GetSection(Communication.MessagingOptions.Section));
         var messaging = config.GetSection(Communication.MessagingOptions.Section).Get<Communication.MessagingOptions>() ?? new Communication.MessagingOptions();

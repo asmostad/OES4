@@ -77,7 +77,7 @@ public static class Navigation
             [
                 new("Email Templates", "bi-envelope-paper", "/Admin/Templates/email", Permissions.TemplatesManage),
                 new("Texting & SMS Templates", "bi-chat-square-text", "/Admin/Templates/sms", Permissions.TemplatesManage),
-                new("Automation", "bi-lightning-charge", null, Permissions.AutomationManage),
+                new("Automation", "bi-lightning-charge", "/Admin/Automation", Permissions.AutomationManage),
             ]),
             new("products", "Products & Estimating", "bi-box-seam",
             [
