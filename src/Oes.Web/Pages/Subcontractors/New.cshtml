@@ -1,0 +1,44 @@
+@page
+@model Oes.Web.Pages.Subcontractors.NewModel
+@{
+    ViewData["Title"] = "New subcontractor";
+}
+<div class="page-header">
+    <div>
+        <h1>New subcontractor</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Subcontractors">Subcontractors</a></li><li class="breadcrumb-item active">New</li></ol></nav>
+    </div>
+</div>
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <div class="row"><div class="col-xl-8">
+        <div class="card mb-3 record-header level-organization"><div class="card-body">
+            <label class="form-label" for="org-search">Existing organization</label>
+            <div class="typeahead mb-3" data-typeahead="/api/v1/lookup/organizations" data-typeahead-clears="#new-org">
+                <input type="hidden" name="Input.ContactId" value="@Model.Input.ContactId" data-typeahead-value>
+                <input id="org-search" name="ContactLabel" value="@Model.ContactLabel" class="form-control" autocomplete="off" placeholder="Search organizations…" data-typeahead-input>
+                <div class="typeahead-menu dropdown-menu"></div>
+            </div>
+            <div id="new-org">
+                <div class="divider-text"><span>or a new company</span></div>
+                <div class="row g-2">
+                    <div class="col-md-12"><label class="form-label" for="on">Company name</label><input id="on" name="Input.OrganizationName" value="@Model.Input.OrganizationName" class="form-control" maxlength="200"></div>
+                    <div class="col-md-6"><label class="form-label" for="oe">Email (work orders go here)</label><input id="oe" type="email" name="Input.Email" value="@Model.Input.Email" class="form-control" maxlength="254"></div>
+                    <div class="col-md-6"><label class="form-label" for="op">Phone</label><input id="op" name="Input.Phone" value="@Model.Input.Phone" class="form-control" maxlength="40"></div>
+                </div>
+            </div>
+            <label class="form-label d-block mt-3">Trades</label>
+            @foreach (var t in Model.Trades)
+            {
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="Input.TradeCodes" value="@t.Code" id="t-@t.Code" checked="@Model.Input.TradeCodes.Contains(t.Code)">
+                    <label class="form-check-label" for="t-@t.Code">@t.Name</label>
+                </div>
+            }
+        </div></div>
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Add subcontractor</button>
+        <a class="btn btn-outline-secondary" href="/Subcontractors">Cancel</a>
+    </div>
+</form>

@@ -186,7 +186,14 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
      - Configurable automation rules (tasks and notifications on stage entry) once tasks and notifications exist.
      - Order sheet (with the takeoff engine).
      - Line-level change orders.
-7. **Subcontractors** — subs, rates, work orders, sub portal.
+7. **Subcontractors** (done 2026-11-17)
+   - Subs as organization contacts with a profile (trades, status).
+   - Documents with expiry dates, with a cached earliest insurance expiry and badges.
+   - Effective-dated rates: a new rate ends the old one.
+   - Work orders on trades, with lines copied from the rates in effect on the work date.
+   - Issuing emails a hashed, 60-day, revocable portal link; revise, new link and cancel all revoke it.
+   - Sub portal (no sign-in, rate limited, no-referrer, noindex): accept or decline, then report completion with photos that roll up to the trade and project.
+   - Still to do: work order PDF, and insurance-expiry notifications (milestone 8).
 8. **Communication**
    - M365 mail + calendar sync, templates, SMS with consent/STOP, notifications (+ SignalR).
    - Tasks, calendar, appointments.

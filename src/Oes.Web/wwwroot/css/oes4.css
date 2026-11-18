@@ -301,3 +301,9 @@
     color: var(--oes-text-secondary); text-decoration: none;
 }
 a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary); }
+
+.wo-issued { background: var(--oes-info-bg); color: #0e7490; }
+.wo-completed { background: var(--oes-success-bg); color: #047857; }
+.wo-paid { background: #d1fae5; color: #065f46; }
+.wo-cancelled { background: var(--oes-danger-bg); color: #b91c1c; }
+

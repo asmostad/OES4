@@ -19,6 +19,13 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             && http.Features.Get<Microsoft.AspNetCore.Diagnostics.IStatusCodePagesFeature>() is { } pages)
             pages.Enabled = false;
 
+        // Public link pages get their tenant from the link's token, never from a staff sign-in.
+        if (http.Request.Path.StartsWithSegments("/portal"))
+        {
+            await next(http);
+            return;
+        }
+
         var user = http.User;
         if (user.Identity?.IsAuthenticated == true
             && Guid.TryParse(user.FindFirstValue(OesClaims.TenantId), out var tenantId)
@@ -46,7 +53,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 /// <summary>Signed-in users who haven't picked a tenant yet are sent to the tenant picker.</summary>
 public sealed class RequireTenantMiddleware(RequestDelegate next)
 {
-    private static readonly string[] Open = ["/Account", "/api/v1/health", "/health", "/css", "/js", "/img", "/favicon.ico", "/Error"];
+    private static readonly string[] Open = ["/Account", "/api/v1/health", "/health", "/css", "/js", "/img", "/favicon.ico", "/Error", "/portal"];
 
     public async Task InvokeAsync(HttpContext http, TenantContext tenant)
     {
@@ -82,7 +89,9 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
         var h = http.Response.Headers;
         h["Content-Security-Policy"] = Csp;
         h["X-Content-Type-Options"] = "nosniff";
-        h["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        // Token pages must never leak their URL (the token) to other sites.
+        h["Referrer-Policy"] = http.Request.Path.StartsWithSegments("/portal") ? "no-referrer" : "strict-origin-when-cross-origin";
+        if (http.Request.Path.StartsWithSegments("/portal")) h["X-Robots-Tag"] = "noindex, nofollow";
         h["X-Frame-Options"] = "DENY";
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
         return next(http);

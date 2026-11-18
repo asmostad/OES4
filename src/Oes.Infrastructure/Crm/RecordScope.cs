@@ -95,6 +95,8 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
     {
         EntityTypes.Project => await (await ProjectsAsync(true)).AnyAsync(p => p.Id == id),
         EntityTypes.Trade => await CanSeeTradeAsync(id),
+        EntityTypes.WorkOrder => await db.WorkOrders.Where(w => w.Id == id).Select(w => (Guid?)w.ProjectId).FirstOrDefaultAsync() is { } wp
+                                 && await (await ProjectsAsync(true)).AnyAsync(p => p.Id == wp),
         EntityTypes.Estimate => await (await EstimatesAsync(true)).AnyAsync(e => e.Id == id),
         EntityTypes.Contact => await (await ContactsAsync(true)).AnyAsync(c => c.Id == id),
         EntityTypes.Property => await (await PropertiesAsync(true)).AnyAsync(p => p.Id == id),
@@ -140,6 +142,7 @@ public sealed class RecordScope(OesDbContext db, ICurrentUser user)
         EntityTypes.Estimate => "Estimate",
         EntityTypes.Project => "Project",
         EntityTypes.Trade => "Trade",
+        EntityTypes.WorkOrder => "Work order",
         _ => "Record",
     };
 }

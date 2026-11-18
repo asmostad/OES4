@@ -6,17 +6,33 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Projects;
 
-public class TradeModel(ProjectService projects, RecordItems items, CrmLookups lookups) : CrmPageModel
+public class TradeModel(ProjectService projects, RecordItems items, CrmLookups lookups,
+    Oes.Infrastructure.Subcontractors.WorkOrderService workOrders, Oes.Infrastructure.Subcontractors.SubcontractorService subs) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
     public TradeDetail Detail { get; private set; } = null!;
     public TimelineModel Timeline { get; private set; } = null!;
     public List<Option> RemovalReasons { get; private set; } = [];
+    public List<Oes.Infrastructure.Subcontractors.WorkOrderRow> WorkOrders { get; private set; } = [];
+    public List<Oes.Infrastructure.Subcontractors.SubRow> Subs { get; private set; } = [];
+
+    public Task<IActionResult> OnPostWorkOrderAsync(Guid subcontractorId, DateOnly? workDate, string? arrivalTime, string? instructions) => Guard(async () =>
+    {
+        var woId = await workOrders.CreateAsync(Id, subcontractorId, workDate, arrivalTime, instructions);
+        return RedirectToPage("/WorkOrders/View", new { id = woId });
+    });
 
     public Task<IActionResult> OnGetAsync(string? tab) => Guard(async () =>
     {
         Detail = await projects.GetTradeAsync(Id);
+        WorkOrders = await workOrders.ListAsync(null, null, Id);
+        try { Subs = await subs.ListAsync(null, Detail.Type.Code, activeOnly: true); }
+        catch (RecordForbiddenException) { Subs = []; }
+        if (Subs.Count == 0)
+        {
+            try { Subs = await subs.ListAsync(null, null, activeOnly: true); } catch (RecordForbiddenException) { }
+        }
         Timeline = await TimelineModel.LoadAsync(items, lookups, EntityTypes.Trade, Id, tab, null);
         RemovalReasons = await lookups.ValuesAsync(Oes.Domain.Production.RemovalReasons.Type);
         return Page();

@@ -1,0 +1,124 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.WorkOrders.ViewModel
+@using Oes.Domain.Subcontractors
+@{
+    var d = Model.Detail;
+    var w = d.WorkOrder;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal v) => v.ToString("C2", us);
+    ViewData["Title"] = $"{w.Number} · {d.SubContact.DisplayName}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    parents.Add(new Crumb(RecordLevel.Project, d.Project.Name, $"/Projects/View/{d.Project.Id}"));
+    parents.Add(new Crumb(RecordLevel.Trade, d.TradeName, $"/Projects/Trade/{d.Trade.Id}"));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Trade, Title = $"Work order · {d.SubContact.DisplayName}", Number = w.Number,
+        Status = Fmt.Cap(w.Status) + (w.Status == WorkOrderStatuses.Issued ? " · " + Fmt.Cap(w.AcceptStatus) : ""),
+        Subtitle = $"{d.TradeName} · {(w.WorkDate is null ? "no work date" : w.WorkDate.Value.ToString("dddd, MMM d"))}{(w.ArrivalTime is null ? "" : " · " + w.ArrivalTime)} · {M(w.Amount)}",
+        Parents = parents,
+        Chips = [new RecordChip("bi-building", d.SubContact.DisplayName, $"/Subcontractors/View/{d.Sub.Id}")],
+    };
+    var edit = d.CanEdit;
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (edit && d.IsDraft) { <form method="post" asp-page-handler="Issue" class="d-inline"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-send me-1"></i>Issue to sub</button></form> }
+    @if (edit && w.Status == WorkOrderStatuses.Issued)
+    {
+        <form method="post" asp-page-handler="NewLink" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Send a new link? The current link will stop working."><i class="bi bi-link-45deg me-1"></i>New portal link</button></form>
+        <form method="post" asp-page-handler="Revise" class="d-inline"><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-pencil-square me-1"></i>Revise</button></form>
+        <form method="post" asp-page-handler="Status" class="d-inline"><input type="hidden" name="status" value="@WorkOrderStatuses.Completed"><button class="btn btn-sm btn-outline-success" type="submit">Mark complete</button></form>
+    }
+    @if (edit && w.Status == WorkOrderStatuses.Completed)
+    {
+        <form method="post" asp-page-handler="Status" class="d-inline"><input type="hidden" name="status" value="@WorkOrderStatuses.Paid"><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-cash me-1"></i>Mark paid</button></form>
+    }
+    @if (edit && (d.IsDraft || w.Status == WorkOrderStatuses.Issued))
+    {
+        <form method="post" asp-page-handler="Status" class="d-inline ms-auto"><input type="hidden" name="status" value="@WorkOrderStatuses.Cancelled"><button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Cancel this work order? The portal link stops working.">Cancel work order</button></form>
+    }
+</div>
+
+@if (Model.NewLink is { } link)
+{
+    <div class="alert alert-info">
+        <div class="fw-medium mb-1"><i class="bi bi-link-45deg me-1"></i>Portal link (shown only now; OES keeps only a fingerprint of it)</div>
+        <div class="input-group input-group-sm"><input class="form-control" value="@link" readonly aria-label="Portal link" data-select-on-focus>
+            <button class="btn btn-outline-secondary" type="button" data-copy="@link"><i class="bi bi-clipboard"></i> Copy</button></div>
+    </div>
+}
+@if (w.Status == WorkOrderStatuses.Issued)
+{
+    <div class="alert @(w.AcceptStatus == AcceptStatuses.Accepted ? "alert-success" : w.AcceptStatus == AcceptStatuses.Declined ? "alert-danger" : "alert-light border") small">
+        @if (w.AcceptStatus == AcceptStatuses.Accepted) { <span><i class="bi bi-check-circle me-1"></i>Accepted by @w.AcceptedName · @w.AcceptedAt?.ToString("MMM d, h:mm tt")</span> }
+        else if (w.AcceptStatus == AcceptStatuses.Declined) { <span><i class="bi bi-x-circle me-1"></i>Declined by @w.AcceptedName: @w.DeclineReason</span> }
+        else { <span><i class="bi bi-hourglass me-1"></i>Waiting for the sub to accept.</span> }
+        <span class="text-muted ms-2">Link @(d.LinkActive ? $"active until {d.LinkExpiresAt:MMM d}" : "inactive")@(d.LinkLastUsedAt is null ? "" : $", last opened {Fmt.Ago(d.LinkLastUsedAt.Value)}")</span>
+    </div>
+}
+@if (w.CompletionNote is not null) { <div class="alert alert-success small"><strong>Completion note:</strong> @w.CompletionNote</div> }
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header">Lines</div>
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <thead><tr><th>Work</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Rate</th><th class="text-end">Amount</th><th></th></tr></thead>
+                    <tbody>
+                        @if (d.Lines.Count == 0) { <tr><td colspan="6" class="text-muted">No lines yet.</td></tr> }
+                        @foreach (var l in d.Lines)
+                        {
+                            <tr><td>@l.Description</td><td class="text-end">@l.Qty.ToString("#,0.##", us)</td><td>@l.Unit</td><td class="text-end">@M(l.Rate)</td><td class="text-end fw-medium">@M(l.Amount)</td>
+                                <td class="text-end">@if (edit && d.IsDraft) { <form method="post" asp-page-handler="RemoveLine"><input type="hidden" name="lineId" value="@l.Id"><button class="btn btn-link btn-sm p-0 text-danger" type="submit" title="Remove"><i class="bi bi-trash"></i></button></form> }</td></tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><td colspan="4" class="text-end">Total</td><td class="text-end fw-semibold">@M(w.Amount)</td><td></td></tr></tfoot>
+                </table>
+            </div>
+            @if (edit && d.IsDraft)
+            {
+                <div class="card-body border-top">
+                    @if (d.Rates.Count > 0)
+                    {
+                        <form method="post" asp-page-handler="Line" class="d-flex flex-wrap gap-2 mb-2">
+                            <select name="rateId" class="form-select form-select-sm w-auto" required aria-label="Rate">
+                                @foreach (var r in d.Rates) { <option value="@r.Id">@r.Description · @r.Rate.ToString("C2", us)/@r.Unit</option> }</select>
+                            <input type="number" step="any" min="0" name="qty" value="@(d.Trade.Amount > 0 ? "" : "1")" class="form-control form-control-sm" style="max-width:110px" placeholder="Qty" required aria-label="Quantity">
+                            <button class="btn btn-sm btn-primary" type="submit">Add from rate</button>
+                        </form>
+                    }
+                    else { <p class="small text-muted mb-2">This sub has no current rates for @d.TradeName. <a href="/Subcontractors/View/@d.Sub.Id">Add rates</a> or enter a custom line.</p> }
+                    <form method="post" asp-page-handler="Line" class="d-flex flex-wrap gap-2">
+                        <input name="description" class="form-control form-control-sm flex-grow-1" style="min-width:200px" placeholder="Custom work" maxlength="300" required aria-label="Description">
+                        <input type="number" step="any" min="0" name="qty" value="1" class="form-control form-control-sm" style="max-width:90px" aria-label="Quantity">
+                        <input name="unit" value="EA" class="form-control form-control-sm" style="max-width:70px" maxlength="10" aria-label="Unit">
+                        <input type="number" step="0.01" min="0" name="rate" class="form-control form-control-sm" style="max-width:110px" placeholder="Rate" required aria-label="Rate">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Add custom</button>
+                    </form>
+                </div>
+            }
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-header">Details</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Details">
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label small" for="wd">Work date</label><input id="wd" type="date" name="workDate" value="@w.WorkDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" disabled="@(!edit)"></div>
+                        <div class="col-6"><label class="form-label small" for="wa">Arrival</label><input id="wa" name="arrivalTime" value="@w.ArrivalTime" class="form-control form-control-sm" maxlength="50" placeholder="7:30 am" disabled="@(!edit)"></div>
+                        <div class="col-12"><label class="form-label small" for="wi">Instructions for the crew</label><textarea id="wi" name="instructions" class="form-control form-control-sm" rows="4" maxlength="5000" disabled="@(!edit)">@w.Instructions</textarea></div>
+                    </div>
+                    @if (edit) { <button class="btn btn-sm btn-primary mt-2" type="submit">Save details</button> }
+                </form>
+                @if (d.Property?.Notes is not null) { <div class="small mt-3"><i class="bi bi-info-circle me-1"></i>Property notes the sub will see: @d.Property.Notes</div> }
+                <div class="small text-muted mt-2">Sub email: @(d.SubEmail ?? "none on file")</div>
+            </div>
+        </div>
+    </div>
+</div>

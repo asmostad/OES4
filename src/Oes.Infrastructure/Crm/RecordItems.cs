@@ -22,6 +22,12 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
     public async Task<List<(string Type, Guid Id)>> LinkTargetsAsync(string entityType, Guid entityId, CancellationToken ct = default)
     {
         var targets = new List<(string, Guid)> { (entityType, entityId) };
+        if (entityType == EntityTypes.WorkOrder)
+        {
+            var wo = db.WorkOrders.Local.FirstOrDefault(x => x.Id == entityId) ?? await db.WorkOrders.FirstAsync(x => x.Id == entityId, ct);
+            targets.AddRange(await LinkTargetsAsync(EntityTypes.Trade, wo.ProjectTradeId, ct));
+            return targets;
+        }
         if (entityType == EntityTypes.Trade)
         {
             var trade = db.ProjectTrades.Local.FirstOrDefault(x => x.Id == entityId) ?? await db.ProjectTrades.FirstAsync(x => x.Id == entityId, ct);
@@ -139,6 +145,20 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
         string? categoryKey, CancellationToken ct = default)
     {
         await scope.EnsureCanSeeAsync(entityType, entityId);
+        return await StoreAsync(entityType, entityId, content, fileName, contentType, categoryKey, "upload", ct);
+    }
+
+    /// <summary>
+    /// For callers already authorized another way (a sub portal link): no user record-scope check.
+    /// The tenant context must already be set from the verified token.
+    /// </summary>
+    public Task<Guid> UploadFromLinkAsync(string entityType, Guid entityId, Stream content, string fileName, string contentType,
+        string? categoryKey, CancellationToken ct = default) =>
+        StoreAsync(entityType, entityId, content, fileName, contentType, categoryKey, "portal", ct);
+
+    private async Task<Guid> StoreAsync(string entityType, Guid entityId, Stream content, string fileName, string contentType,
+        string? categoryKey, string source, CancellationToken ct)
+    {
 
         // Hash while storing, for duplicate detection later.
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -149,7 +169,7 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
         {
             StorageKey = stored.Key, FileName = Path.GetFileName(fileName), ContentType = contentType,
             SizeBytes = stored.Length, Sha256 = Convert.ToHexStringLower(sha.GetHashAndReset()),
-            CategoryKey = categoryKey, UploadedByUserId = user.UserId, EntityType = entityType, EntityId = entityId,
+            CategoryKey = categoryKey, UploadedByUserId = user.UserId, EntityType = entityType, EntityId = entityId, Source = source,
         };
         db.Documents.Add(doc);
         await LinkAsync(ItemTypes.Document, doc.Id, entityType, entityId, ct);

@@ -1,0 +1,125 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Subcontractors.ViewModel
+@using Oes.Domain.Subcontractors
+@using Oes.Domain.Crm
+@{
+    var d = Model.Detail;
+    var s = d.Sub;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    ViewData["Title"] = d.Contact.DisplayName;
+    var tradeNames = d.Trades.Where(t => s.Trades.Contains(t.Code)).Select(t => t.Name).ToList();
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Organization, Title = d.Contact.DisplayName, Status = "Subcontractor · " + Fmt.Cap(s.Status),
+        Subtitle = tradeNames.Count == 0 ? "No trades set" : string.Join(", ", tradeNames),
+        Chips = d.Contact.Methods.Where(m => m.IsPrimary).Select(m => new RecordChip(m.Kind == "email" ? "bi-envelope" : "bi-telephone", m.Value, null))
+            .Append(new RecordChip("bi-person-vcard", "Contact record", $"/Contacts/View/{d.Contact.Id}")).ToList(),
+    };
+    var daysLeft = s.InsuranceExpiresOn is { } exp ? exp.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber : (int?)null;
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="row g-3 mt-1">
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-shield-check me-2"></i>Documents
+                <span class="ms-auto"><partial name="_InsuranceBadge" model="(s.InsuranceExpiresOn, daysLeft)" /></span></div>
+            <ul class="list-group list-group-flush small">
+                @if (d.Documents.Count == 0) { <li class="list-group-item text-muted">No documents yet. Upload their liability and workers' comp certificates.</li> }
+                @foreach (var doc in d.Documents)
+                {
+                    <li class="list-group-item d-flex gap-2">
+                        <span class="fw-medium">@SubDocTypes.Label(doc.Doc.DocTypeKey)</span>
+                        <a href="/Records/Items?handler=Download&id=@doc.Doc.DocumentId">@doc.FileName</a>
+                        @if (doc.Doc.ExpiresOn is { } e) { <span class="ms-auto @(e < DateOnly.FromDateTime(DateTime.UtcNow) ? "text-danger" : "text-muted")">expires @e.ToString("MMM d, yyyy")</span> }
+                    </li>
+                }
+            </ul>
+            @if (d.CanManage)
+            {
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="Document" enctype="multipart/form-data" class="row g-2">
+                        <div class="col-6"><select name="docTypeKey" class="form-select form-select-sm" aria-label="Document type">
+                            @foreach (var t in SubDocTypes.All) { <option value="@t">@SubDocTypes.Label(t)</option> }</select></div>
+                        <div class="col-6"><input type="date" name="expiresOn" class="form-control form-control-sm" aria-label="Expires on" title="Expires on"></div>
+                        <div class="col-9"><input type="file" name="file" class="form-control form-control-sm" required aria-label="File"></div>
+                        <div class="col-3"><button class="btn btn-sm btn-primary w-100" type="submit">Upload</button></div>
+                    </form>
+                </div>
+            }
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Profile</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Profile">
+                    <label class="form-label small d-block">Trades</label>
+                    @foreach (var t in d.Trades)
+                    {
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tradeCodes" value="@t.Code" id="pt-@t.Code" checked="@s.Trades.Contains(t.Code)" disabled="@(!d.CanManage)">
+                            <label class="form-check-label small" for="pt-@t.Code">@t.Name</label></div>
+                    }
+                    <div class="row g-2 mt-1">
+                        <div class="col-6"><label class="form-label small" for="ss">Status</label>
+                            <select id="ss" name="status" class="form-select form-select-sm" disabled="@(!d.CanManage)">
+                                @foreach (var st in SubStatuses.All) { <option value="@st" selected="@(s.Status == st)">@Fmt.Cap(st)</option> }</select></div>
+                        <div class="col-12"><label class="form-label small" for="sn">Notes</label><textarea id="sn" name="notes" class="form-control form-control-sm" rows="2" maxlength="5000" disabled="@(!d.CanManage)">@s.Notes</textarea></div>
+                    </div>
+                    @if (d.CanManage) { <button class="btn btn-sm btn-primary mt-2" type="submit">Save profile</button> }
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Crew</div>
+            <ul class="list-group list-group-flush small">
+                @if (d.Crew.Count == 0) { <li class="list-group-item text-muted">No people yet. Add them on the <a href="/Contacts/View/@d.Contact.Id">contact record</a>.</li> }
+                @foreach (var c in d.Crew) { <li class="list-group-item"><a href="/Contacts/View/@c.OtherContactId">@c.OtherName</a> <span class="text-muted">@c.Title</span></li> }
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header">Rates</div>
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <thead><tr><th>For</th><th>Trade</th><th class="text-end">Rate</th><th>From</th><th>To</th></tr></thead>
+                    <tbody>
+                        @if (d.Rates.Count == 0) { <tr><td colspan="5" class="text-muted">No rates yet.</td></tr> }
+                        @foreach (var r in d.Rates.OrderBy(r => r.EffectiveTo is not null).ThenBy(r => r.Description).ThenByDescending(r => r.EffectiveFrom))
+                        {
+                            <tr class="@(r.EffectiveTo is null ? "" : "text-muted")">
+                                <td>@r.Description</td>
+                                <td>@(d.Trades.FirstOrDefault(t => t.Id == r.TradeTypeId)?.Name ?? "Any")</td>
+                                <td class="text-end fw-medium">@r.Rate.ToString("C2", us) / @r.Unit</td>
+                                <td>@r.EffectiveFrom.ToString("MMM d, yyyy")</td>
+                                <td>@(r.EffectiveTo?.ToString("MMM d, yyyy") ?? "current")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (d.CanManage)
+            {
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="Rate" class="row g-2 align-items-end">
+                        <div class="col-12"><label class="form-label small" for="rd">For</label><input id="rd" name="description" class="form-control form-control-sm" placeholder="Tear-off &amp; install, per square" required maxlength="200"></div>
+                        <div class="col-md-3"><label class="form-label small" for="rt">Trade</label><select id="rt" name="tradeTypeId" class="form-select form-select-sm"><option value="">Any</option>
+                            @foreach (var t in d.Trades) { <option value="@t.Id">@t.Name</option> }</select></div>
+                        <div class="col-md-2"><label class="form-label small" for="ru">Unit</label><input id="ru" name="unit" value="SQ" class="form-control form-control-sm" maxlength="10"></div>
+                        <div class="col-md-2"><label class="form-label small" for="rr">Rate $</label><input id="rr" type="number" step="0.01" min="0" name="rate" class="form-control form-control-sm" required></div>
+                        <div class="col-md-3"><label class="form-label small" for="rf">From</label><input id="rf" type="date" name="effectiveFrom" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required></div>
+                        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit">Add rate</button></div>
+                    </form>
+                    <div class="form-text">Adding a rate with the same description, unit and trade ends the current one the day before. Old rates are kept.</div>
+                </div>
+            }
+        </div>
+        <div class="card">
+            <div class="card-header">Work orders</div>
+            <partial name="_WorkOrderTable" model="Model.WorkOrders" />
+        </div>
+    </div>
+</div>

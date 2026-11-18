@@ -102,9 +102,24 @@
                 }
             </ul>
         </div>
-        <div class="text-muted small">Subcontractor and work order: coming in the subcontractors milestone.</div>
     </div>
     <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-clipboard-check me-2 text-level-trade"></i>Work orders
+                @if (Model.Subs.Count > 0) { <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#new-wo"><i class="bi bi-plus-lg"></i> New work order</button> }</div>
+            <div class="collapse" id="new-wo"><div class="card-body border-bottom bg-light">
+                <form method="post" asp-page-handler="WorkOrder" class="row g-2">
+                    <div class="col-md-5"><label class="form-label small" for="wsub">Subcontractor</label>
+                        <select id="wsub" name="subcontractorId" class="form-select form-select-sm" required>
+                            @foreach (var s in Model.Subs) { <option value="@s.Id">@s.Name@(s.InsuranceDaysLeft is null or < 0 ? " (insurance missing/expired)" : "")</option> }</select></div>
+                    <div class="col-md-3"><label class="form-label small" for="wdate">Work date</label><input id="wdate" type="date" name="workDate" value="@t.WorkDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+                    <div class="col-md-4"><label class="form-label small" for="warr">Arrival</label><input id="warr" name="arrivalTime" class="form-control form-control-sm" maxlength="50" placeholder="7:30 am"></div>
+                    <div class="col-12"><textarea name="instructions" class="form-control form-control-sm" rows="2" maxlength="5000" placeholder="Instructions for the crew" aria-label="Instructions">@t.CrewNote</textarea></div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Create draft</button></div>
+                </form>
+            </div></div>
+            <partial name="_WorkOrderTable" model="Model.WorkOrders" />
+        </div>
         <partial name="_Timeline" model="Model.Timeline" />
     </div>
 </div>

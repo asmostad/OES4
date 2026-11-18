@@ -1,0 +1,24 @@
+@model List<Oes.Infrastructure.Subcontractors.WorkOrderRow>
+@{
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+}
+<div class="table-responsive">
+    <table class="table table-clickable mb-0 align-middle small">
+        <thead><tr><th>Number</th><th>Sub</th><th>Project · trade</th><th>Work date</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+            @if (Model.Count == 0) { <tr><td colspan="6" class="text-muted">No work orders.</td></tr> }
+            @foreach (var w in Model)
+            {
+                <tr data-href="/WorkOrders/View/@w.Id">
+                    <td><a href="/WorkOrders/View/@w.Id"><code>@w.Number</code></a></td>
+                    <td>@w.SubName</td>
+                    <td><code>@w.ProjectNumber</code> · @w.TradeName<div class="text-muted">@w.Address</div></td>
+                    <td class="text-nowrap">@w.WorkDate?.ToString("ddd MMM d")</td>
+                    <td><span class="est-status wo-@w.Status">@Fmt.Cap(w.Status)</span>
+                        @if (w.Status == "issued") { <span class="badge @(w.AcceptStatus == "accepted" ? "bg-success-subtle text-success" : w.AcceptStatus == "declined" ? "bg-danger-subtle text-danger" : "bg-secondary-subtle text-secondary")">@Fmt.Cap(w.AcceptStatus)</span> }</td>
+                    <td class="text-end">@w.Amount.ToString("C2", us)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -78,6 +78,7 @@ builder.Services.AddRazorPages(o => o.Conventions
     .AllowAnonymousToPage("/Account/AccessDenied")
     .AllowAnonymousToPage("/Account/ForgotPassword")
     .AllowAnonymousToPage("/Account/ResetPassword")
+    .AllowAnonymousToPage("/Portal/Index")
     .AllowAnonymousToPage("/Error"));
 builder.Services.AddControllers(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
 builder.Services.AddProblemDetails();
@@ -90,6 +91,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("login", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPerMinute, Window = TimeSpan.FromMinutes(1) }));
+    // Public link pages: generous for a real person, tight enough to make token guessing pointless.
+    o.AddPolicy("portal", http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(loginPerMinute * 3, 30), Window = TimeSpan.FromMinutes(1) }));
 });
 
 builder.Services.AddHealthChecks().AddDbContextCheck<OesDbContext>("database");

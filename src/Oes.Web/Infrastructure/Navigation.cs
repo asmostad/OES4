@@ -30,7 +30,7 @@ public static class Navigation
             new("Dashboard", "bi-grid-1x2", "/", Match: ["/"]),
             new("Activity Log", "bi-clock-history", null),
             new("Tasks", "bi-check2-square", null),
-            new("Work Orders", "bi-clipboard-check", null, Permissions.WorkOrdersManage),
+            new("Work Orders", "bi-clipboard-check", "/WorkOrders", Permissions.WorkOrdersManage),
             new("Calendar", "bi-calendar3", null),
         ]),
         new("CRM",
@@ -89,7 +89,7 @@ public static class Navigation
             [
                 new("Users", "bi-person-gear", "/Admin/Users", Permissions.UsersManage),
                 new("Roles & Permissions", "bi-shield-lock", "/Admin/Roles", Permissions.RolesManage),
-                new("Subcontractors", "bi-people-fill", null, Permissions.SubcontractorsManage),
+                new("Subcontractors", "bi-people-fill", "/Subcontractors", Permissions.SubcontractorsManage),
                 new("Insurance Carriers", "bi-shield-check", "/Admin/Carriers", Permissions.CarriersManage),
             ]),
             new("system", "System", "bi-gear",

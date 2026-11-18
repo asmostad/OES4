@@ -1,0 +1,17 @@
+@model (DateOnly? ExpiresOn, int? DaysLeft)
+@if (Model.ExpiresOn is null)
+{
+    <span class="badge bg-danger-subtle text-danger"><i class="bi bi-shield-x"></i> None on file</span>
+}
+else if (Model.DaysLeft < 0)
+{
+    <span class="badge bg-danger-subtle text-danger"><i class="bi bi-shield-x"></i> Expired @Model.ExpiresOn.Value.ToString("MMM d")</span>
+}
+else if (Model.DaysLeft <= 30)
+{
+    <span class="badge bg-warning-subtle text-warning"><i class="bi bi-shield-exclamation"></i> Expires @Model.ExpiresOn.Value.ToString("MMM d") (@Model.DaysLeft d)</span>
+}
+else
+{
+    <span class="badge bg-success-subtle text-success"><i class="bi bi-shield-check"></i> To @Model.ExpiresOn.Value.ToString("MMM d, yyyy")</span>
+}

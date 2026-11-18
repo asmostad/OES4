@@ -9,6 +9,7 @@ using Oes.Domain.Estimating;
 using Oes.Domain.Insurance;
 using Oes.Domain.Measurements;
 using Oes.Domain.Production;
+using Oes.Domain.Subcontractors;
 using Oes.Domain.Tenancy;
 using Oes.Infrastructure.Identity;
 
@@ -79,6 +80,14 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<ProjectTrade> ProjectTrades => Set<ProjectTrade>();
     public DbSet<WorkflowStageChange> WorkflowStageChanges => Set<WorkflowStageChange>();
     public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
+
+    // Subcontractors
+    public DbSet<Subcontractor> Subcontractors => Set<Subcontractor>();
+    public DbSet<SubcontractorDocument> SubcontractorDocuments => Set<SubcontractorDocument>();
+    public DbSet<SubcontractorRate> SubcontractorRates => Set<SubcontractorRate>();
+    public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderLine> WorkOrderLines => Set<WorkOrderLine>();
+    public DbSet<ExternalAccessToken> ExternalAccessTokens => Set<ExternalAccessToken>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
@@ -187,7 +196,83 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureMeasurements(b);
         ConfigureEstimating(b);
         ConfigureProduction(b);
+        ConfigureSubcontractors(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureSubcontractors(ModelBuilder b)
+    {
+        b.Entity<Subcontractor>(e =>
+        {
+            e.ToTable("subcontractors");
+            e.Property(s => s.TradeCodes).HasMaxLength(500);
+            e.Property(s => s.Status).HasMaxLength(20);
+            e.Property(s => s.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Ignore(s => s.Trades);
+            e.HasIndex(s => new { s.TenantId, s.ContactId }).IsUnique();
+            e.HasOne<Contact>().WithMany().HasForeignKey(s => s.ContactId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<SubcontractorDocument>(e =>
+        {
+            e.ToTable("subcontractor_documents");
+            e.Property(d => d.DocTypeKey).HasMaxLength(40);
+            e.HasIndex(d => new { d.TenantId, d.SubcontractorId });
+            e.HasOne<Subcontractor>().WithMany().HasForeignKey(d => d.SubcontractorId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Document>().WithMany().HasForeignKey(d => d.DocumentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<SubcontractorRate>(e =>
+        {
+            e.ToTable("subcontractor_rates");
+            e.Property(r => r.Description).HasMaxLength(200);
+            e.Property(r => r.Unit).HasMaxLength(10);
+            e.Property(r => r.Rate).HasPrecision(12, 4);
+            e.HasIndex(r => new { r.TenantId, r.SubcontractorId });
+            e.HasOne<Subcontractor>().WithMany().HasForeignKey(r => r.SubcontractorId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<WorkOrder>(e =>
+        {
+            e.ToTable("work_orders");
+            e.Property(w => w.Number).HasMaxLength(30);
+            e.Property(w => w.Status).HasMaxLength(20);
+            e.Property(w => w.AcceptStatus).HasMaxLength(20);
+            e.Property(w => w.AcceptedName).HasMaxLength(150);
+            e.Property(w => w.DeclineReason).HasMaxLength(500);
+            e.Property(w => w.Amount).HasPrecision(12, 2);
+            e.Property(w => w.ArrivalTime).HasMaxLength(50);
+            e.Property(w => w.Instructions).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(w => w.CompletionNote).HasMaxLength(2000);
+            e.HasIndex(w => new { w.TenantId, w.Number }).IsUnique();
+            e.HasIndex(w => new { w.TenantId, w.SubcontractorId });
+            e.HasIndex(w => new { w.TenantId, w.ProjectTradeId });
+            e.HasOne<Project>().WithMany().HasForeignKey(w => w.ProjectId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ProjectTrade>().WithMany().HasForeignKey(w => w.ProjectTradeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Subcontractor>().WithMany().HasForeignKey(w => w.SubcontractorId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<WorkOrderLine>(e =>
+        {
+            e.ToTable("work_order_lines");
+            e.Property(l => l.Description).HasMaxLength(300);
+            e.Property(l => l.Qty).HasPrecision(14, 4);
+            e.Property(l => l.Unit).HasMaxLength(10);
+            e.Property(l => l.Rate).HasPrecision(12, 4);
+            e.Ignore(l => l.Amount);
+            e.HasIndex(l => new { l.TenantId, l.WorkOrderId });
+            e.HasOne<WorkOrder>().WithMany().HasForeignKey(l => l.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ExternalAccessToken>(e =>
+        {
+            e.ToTable("external_access_tokens");
+            e.Property(t => t.Purpose).HasMaxLength(30);
+            e.Property(t => t.EntityType).HasMaxLength(30);
+            e.Property(t => t.TokenHash).HasMaxLength(64);
+            e.HasIndex(t => t.TokenHash).IsUnique();
+            e.HasIndex(t => new { t.TenantId, t.EntityType, t.EntityId });
+        });
     }
 
     private static void ConfigureProduction(ModelBuilder b)

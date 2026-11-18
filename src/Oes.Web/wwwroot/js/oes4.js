@@ -134,6 +134,15 @@
         setTimeout(function () { input.classList.remove('is-picked'); }, 800);
     });
 
+    // ---------------- copy buttons and select-on-focus ----------------
+    document.addEventListener('click', function (e) {
+        const b = e.target.closest('[data-copy]');
+        if (!b) return;
+        const text = b.getAttribute('data-copy');
+        if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { b.textContent = 'Copied'; });
+    });
+    document.querySelectorAll('[data-select-on-focus]').forEach(function (i) { i.addEventListener('focus', function () { i.select(); }); });
+
     // ---------------- print buttons ----------------
     document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
     document.querySelectorAll('input[data-autosubmit-check]').forEach(function (cb) {
