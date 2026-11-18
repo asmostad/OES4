@@ -90,6 +90,38 @@ public sealed class ScopeImportTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task Supplement_compare_pairs_items_and_totals_the_difference()
+    {
+        var w = await WorldAsync();
+        fx.Ai.Reset();
+        fx.Ai.NextExtraction = (ScopeJson, "end_turn");
+        await using var s = fx.ScopeAs(w.Tenant, w.Admin);
+        var svc = s.Get<ScopeImportService>();
+        var db = s.Get<OesDbContext>();
+        var importId = await svc.ExtractAsync(w.Estimate, Pdf(), "scope.pdf");
+        // Tear-off at 26 SQ (our price), ridge vent as a custom line; the shingles replacement is left out.
+        await svc.ApplyAsync(importId, [0, 2], new Dictionary<int, decimal> { [0] = 26m }, "");
+        // Plus an item the carrier missed.
+        var est = s.Get<EstimateService>();
+        var listId = (await db.Estimates.SingleAsync(e => e.Id == w.Estimate)).PriceListId!.Value;
+        var drip = (await s.Get<CatalogService>().ItemsAsync(listId, "DRIP")).Items.Single().PriceListItemId;
+        var section = await db.EstimateSections.Where(x => x.EstimateId == w.Estimate).OrderBy(x => x.Sort).Select(x => x.Id).FirstAsync();
+        await est.AddPriceBookLineAsync(w.Estimate, section, drip, 120);
+
+        var c = await svc.CompareAsync(importId);
+        Assert.Equal(4, c.Rows.Count);
+        var tearOff = c.Rows.Single(r => r.Code == "RFG 300S" && r.Activity == Activities.Remove);
+        Assert.Equal((CompareKind.Different, 25.5m, 26m, 60.00m, 62.50m, 95.00m),
+            (tearOff.Kind, tearOff.CarrierQty!.Value, tearOff.OurQty!.Value, tearOff.CarrierUnitPrice!.Value, tearOff.OurUnitPrice!.Value, tearOff.Difference));
+        Assert.Equal(CompareKind.CarrierOnly, c.Rows.Single(r => r.Code == "RFG 300S" && r.Activity == Activities.Replace).Kind);
+        var vent = c.Rows.Single(r => r.Code == "RFG VENT");
+        Assert.Equal((CompareKind.Same, "Ridge vent"), (vent.Kind, vent.Description)); // the custom line pairs back with the carrier's line
+        Assert.Equal((CompareKind.OursOnly, 282.00m), (c.Rows.Single(r => r.Code == "RFG DRIP").Kind, c.Rows.Single(r => r.Code == "RFG DRIP").Difference));
+        Assert.Equal((9559.10m, 2287.00m, -7272.10m), (c.CarrierTotal, c.OurTotal, c.Difference));
+        Assert.Equal(CompareKind.Same, c.Rows[^1].Kind); // differences first
+    }
+
+    [Fact]
     public async Task Refusals_discards_and_other_tenants_are_handled()
     {
         var w = await WorldAsync();
@@ -111,6 +143,17 @@ public sealed class ScopeImportTests(MySqlFixture fx)
         await Assert.ThrowsAsync<CrmRuleException>(() => svc.ApplyAsync(importId, [], new Dictionary<int, decimal>(), "")); // nothing ticked
         await svc.DiscardAsync(importId);
         Assert.Equal(ScopeImportStatuses.Discarded, (await svc.GetAsync(importId)).Import.Status);
+
+        // A signed estimate: the scope can still be read and compared, but not added.
+        await s.Get<OesDbContext>().Estimates.Where(e => e.Id == w.Estimate)
+            .ExecuteUpdateAsync(u => u.SetProperty(e => e.Status, EstimateStatuses.Signed));
+        await using (var signed = fx.ScopeAs(w.Tenant, w.Admin))
+        {
+            var svc2 = signed.Get<ScopeImportService>();
+            var afterSigning = await svc2.ExtractAsync(w.Estimate, Pdf(), "supplement.pdf");
+            Assert.Equal(3, (await svc2.CompareAsync(afterSigning)).Rows.Count(r => r.Kind == CompareKind.CarrierOnly));
+            Assert.Contains("signed", (await Assert.ThrowsAsync<CrmRuleException>(() => svc2.ApplyAsync(afterSigning, [0], new Dictionary<int, decimal>(), ""))).Message);
+        }
 
         // Another tenant can't see the import.
         await using var o = fx.ScopeAs(other.Tenant, other.Admin);

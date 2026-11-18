@@ -1,0 +1,99 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Estimates.SupplementModel
+@using Oes.Domain.Estimating
+@using Oes.Infrastructure.Ai
+@{
+    Layout = "_PrintLayout";
+    var c = Model.Compare;
+    var d = Model.Detail;
+    var e = c.Estimate;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal x) => x.ToString("C2", us);
+    string P(decimal? x) => x is null ? "—" : x.Value.ToString("C2", us);
+    string Q(decimal? x) => x is null ? "—" : x.Value.ToString("0.##");
+    string Signed(decimal x) => (x > 0 ? "+" : "") + M(x);
+    var rows = Model.All ? c.Rows : c.Rows.Where(r => r.Kind != CompareKind.Same).ToList();
+    var same = c.Rows.Count(r => r.Kind == CompareKind.Same);
+    ViewData["Title"] = $"Supplement · {e.Number}";
+}
+<div class="print-toolbar no-print">
+    <a href="/Estimates/View/@e.Id" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Back to estimate</a>
+    <a href="/Estimates/Supplement/@c.Import.Id@(Model.All ? "" : "?all=true")" class="btn btn-sm btn-outline-light">@(Model.All ? "Only differences" : $"Show matching items too ({same})")</a>
+    <span class="small text-muted">Compared with the estimate as it is now</span>
+    <button type="button" class="btn btn-sm btn-primary" data-print><i class="bi bi-printer me-1"></i>Print / save as PDF</button>
+</div>
+
+<article class="proposal">
+    <header class="proposal-head">
+        <div>
+            <div class="proposal-company">@Model.Company.Name</div>
+            @if (Model.Company.PostalAddress is not null) { <div class="small text-muted pre-wrap">@Model.Company.PostalAddress</div> }
+        </div>
+        <div class="text-end">
+            <div class="proposal-title">Supplement</div>
+            <div><strong>@e.Number</strong></div>
+            <div class="small text-muted">@DateTime.UtcNow.ToString("MMMM d, yyyy")</div>
+        </div>
+    </header>
+
+    <section class="proposal-parties">
+        <div>
+            <div class="label">Insured</div>
+            <div class="fw-semibold">@d.Contact.DisplayName</div>
+            <div>@(d.Property?.Line1 ?? "—")</div>
+            @if (d.Property is not null) { <div class="small">@d.Property.CityLine</div> }
+        </div>
+        <div>
+            <div class="label">Claim</div>
+            <div>@(c.Import.Carrier ?? "Carrier")</div>
+            @if (d.Claim?.ClaimNumber is not null) { <div class="small">Claim @d.Claim.ClaimNumber</div> }
+            @if (d.Claim?.PolicyNumber is not null) { <div class="small">Policy @d.Claim.PolicyNumber</div> }
+        </div>
+        <div>
+            <div class="label">Compared</div>
+            <div class="small">Carrier scope: @c.Import.FileName@(c.Import.CarrierPriceList is null ? "" : " (" + c.Import.CarrierPriceList + ")")</div>
+            <div class="small">Our estimate: @e.Number@(e.LatestVersionNo > 0 ? " v" + e.LatestVersionNo : "")</div>
+        </div>
+    </section>
+
+    <section class="proposal-section">
+        <div class="proposal-section-head"><h2>@(Model.All ? "All items" : "Items that differ")</h2></div>
+        <table class="table table-sm proposal-lines mb-1">
+            <thead>
+                <tr><th>Item</th><th>Unit</th><th class="text-end">Carrier qty</th><th class="text-end">Carrier price</th><th class="text-end">Our qty</th><th class="text-end">Our price</th><th class="text-end">Difference</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr class="@(r.Kind == CompareKind.Same ? "text-muted" : "")">
+                        <td>
+                            @r.Description
+                            <div class="small text-muted">@r.Code@(r.Activity.Length == 0 ? "" : " · " + Activities.Label(r.Activity))
+                                @(r.Kind switch { CompareKind.OursOnly => " · not in carrier scope", CompareKind.CarrierOnly => " · not in our estimate", _ => "" })</div>
+                        </td>
+                        <td>@r.Unit</td>
+                        <td class="text-end @(r.Kind == CompareKind.Different && r.CarrierQty != r.OurQty ? "fw-semibold" : "")">@Q(r.CarrierQty)</td>
+                        <td class="text-end">@P(r.CarrierUnitPrice)</td>
+                        <td class="text-end @(r.Kind == CompareKind.Different && r.CarrierQty != r.OurQty ? "fw-semibold" : "")">@Q(r.OurQty)</td>
+                        <td class="text-end">@P(r.OurUnitPrice)</td>
+                        <td class="text-end fw-semibold">@(r.Difference == 0 ? "—" : Signed(r.Difference))</td>
+                    </tr>
+                }
+                @if (rows.Count == 0) { <tr><td colspan="7" class="text-muted">The carrier scope and the estimate match item for item.</td></tr> }
+            </tbody>
+        </table>
+        <div class="proposal-totals">
+            <table class="table table-sm mb-0">
+                <tr><td>Carrier scope</td><td class="text-end">@M(c.CarrierTotal)</td></tr>
+                <tr><td>Our estimate</td><td class="text-end">@M(c.OurTotal)</td></tr>
+                <tr class="grand"><td>@(c.Difference > 0 ? "Supplement requested" : "Difference")</td><td class="text-end">@Signed(c.Difference)</td></tr>
+            </table>
+        </div>
+    </section>
+
+    <section class="proposal-terms">
+        <p>Line amounts are replacement cost before overhead, profit and tax. Quantities are summed where an item appears on more than one line.@(Model.All ? "" : $" {same} item(s) match and are not listed.")</p>
+    </section>
+
+    <footer class="proposal-foot">@e.Number · supplement · printed @DateTime.UtcNow.ToString("yyyy-MM-dd")</footer>
+</article>

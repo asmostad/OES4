@@ -19,6 +19,26 @@ public sealed record ScopeLine(
 
 public sealed record ScopeImportView(ScopeImport Import, Estimate Estimate, List<ScopeLine> Lines);
 
+public enum CompareKind { Same, Different, CarrierOnly, OursOnly }
+
+/// <summary>One item on the carrier scope and/or our estimate, quantities summed across lines and sections.</summary>
+public sealed record CompareRow(
+    string? Code, string Activity, string Description, string Unit,
+    decimal? CarrierQty, decimal? CarrierUnitPrice, decimal CarrierAmount,
+    decimal? OurQty, decimal? OurUnitPrice, decimal OurAmount)
+{
+    public decimal Difference => OurAmount - CarrierAmount;
+    public CompareKind Kind => CarrierQty is null ? CompareKind.OursOnly : OurQty is null ? CompareKind.CarrierOnly
+        : CarrierQty == OurQty && CarrierUnitPrice == OurUnitPrice ? CompareKind.Same : CompareKind.Different;
+}
+
+public sealed record SupplementCompare(ScopeImport Import, Estimate Estimate, List<CompareRow> Rows)
+{
+    public decimal CarrierTotal => Rows.Sum(r => r.CarrierAmount);
+    public decimal OurTotal => Rows.Sum(r => r.OurAmount);
+    public decimal Difference => OurTotal - CarrierTotal;
+}
+
 /// <summary>
 /// Carrier scope import: Claude reads the scope PDF (Xactimate or similar) into lines with one structured-output
 /// call; each line is matched to the estimate's price list by category, item code and activity. Nothing reaches
@@ -69,11 +89,13 @@ public sealed class ScopeImportService(
         },
     });
 
-    private async Task<Estimate> VisibleEditableAsync(Guid estimateId, CancellationToken ct)
+    /// <summary>Reading a scope and comparing need edit rights; adding lines also needs an unsigned estimate.</summary>
+    private async Task<Estimate> VisibleEditableAsync(Guid estimateId, CancellationToken ct, bool toAddLines = false)
     {
         var d = await estimates.GetAsync(estimateId, ct); // visibility
-        if (!d.CanEdit) throw new RecordForbiddenException("You can't edit this estimate.");
-        if (d.Estimate.Status == EstimateStatuses.Signed) throw new CrmRuleException("This estimate is signed. Use a change order instead.");
+        if (!await estimates.HasEditRightsAsync(d.Estimate)) throw new RecordForbiddenException("You can't edit this estimate.");
+        if (toAddLines && d.Estimate.Status == EstimateStatuses.Signed)
+            throw new CrmRuleException("This estimate is signed. Use the supplement compare, and a change order for extra work.");
         return d.Estimate;
     }
 
@@ -189,7 +211,7 @@ public sealed class ScopeImportService(
     {
         var view = await GetAsync(importId, ct);
         if (view.Import.Status != ScopeImportStatuses.Review) throw new CrmRuleException("This scope was already added or discarded.");
-        await VisibleEditableAsync(view.Estimate.Id, ct);
+        await VisibleEditableAsync(view.Estimate.Id, ct, toAddLines: true);
         var chosen = view.Lines.Where(l => include.Contains(l.Index)).ToList();
         if (chosen.Count == 0) throw new CrmRuleException("Tick at least one line to add.");
         var name = string.IsNullOrWhiteSpace(sectionName) ? $"Carrier scope{(view.Import.Carrier is null ? "" : " – " + view.Import.Carrier)}" : sectionName.Trim();
@@ -211,6 +233,55 @@ public sealed class ScopeImportService(
         return chosen.Count;
     }
 
+    /// <summary>
+    /// Supplement compare: the carrier's scope against the estimate as it stands now, item by item. Items pair up by
+    /// category + item code + activity; lines without a code pair up by description. Amounts are before O&amp;P and tax.
+    /// </summary>
+    public async Task<SupplementCompare> CompareAsync(Guid importId, CancellationToken ct = default)
+    {
+        var view = await GetAsync(importId, ct);
+        var ours = await db.EstimateLines.Where(l => l.EstimateId == view.Estimate.Id).OrderBy(l => l.Sort).ToListAsync(ct);
+
+        static string Norm(string s) => string.Join(' ', s.Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        static string CodeKey(string code, string activity) => "C|" + Norm(code) + "|" + activity;
+        // A custom line made from a scope ends with "(CAT CODE)".
+        static string? CodeFromDescription(string d) =>
+            d.EndsWith(')') && d.LastIndexOf(" (", StringComparison.Ordinal) is var i and > 0 ? d[(i + 2)..^1] : null;
+
+        var rows = new Dictionary<string, CompareAcc>();
+        void Add(string key, string? code, string activity, string description, string unit, bool carrier, decimal qty, decimal amount, decimal? unitPrice)
+        {
+            if (!rows.TryGetValue(key, out var r)) rows[key] = r = new CompareAcc(code, activity, description, unit);
+            (carrier ? r.Carrier : r.Ours).Add(qty, amount, unitPrice);
+        }
+
+        foreach (var l in view.Lines)
+        {
+            var code = l.Code is null ? null : l.Category is null ? l.Code : $"{l.Category} {l.Code}";
+            var key = code is null ? "D|" + Norm(l.Description) : CodeKey(code, l.Activity);
+            var amount = Math.Round(l.Quantity * (l.CarrierUnitPrice ?? 0), 2, MidpointRounding.AwayFromZero);
+            Add(key, code, l.Activity, l.Description, l.Unit, true, l.Quantity, amount, l.CarrierUnitPrice);
+        }
+        foreach (var l in ours)
+        {
+            var code = l.Code ?? CodeFromDescription(l.Description);
+            var description = l.Code is null && code is not null ? l.Description[..l.Description.LastIndexOf(" (", StringComparison.Ordinal)] : l.Description;
+            string key;
+            if (code is null) key = "D|" + Norm(l.Description);
+            else if (rows.ContainsKey(CodeKey(code, l.Activity))) key = CodeKey(code, l.Activity);
+            // A carrier line with the same code but no activity, or (for our custom lines, which have none) any activity, still pairs.
+            else if (rows.ContainsKey(CodeKey(code, Activities.None))) key = CodeKey(code, Activities.None);
+            else if (l.Activity == Activities.None && rows.Keys.FirstOrDefault(k => k.StartsWith(CodeKey(code, ""), StringComparison.Ordinal)) is { } any) key = any;
+            else key = CodeKey(code, l.Activity);
+            Add(key, code, l.Activity, description, l.Unit, false, l.Qty, l.Amount, l.UnitPrice);
+        }
+
+        var list = rows.Values.Select(r => new CompareRow(r.Code, r.Activity, r.Description, r.Unit,
+                r.Carrier.Any ? r.Carrier.Qty : null, r.Carrier.Price, r.Carrier.Amount, r.Ours.Any ? r.Ours.Qty : null, r.Ours.Price, r.Ours.Amount))
+            .OrderBy(r => r.Kind == CompareKind.Same ? 1 : 0).ThenBy(r => r.Code ?? "~").ThenBy(r => r.Description).ToList();
+        return new SupplementCompare(view.Import, view.Estimate, list);
+    }
+
     public async Task DiscardAsync(Guid importId, CancellationToken ct = default)
     {
         var view = await GetAsync(importId, ct);
@@ -218,5 +289,32 @@ public sealed class ScopeImportService(
         var import = await db.ScopeImports.FirstAsync(x => x.Id == importId, ct);
         if (import.Status == ScopeImportStatuses.Review) import.Status = ScopeImportStatuses.Discarded;
         await db.SaveChangesAsync(ct);
+    }
+}
+
+internal sealed class CompareAcc(string? code, string activity, string description, string unit)
+{
+    public string? Code { get; } = code;
+    public string Activity { get; } = activity;
+    public string Description { get; } = description;
+    public string Unit { get; } = unit;
+    public CompareSide Carrier { get; } = new();
+    public CompareSide Ours { get; } = new();
+}
+
+internal sealed class CompareSide
+{
+    public bool Any { get; private set; }
+    public decimal Qty { get; private set; }
+    public decimal Amount { get; private set; }
+    /// <summary>The unit price when every line agrees on one; otherwise null.</summary>
+    public decimal? Price { get; private set; }
+
+    public void Add(decimal qty, decimal amount, decimal? unitPrice)
+    {
+        Price = Any && Price != unitPrice ? null : unitPrice;
+        Any = true;
+        Qty += qty;
+        Amount += amount;
     }
 }

@@ -18,6 +18,8 @@ public class ViewModel(EstimateService estimates, MeasurementService measurement
     public List<TradeType> Trades { get; private set; } = [];
     public List<PropertyStructure> Structures { get; private set; } = [];
     public Guid? ProjectId { get; private set; }
+    /// <summary>Carrier scopes and supplements work on signed estimates too.</summary>
+    public bool CanUseScopes { get; private set; }
 
     public Task<IActionResult> OnPostCreateProjectAsync() => Guard(async () =>
     {
@@ -30,6 +32,7 @@ public class ViewModel(EstimateService estimates, MeasurementService measurement
     {
         Detail = await estimates.GetAsync(Id);
         ProjectId = await projects.ForEstimateAsync(Id);
+        CanUseScopes = await estimates.HasEditRightsAsync(Detail.Estimate);
         Timeline = await TimelineModel.LoadAsync(items, lookups, EntityTypes.Estimate, Id, tab, null);
         Trades = await measurements.TradesAsync();
         if (Detail.Property is not null) Structures = (await properties.GetAsync(Detail.Property.Id)).Structures;

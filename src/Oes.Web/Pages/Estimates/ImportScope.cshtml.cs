@@ -16,10 +16,12 @@ public class ImportScopeModel(ScopeImportService imports, EstimateService estima
     public EstimateDetail Detail { get; private set; } = null!;
     public List<ScopeImport> Imports { get; private set; } = [];
     public bool AiReady => imports.IsConfigured;
+    public bool CanUseScopes { get; private set; }
 
     private async Task LoadAsync()
     {
         Detail = await estimates.GetAsync(Id);
+        CanUseScopes = await estimates.HasEditRightsAsync(Detail.Estimate);
         Imports = await imports.ForEstimateAsync(Id);
     }
 

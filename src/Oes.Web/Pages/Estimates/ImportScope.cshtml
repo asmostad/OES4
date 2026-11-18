@@ -20,14 +20,17 @@
         <div class="card">
             <div class="card-body">
                 @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="alert alert-danger"></div> }
-                @if (!Model.Detail.CanEdit || e.Status == EstimateStatuses.Signed)
+                @if (!Model.CanUseScopes)
                 {
-                    <p class="mb-0 text-muted">@(e.Status == EstimateStatuses.Signed ? "This estimate is signed. Add carrier lines through a change order instead." : "You can't edit this estimate.")</p>
+                    <p class="mb-0 text-muted">You can't edit this estimate.</p>
                 }
                 else if (Model.AiReady)
                 {
                     <p class="small text-muted">Attach the insurance company's scope of loss (Xactimate or similar, as a PDF). The AI lists its line items and matches them to
-                        @(Model.Detail.PriceList is null ? "your catalog" : $"the {Model.Detail.PriceList.Name} price list"). You review every line before anything is added to the estimate.</p>
+                        @(Model.Detail.PriceList is null ? "your catalog" : $"the {Model.Detail.PriceList.Name} price list").
+                        @(e.Status == EstimateStatuses.Signed
+                            ? "This estimate is signed, so the lines can't be added to it, but you can compare the scope with it and print a supplement."
+                            : "You review every line before anything is added to the estimate, and can compare the scope with the estimate for a supplement.")</p>
                     <form method="post" enctype="multipart/form-data">
                         <label class="form-label" for="scope">Scope PDF</label>
                         <input id="scope" type="file" name="Scope" accept=".pdf" class="form-control mb-3" required>
@@ -56,7 +59,8 @@
                     {
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span><a href="/Estimates/ScopeReview/@i.Id">@i.FileName</a> <span class="text-muted small">@(i.Carrier ?? "") · @Fmt.Ago(i.CreatedAt)</span></span>
-                            <span class="badge @(i.Status == ScopeImportStatuses.Review ? "text-bg-warning" : i.Status == ScopeImportStatuses.Imported ? "text-bg-success" : "text-bg-secondary")">@Fmt.Cap(i.Status)</span>
+                            <span class="d-flex gap-2 align-items-center"><a class="small" href="/Estimates/Supplement/@i.Id">Compare</a>
+                            <span class="badge @(i.Status == ScopeImportStatuses.Review ? "text-bg-warning" : i.Status == ScopeImportStatuses.Imported ? "text-bg-success" : "text-bg-secondary")">@Fmt.Cap(i.Status)</span></span>
                         </li>
                     }
                 </ul>

@@ -177,9 +177,13 @@ public sealed class EstimateService(
         return result;
     }
 
-    private async Task<bool> CanEditAsync(Estimate est)
+    private async Task<bool> CanEditAsync(Estimate est) =>
+        est.Status != EstimateStatuses.Signed && await HasEditRightsAsync(est);
+
+    /// <summary>Whether this user may work on the estimate, whatever its status (signed estimates still take supplements).</summary>
+    public async Task<bool> HasEditRightsAsync(Estimate est)
     {
-        if (est.Status == EstimateStatuses.Signed || est.ArchivedAt is not null) return false;
+        if (est.ArchivedAt is not null) return false;
         if (await user.HasPermissionAsync(Permissions.EstimatesManage)) return true;
         return await user.HasPermissionAsync(Permissions.EstimatesCreate) && (est.OwnerUserId is null || est.OwnerUserId == scope.Me);
     }

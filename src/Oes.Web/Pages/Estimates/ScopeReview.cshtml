@@ -7,7 +7,8 @@
     var e = v.Estimate;
     var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
     string M(decimal? x) => x is null ? "—" : x.Value.ToString("C2", us);
-    var open = i.Status == ScopeImportStatuses.Review;
+    var signed = e.Status == EstimateStatuses.Signed;
+    var open = i.Status == ScopeImportStatuses.Review && !signed;
     var matched = v.Lines.Count(l => l.PriceListItemId is not null);
     ViewData["Title"] = $"Carrier scope · {e.Number}";
 }
@@ -30,10 +31,12 @@
     }
     else
     {
-        <text>This scope was @(i.Status == ScopeImportStatuses.Imported ? "added to the estimate" : "discarded").</text>
+        <text>@(i.Status == ScopeImportStatuses.Imported ? "This scope was added to the estimate." : i.Status == ScopeImportStatuses.Discarded ? "This scope was discarded." : "The estimate is signed, so these lines can't be added to it. Use the supplement compare.")</text>
     }
     @if (i.Notes is not null) { <div class="mt-1 pre-wrap">@i.Notes</div> }
 </div>
+
+<div class="mb-3"><a class="btn btn-sm btn-outline-secondary" href="/Estimates/Supplement/@i.Id"><i class="bi bi-arrow-left-right me-1"></i>Compare with our estimate (supplement)</a></div>
 
 <form method="post">
     @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="alert alert-danger"></div> }
