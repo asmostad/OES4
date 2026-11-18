@@ -45,6 +45,11 @@ public static class TenantDefaults
             ("price", "Price"), ("competitor", "Chose a competitor"), ("no_damage", "No damage found"),
             ("claim_denied", "Claim denied"), ("no_response", "No response"), ("not_interested", "Not interested"), ("other", "Other"),
         ],
+        [Domain.Work.AppointmentTypes.LookupType] =
+        [
+            ("inspection", "Inspection"), ("adjuster_meeting", "Adjuster meeting"), ("estimate", "Estimate presentation"),
+            ("contract_signing", "Contract signing"), ("install", "Install / production"), ("walkthrough", "Final walkthrough"), ("other", "Other"),
+        ],
         [Domain.Production.RemovalReasons.Type] =
         [
             ("on_hold", "On hold"), ("waiting_insurance", "Waiting on insurance"), ("customer_cancelled", "Customer cancelled"),

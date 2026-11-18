@@ -1,0 +1,30 @@
+@model (List<Oes.Infrastructure.Work.TaskRow> Tasks, bool ShowRecord)
+@{
+    var self = Context.Request.Path + Context.Request.QueryString;
+}
+<ul class="list-group list-group-flush task-list">
+    @if (Model.Tasks.Count == 0) { <li class="list-group-item text-muted small">Nothing to do.</li> }
+    @foreach (var t in Model.Tasks)
+    {
+        <li class="list-group-item d-flex align-items-start gap-2 @(t.CompletedAt is not null ? "task-done" : t.IsOverdue ? "task-overdue" : "")">
+            <form method="post" asp-antiforgery="true" action="/Work/Items?handler=TaskDone" class="pt-1">
+                <input type="hidden" name="id" value="@t.Id"><input type="hidden" name="done" value="@((t.CompletedAt is null).ToString().ToLowerInvariant())">
+                <input type="hidden" name="returnUrl" value="@self">
+                <button type="submit" class="task-check" title="@(t.CompletedAt is null ? "Mark done" : "Reopen")" disabled="@(!t.CanEdit)" aria-label="@(t.CompletedAt is null ? "Mark done" : "Reopen")">
+                    <i class="bi @(t.CompletedAt is null ? "bi-circle" : "bi-check-circle-fill")"></i></button>
+            </form>
+            <div class="flex-grow-1 min-w-0">
+                <div class="task-title">@if (t.Priority == "high") { <i class="bi bi-exclamation-circle-fill text-danger me-1" title="High priority"></i> }@t.Title</div>
+                <div class="small text-muted">
+                    @if (t.DueLocal is { } due)
+                    {
+                        <span class="@(t.IsOverdue ? "text-danger fw-medium" : t.IsDueToday ? "text-warning fw-medium" : "")"><i class="bi bi-calendar-event"></i> @(t.IsDueToday ? "Today" : due.ToString("ddd MMM d"))@(t.HasDueTime ? " " + due.ToString("h:mm tt") : "")</span>
+                    }
+                    <span><i class="bi bi-person"></i> @t.AssigneeName</span>
+                    @if (Model.ShowRecord && t.RecordUrl is not null) { <a href="@t.RecordUrl"><i class="bi bi-box-arrow-up-right"></i> @Oes.Infrastructure.Crm.RecordScope.Describe(t.EntityType!)</a> }
+                </div>
+                @if (t.Notes is not null) { <div class="small pre-wrap">@t.Notes</div> }
+            </div>
+        </li>
+    }
+</ul>

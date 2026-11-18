@@ -123,6 +123,10 @@ public sealed class SubcontractorTests(MySqlFixture fx)
             // The photo rolls up to the trade and project.
             var onTrade = await s.Get<RecordItems>().TimelineAsync(EntityTypes.Trade, x.Trade, TimelineScope.Everything, ItemTypes.Document);
             Assert.Contains(onTrade, i => i.FileName == "after.jpg");
+            // The project owner hears about the sub's responses.
+            var notes = await s.Get<Oes.Infrastructure.Work.NotificationService>().LatestAsync();
+            Assert.Contains(notes, n => n.Kind == "work_order.accepted");
+            Assert.Contains(notes, n => n.Kind == "work_order.completed" && n.Url == $"/WorkOrders/View/{woId}");
             await s.Get<WorkOrderService>().SetStatusAsync(woId, WorkOrderStatuses.Paid);
         }
     }

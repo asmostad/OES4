@@ -29,9 +29,9 @@ public static class Navigation
         [
             new("Dashboard", "bi-grid-1x2", "/", Match: ["/"]),
             new("Activity Log", "bi-clock-history", null),
-            new("Tasks", "bi-check2-square", null),
+            new("Tasks", "bi-check2-square", "/Tasks"),
             new("Work Orders", "bi-clipboard-check", "/WorkOrders", Permissions.WorkOrdersManage),
-            new("Calendar", "bi-calendar3", null),
+            new("Calendar", "bi-calendar3", "/Calendar"),
         ]),
         new("CRM",
         [

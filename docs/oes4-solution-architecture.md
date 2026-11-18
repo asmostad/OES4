@@ -194,9 +194,16 @@ Every job is per tenant, retried with backoff, and visible on a super-admin dash
    - Issuing emails a hashed, 60-day, revocable portal link; revise, new link and cancel all revoke it.
    - Sub portal (no sign-in, rate limited, no-referrer, noindex): accept or decline, then report completion with photos that roll up to the trade and project.
    - Still to do: work order PDF, and insurance-expiry notifications (milestone 8).
-8. **Communication**
-   - M365 mail + calendar sync, templates, SMS with consent/STOP, notifications (+ SignalR).
-   - Tasks, calendar, appointments.
+8. **Communication** (in progress: tasks, calendar and in-app notifications done 2026-11-17)
+   - Done:
+     - Tasks: standalone or on any record, rolled up through record_links (a task on an opportunity shows on its property and contact). Date-only tasks are stored at noon in the company time zone; overdue/today grouping; mine/everyone (`tasks.view_all`); done-toggle logs to the record and notifies the creator.
+     - Appointments: typed (lookup `appointment_type`), on records or standalone, location defaults to the property address, assigning others needs `calendar.manage`. Week calendar (Sunday start) with tasks due that week.
+     - Record pages (opportunity, property, contact, claim, project, trade) show a Tasks and Appointments card through the `RecordAgenda` view component.
+     - In-app notifications: bell with unread count and mark-all-read; links are app-relative only. Sent for task assignment/completion, price approvals needed (to everyone with `pricing.approve` except the requester), and sub portal accept/decline/complete (to the project owner). Never to yourself.
+     - Dashboard "My day": overdue, due today, today's appointments.
+   - Still to do (needs external credentials or later work):
+     - M365 mail + calendar sync, templates, SMS with consent/STOP, SignalR live updates, email/push delivery of notifications and preferences.
+     - Appointment attendees, all-day events, editing tasks/appointments in place, insurance-expiry notifications (needs the Worker), configurable automation rules.
 9. **Marketing** — nurture, email blasts + suppressions, online booking + busy calendars.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.
 11. **Reports** — pipeline, conversion, production, stale, tasks, with charts and CSV.

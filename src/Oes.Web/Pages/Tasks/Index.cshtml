@@ -1,0 +1,62 @@
+@page
+@model Oes.Web.Pages.Tasks.IndexModel
+@{
+    ViewData["Title"] = "Tasks";
+    var open = Model.Tasks.Where(t => t.CompletedAt is null).ToList();
+    var groups = new (string Title, string Icon, List<Oes.Infrastructure.Work.TaskRow> Rows)[]
+    {
+        ("Overdue", "bi-exclamation-triangle text-danger", open.Where(t => t.IsOverdue).ToList()),
+        ("Today", "bi-sun text-warning", open.Where(t => t.IsDueToday && !t.IsOverdue).ToList()),
+        ("Upcoming", "bi-calendar-week", open.Where(t => t.DueLocal is not null && !t.IsDueToday && !t.IsOverdue).ToList()),
+        ("No due date", "bi-inbox", open.Where(t => t.DueLocal is null).ToList()),
+        ("Done", "bi-check2-all text-success", Model.Tasks.Where(t => t.CompletedAt is not null).ToList()),
+    };
+    var self = Request.Path + Request.QueryString;
+}
+<div class="page-header">
+    <div>
+        <h1>Tasks</h1>
+        <p class="page-subtitle">@(Model.All ? "Everyone's tasks you can see." : "Assigned to you.") Tasks added on a record also show on the records above it.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="d-flex gap-2 mb-3">
+            <div class="btn-group btn-group-sm">
+                <a class="btn @(!Model.All ? "btn-secondary" : "btn-outline-secondary")" href="?all=false&done=@Model.Done.ToString().ToLowerInvariant()">Mine</a>
+                <a class="btn @(Model.All ? "btn-secondary" : "btn-outline-secondary")" href="?all=true&done=@Model.Done.ToString().ToLowerInvariant()">Everyone</a>
+            </div>
+            <a class="btn btn-sm btn-link" href="?all=@Model.All.ToString().ToLowerInvariant()&done=@((!Model.Done).ToString().ToLowerInvariant())">@(Model.Done ? "Hide done" : "Show done")</a>
+        </div>
+        @foreach (var g in groups.Where(g => g.Rows.Count > 0))
+        {
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi @g.Icon me-2"></i>@g.Title <span class="text-muted fw-normal">@g.Rows.Count</span></div>
+                <partial name="_TaskList" model="(g.Rows, true)" />
+            </div>
+        }
+        @if (Model.Tasks.Count == 0) { <div class="card"><div class="empty-state"><i class="bi bi-check2-square"></i><h5>All clear</h5><p>No open tasks.</p></div></div> }
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">New task</div>
+            <div class="card-body">
+                <form method="post" asp-antiforgery="true" action="/Work/Items?handler=Task" class="row g-2">
+                    <input type="hidden" name="returnUrl" value="@self">
+                    <div class="col-12"><input name="task.Title" class="form-control form-control-sm" placeholder="What needs doing?" required maxlength="300" aria-label="Task"></div>
+                    <div class="col-6"><input type="date" name="task.DueDate" class="form-control form-control-sm" aria-label="Due date"></div>
+                    <div class="col-6"><input type="time" name="task.DueTime" class="form-control form-control-sm" aria-label="Due time (optional)"></div>
+                    <div class="col-12"><select name="task.AssignedToUserId" class="form-select form-select-sm" aria-label="Assign to">
+                        @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
+                    <div class="col-12"><textarea name="task.Notes" class="form-control form-control-sm" rows="2" placeholder="Notes" maxlength="5000" aria-label="Notes"></textarea></div>
+                    <div class="col-12 d-flex align-items-center">
+                        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="task.Priority" value="high" id="tp"><label class="form-check-label small" for="tp">High priority</label></div>
+                        <button class="btn btn-sm btn-primary ms-auto" type="submit">Add task</button>
+                    </div>
+                </form>
+                <div class="form-text">To tie a task to a job, add it from that record's page.</div>
+            </div>
+        </div>
+    </div>
+</div>

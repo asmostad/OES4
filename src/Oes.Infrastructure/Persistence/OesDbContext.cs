@@ -89,6 +89,11 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<WorkOrderLine> WorkOrderLines => Set<WorkOrderLine>();
     public DbSet<ExternalAccessToken> ExternalAccessTokens => Set<ExternalAccessToken>();
 
+    // Tasks, calendar, notifications
+    public DbSet<Domain.Work.TaskItem> Tasks => Set<Domain.Work.TaskItem>();
+    public DbSet<Domain.Work.Appointment> Appointments => Set<Domain.Work.Appointment>();
+    public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
     {
         b.Properties<Guid>().HaveConversion<GuidBinaryConverter>().HaveColumnType("binary(16)");
@@ -197,7 +202,47 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         ConfigureEstimating(b);
         ConfigureProduction(b);
         ConfigureSubcontractors(b);
+        ConfigureWork(b);
         ApplyTenantFilters(b);
+    }
+
+    private static void ConfigureWork(ModelBuilder b)
+    {
+        b.Entity<Domain.Work.TaskItem>(e =>
+        {
+            e.ToTable("tasks");
+            e.Property(t => t.Title).HasMaxLength(300);
+            e.Property(t => t.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(t => t.Priority).HasMaxLength(10);
+            e.Property(t => t.EntityType).HasMaxLength(30);
+            e.Ignore(t => t.IsOpen);
+            e.HasIndex(t => new { t.TenantId, t.AssignedToUserId, t.CompletedAt, t.DueAt });
+            e.HasIndex(t => new { t.TenantId, t.EntityType, t.EntityId });
+        });
+
+        b.Entity<Domain.Work.Appointment>(e =>
+        {
+            e.ToTable("appointments");
+            e.Property(a => a.Title).HasMaxLength(300);
+            e.Property(a => a.TypeKey).HasMaxLength(60);
+            e.Property(a => a.Location).HasMaxLength(300);
+            e.Property(a => a.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(a => a.Status).HasMaxLength(20);
+            e.Property(a => a.EntityType).HasMaxLength(30);
+            e.HasIndex(a => new { a.TenantId, a.StartsAt });
+            e.HasIndex(a => new { a.TenantId, a.AssignedToUserId, a.StartsAt });
+            e.HasIndex(a => new { a.TenantId, a.EntityType, a.EntityId });
+        });
+
+        b.Entity<Domain.Work.Notification>(e =>
+        {
+            e.ToTable("notifications");
+            e.Property(n => n.Kind).HasMaxLength(60);
+            e.Property(n => n.Title).HasMaxLength(300);
+            e.Property(n => n.Body).HasMaxLength(1000);
+            e.Property(n => n.Url).HasMaxLength(500);
+            e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
+        });
     }
 
     private static void ConfigureSubcontractors(ModelBuilder b)

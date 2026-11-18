@@ -1,10 +1,13 @@
 @* Authenticated shell, ported from OES3 includes/header.cfm + footer.cfm *@
 @inject Shell ShellService
+@inject Oes.Infrastructure.Work.NotificationService Notifications
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     var shell = await ShellService.GetAsync();
     var path = Context.Request.Path;
     var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var unread = await Notifications.UnreadCountAsync();
+    var notifications = await Notifications.LatestAsync(8);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -108,19 +111,35 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="/Estimates"><i class="bi bi-file-earmark-text me-2"></i>Estimate (from an opportunity)</a></li>
                         <li><a class="dropdown-item" href="/Projects"><i class="bi bi-kanban me-2"></i>Project (from a signed estimate)</a></li>
-                        <li><span class="dropdown-item disabled"><i class="bi bi-check2-square me-2"></i>Task</span></li>
+                        <li><a class="dropdown-item" href="/Tasks"><i class="bi bi-check2-square me-2"></i>Task</a></li>
+                        <li><a class="dropdown-item" href="/Calendar"><i class="bi bi-calendar-plus me-2"></i>Appointment</a></li>
                     </ul>
                 </div>
 
                 <div class="dropdown">
                     <button class="btn btn-icon position-relative" type="button" data-bs-toggle="dropdown" aria-label="Notifications">
                         <i class="bi bi-bell fs-5"></i>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge d-none" id="notifBadge">0</span>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge @(unread == 0 ? "d-none" : "")" id="notifBadge">@(unread > 99 ? "99+" : unread)</span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end notification-dropdown">
-                        <div class="dropdown-header"><strong>Notifications</strong></div>
+                        <div class="dropdown-header d-flex align-items-center"><strong>Notifications</strong>
+                            @if (unread > 0)
+                            {
+                                <form method="post" action="/Work/Items?handler=ReadAll" class="ms-auto">
+                                    <input type="hidden" name="__RequestVerificationToken" value="@csrf"><input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)">
+                                    <button class="btn btn-link btn-sm p-0" type="submit">Mark all read</button>
+                                </form>
+                            }</div>
                         <div class="dropdown-divider"></div>
-                        <div class="text-center text-muted py-3 fs-sm">You're all caught up.</div>
+                        @if (notifications.Count == 0) { <div class="text-center text-muted py-3 fs-sm">You're all caught up.</div> }
+                        @foreach (var n in notifications)
+                        {
+                            <a class="dropdown-item notification-item @(n.ReadAt is null ? "unread" : "")" href="/Work/Items?handler=Notification&amp;id=@n.Id">
+                                <div class="fw-medium text-wrap">@n.Title</div>
+                                @if (n.Body is not null) { <div class="small text-muted text-wrap">@n.Body</div> }
+                                <div class="small text-muted">@Fmt.Ago(n.CreatedAt)</div>
+                            </a>
+                        }
                     </div>
                 </div>
 

@@ -1,0 +1,58 @@
+@* Tasks and appointments on a record (and everything under it), with quick-add forms. *@
+@model AgendaModel
+@{
+    var self = Context.Request.Path + Context.Request.QueryString;
+    var key = Model.EntityId.ToString("N")[..8];
+    var today = Model.Today.ToString("yyyy-MM-dd");
+}
+<div class="record-agenda">
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center"><i class="bi bi-check2-square me-2"></i>Tasks
+        <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#addtask-@key"><i class="bi bi-plus-lg"></i> Add</button></div>
+    <div class="collapse" id="addtask-@key"><div class="card-body border-bottom bg-light">
+        <form method="post" asp-antiforgery="true" action="/Work/Items?handler=Task" class="row g-2">
+            <input type="hidden" name="task.EntityType" value="@Model.EntityType"><input type="hidden" name="task.EntityId" value="@Model.EntityId"><input type="hidden" name="returnUrl" value="@self">
+            <div class="col-12"><input name="task.Title" class="form-control form-control-sm" placeholder="What needs doing?" required maxlength="300" aria-label="Task"></div>
+            <div class="col-6"><input type="date" name="task.DueDate" class="form-control form-control-sm" aria-label="Due date"></div>
+            <div class="col-6"><select name="task.AssignedToUserId" class="form-select form-select-sm" aria-label="Assign to">
+                @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
+            <div class="col-12 d-flex gap-2 align-items-center">
+                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="task.Priority" value="high" id="tp-@key"><label class="form-check-label small" for="tp-@key">High priority</label></div>
+                <button class="btn btn-sm btn-primary ms-auto" type="submit">Add task</button>
+            </div>
+        </form>
+    </div></div>
+    <partial name="_TaskList" model="(Model.Tasks, false)" />
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center"><i class="bi bi-calendar-event me-2"></i>Appointments
+        <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#addappt-@key"><i class="bi bi-plus-lg"></i> Schedule</button></div>
+    <div class="collapse" id="addappt-@key"><div class="card-body border-bottom bg-light">
+        <form method="post" asp-antiforgery="true" action="/Work/Items?handler=Appointment" class="row g-2">
+            <input type="hidden" name="appointment.EntityType" value="@Model.EntityType"><input type="hidden" name="appointment.EntityId" value="@Model.EntityId"><input type="hidden" name="returnUrl" value="@self">
+            <div class="col-7"><input name="appointment.Title" class="form-control form-control-sm" placeholder="Title" required maxlength="300" aria-label="Title"></div>
+            <div class="col-5"><select name="appointment.TypeKey" class="form-select form-select-sm" aria-label="Type">
+                @foreach (var t in Model.AppointmentTypes) { <option value="@t.Value">@t.Label</option> }</select></div>
+            <div class="col-5"><input type="date" name="appointment.Date" value="@today" class="form-control form-control-sm" required aria-label="Date"></div>
+            <div class="col-4"><input type="time" name="appointment.StartTime" value="09:00" class="form-control form-control-sm" required aria-label="Start time"></div>
+            <div class="col-3"><select name="appointment.DurationMinutes" class="form-select form-select-sm" aria-label="Duration">
+                @foreach (var (m, l) in new[] { (30, "30m"), (60, "1h"), (90, "1.5h"), (120, "2h"), (240, "4h"), (480, "8h") }) { <option value="@m" selected="@(m == 60)">@l</option> }</select></div>
+            <div class="col-7"><select name="appointment.AssignedToUserId" class="form-select form-select-sm" aria-label="With">
+                @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
+            <div class="col-5"><button class="btn btn-sm btn-primary w-100" type="submit">Schedule</button></div>
+            <div class="col-12 form-text mt-0">Location defaults to the property address.</div>
+        </form>
+    </div></div>
+    <ul class="list-group list-group-flush small">
+        @if (Model.Appointments.Count == 0) { <li class="list-group-item text-muted">Nothing scheduled.</li> }
+        @foreach (var a in Model.Appointments)
+        {
+            <li class="list-group-item @(a.EndLocal < Model.NowLocal || a.Status == "completed" ? "text-muted" : "")">
+                <div class="fw-medium">@a.StartLocal.ToString("ddd MMM d, h:mm tt") · @a.Title</div>
+                <div class="text-muted">@a.AssigneeName@(a.Location is null ? "" : " · " + a.Location)</div>
+            </li>
+        }
+    </ul>
+</div>
+</div>

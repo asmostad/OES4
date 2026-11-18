@@ -19,8 +19,15 @@ public sealed record PortalView(
 /// What a sub can do through their link, with no account: see the work order, accept or decline,
 /// and report completion with photos. The token is the authorization; every call re-checks it.
 /// </summary>
-public sealed class PortalService(OesDbContext db, AccessTokenService tokens, RecordItems items, IClock clock)
+public sealed class PortalService(OesDbContext db, AccessTokenService tokens, RecordItems items, IClock clock, Work.NotificationService notifications)
 {
+    /// <summary>Tells the project manager what the sub did.</summary>
+    private async Task NotifyOwnerAsync(WorkOrder wo, string kind, string title, CancellationToken ct)
+    {
+        var owner = await db.Projects.Where(p => p.Id == wo.ProjectId).Select(p => p.OwnerUserId).FirstOrDefaultAsync(ct);
+        notifications.Notify(owner, kind, title, null, $"/WorkOrders/View/{wo.Id}");
+    }
+
     public const int MaxPhotos = 20;
 
     private async Task<WorkOrder?> ResolveAsync(string token, CancellationToken ct)
@@ -58,6 +65,8 @@ public sealed class PortalService(OesDbContext db, AccessTokenService tokens, Re
         wo.DeclineReason = accept ? null : reason!.Trim()[..Math.Min(reason.Trim().Length, 500)];
         await items.LogAsync(EntityTypes.WorkOrder, wo.Id, accept ? "work_order.accepted" : "work_order.declined",
             accept ? $"Accepted by {wo.AcceptedName} (sub portal)" : $"Declined by {wo.AcceptedName}: {wo.DeclineReason}", ct);
+        await NotifyOwnerAsync(wo, accept ? "work_order.accepted" : "work_order.declined",
+            accept ? $"{wo.Number} accepted by {wo.AcceptedName}" : $"{wo.Number} declined: {wo.DeclineReason}", ct);
         await db.SaveChangesAsync(ct);
         return true;
     }
@@ -78,6 +87,7 @@ public sealed class PortalService(OesDbContext db, AccessTokenService tokens, Re
         wo.Status = WorkOrderStatuses.Completed;
         wo.CompletedAt = clock.UtcNow;
         await items.LogAsync(EntityTypes.WorkOrder, wo.Id, "work_order.completed", $"Reported complete by the sub{(photos.Count > 0 ? $" with {photos.Count} photo(s)" : "")}", ct);
+        await NotifyOwnerAsync(wo, "work_order.completed", $"{wo.Number} reported complete{(photos.Count > 0 ? $" ({photos.Count} photos)" : "")}", ct);
         await db.SaveChangesAsync(ct);
         return true;
     }

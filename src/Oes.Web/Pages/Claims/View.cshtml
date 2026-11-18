@@ -98,6 +98,7 @@
         {
             <div class="card mb-3"><div class="card-header">Notes</div><div class="card-body small pre-wrap">@c.Notes</div></div>
         }
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Claim, entityId = Model.Id })
     </div>
 
     <div class="col-xl-8">

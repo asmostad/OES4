@@ -20,6 +20,8 @@ public static class ItemTypes
     public const string Note = "note";
     public const string Document = "document";
     public const string Activity = "activity";
+    public const string Task = "task";
+    public const string Appointment = "appointment";
 }
 
 public class Note : TenantEntity

@@ -181,6 +181,7 @@
         <partial name="_Timeline" model="Model.Timeline" />
     </div>
     <div class="col-xl-5">
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Project, entityId = Model.Id })
         <div class="card">
             <div class="card-header">Stage history</div>
             <ul class="list-group list-group-flush small">

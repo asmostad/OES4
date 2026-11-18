@@ -51,6 +51,8 @@ public sealed class MySqlFixture : IAsyncLifetime
     public AsyncServiceScope ScopeFor(Guid? tenantId)
     {
         var scope = App.Services.CreateAsyncScope();
+        // IHttpContextAccessor is AsyncLocal: clear any user an earlier ScopeAs left in this async flow.
+        scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>().HttpContext = null;
         if (tenantId is { } id) scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(id);
         return scope;
     }

@@ -64,6 +64,10 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
         return targets;
     }
 
+    /// <summary>Links an item (task, appointment…) to a record and everything above it. Saved with the caller's SaveChanges.</summary>
+    public Task LinkItemAsync(string itemType, Guid itemId, string entityType, Guid entityId, CancellationToken ct = default) =>
+        LinkAsync(itemType, itemId, entityType, entityId, ct);
+
     private async Task LinkAsync(string itemType, Guid itemId, string entityType, Guid entityId, CancellationToken ct)
     {
         foreach (var (type, id) in await LinkTargetsAsync(entityType, entityId, ct))

@@ -57,6 +57,9 @@ public static class DependencyInjection
         services.AddScoped<Subcontractors.SubcontractorService>();
         services.AddScoped<Subcontractors.WorkOrderService>();
         services.AddScoped<Subcontractors.PortalService>();
+        services.AddScoped<Work.TenantTime>();
+        services.AddScoped<Work.NotificationService>();
+        services.AddScoped<Work.WorkService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

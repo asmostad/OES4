@@ -81,7 +81,7 @@ public sealed record VersionLine(string Kind, string? Code, string Activity, str
 /// </summary>
 public sealed class EstimateService(
     OesDbContext db, RecordScope scope, RecordItems items, INumberSequence numbers, IClock clock, ICurrentUser user,
-    OpportunityService opportunities, CarrierService carriers)
+    OpportunityService opportunities, CarrierService carriers, Work.NotificationService notifications)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -372,7 +372,11 @@ public sealed class EstimateService(
         line.UnitPrice = unitPrice;
         if (line.Kind == LineKinds.Misc && !string.IsNullOrWhiteSpace(description)) line.Description = description.Trim();
         line.Notes = ContactService.Clean(notes);
-        if (priceChanged || line.ApprovalStatus == ApprovalStatuses.Rejected) EvaluateApproval(line);
+        if (priceChanged || line.ApprovalStatus == ApprovalStatuses.Rejected)
+        {
+            EvaluateApproval(line);
+            await NotifyApproversAsync(est, line, ct);
+        }
         await RecalcAsync(est, ct);
         await db.SaveChangesAsync(ct);
     }
@@ -399,8 +403,16 @@ public sealed class EstimateService(
         EvaluateApproval(line);
         db.EstimateLines.Add(line);
         await RecalcAsync(est, ct, extra: line);
+        await NotifyApproversAsync(est, line, ct);
         await db.SaveChangesAsync(ct);
         return line.Id;
+    }
+
+    private async Task NotifyApproversAsync(Estimate est, EstimateLine line, CancellationToken ct)
+    {
+        if (line.ApprovalStatus != ApprovalStatuses.Pending) return;
+        await notifications.NotifyPermissionAsync(Permissions.PricingApprove, "pricing.approval_needed",
+            $"Price approval needed on {est.Number}", $"{line.Description} · {line.ApprovalReason}", "/Estimates/Approvals", ct);
     }
 
     private async Task EnsureSectionAsync(Guid estimateId, Guid sectionId, CancellationToken ct)

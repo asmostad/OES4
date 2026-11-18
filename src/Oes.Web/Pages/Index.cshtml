@@ -68,12 +68,31 @@
         </div>
     </div>
     <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-sun text-warning me-2"></i>My day
+                <a class="btn btn-sm btn-link ms-auto" href="/Calendar">Calendar</a></div>
+            <div class="card-body pb-2">
+                <div class="d-flex gap-3 mb-2">
+                    <a href="/Tasks" class="text-decoration-none"><span class="stat-value fs-4 @(Model.Day.Overdue > 0 ? "text-danger" : "")">@Model.Day.Overdue</span> <span class="small text-muted">overdue</span></a>
+                    <a href="/Tasks" class="text-decoration-none"><span class="stat-value fs-4">@Model.Day.DueToday</span> <span class="small text-muted">due today</span></a>
+                </div>
+            </div>
+            <ul class="list-group list-group-flush small">
+                @if (Model.Day.Appointments.Count == 0) { <li class="list-group-item text-muted">No appointments today.</li> }
+                @foreach (var a in Model.Day.Appointments)
+                {
+                    <li class="list-group-item @(a.Status != "scheduled" ? "text-muted" : "")">
+                        <span class="fw-medium">@a.StartLocal.ToString("h:mm tt")</span> ·
+                        @if (a.RecordUrl is not null) { <a href="@a.RecordUrl">@a.Title</a> } else { @a.Title }
+                        @if (a.Location is not null) { <div class="text-muted">@a.Location</div> }
+                    </li>
+                }
+            </ul>
+        </div>
         <div class="card">
             <div class="card-body">
                 <div class="d-flex align-items-center mb-2"><i class="bi bi-trophy text-success fs-4 me-2"></i><div class="stat-value fs-3">@c.WonThisMonth</div></div>
                 <div class="text-muted small">Won this month</div>
-                <hr>
-                <div class="small text-muted">Coming next: insurance claims and storms, measurements, then estimating and production.</div>
             </div>
         </div>
     </div>
