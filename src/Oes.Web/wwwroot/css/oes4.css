@@ -365,3 +365,9 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 
 /* Nurture */
 .nurture-steps > li { list-style: none; }
+
+/* ---------------- M11: reports ---------------- */
+.report-card:hover { border-color: var(--bs-primary); }
+.report-bar-col { width: 32%; min-width: 120px; }
+.report-bar { height: .7rem; width: var(--bar, 0%); min-width: 2px; background: var(--bar-color, var(--bs-primary)); border-radius: .2rem; }
+@media (max-width: 575.98px) { .report-bar-col { display: none; } }

@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<Communication.NurtureRunner>();
         services.AddScoped<Admin.SettingsService>();
         services.AddScoped<Scheduling.BookingService>();
+        services.AddScoped<Reports.ReportService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

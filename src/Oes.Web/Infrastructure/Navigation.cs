@@ -60,7 +60,7 @@ public static class Navigation
         ]),
         new("Reports",
         [
-            new("Reports", "bi-bar-chart-line", null, Permissions.ReportsView),
+            new("Reports", "bi-bar-chart-line", "/Reports", Permissions.ReportsView),
         ]),
         new("Administration", [],
         [

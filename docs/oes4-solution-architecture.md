@@ -234,6 +234,10 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Enroll automatically on pipeline/workflow stage entry (with configurable automation rules); stop on inbound email replies once mail sync exists.
      - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.
-11. **Reports** — pipeline, conversion, production, stale, tasks, with charts and CSV.
+11. **Reports** (done 2026-11-17)
+   - Pipeline (open opportunities by stage and owner), Sales (new leads, won, lost, win rate and won value by month, lead source and owner; lost reasons), Production (active projects and open trades by stage and trade type, backlog, sold and completed), Stale (opportunities and projects past their stage's limit, linked to the record), Tasks (open, overdue and done by person).
+   - Every report runs on the same record scope as the lists, so a report never counts records the user can't see; `records.view_all` users get an owner filter. Needs `reports.view` (managers and admins by default). Date ranges are whole days in the company time zone. Won value is the signed project contract where there is one, otherwise the expected value.
+   - Charts are server-rendered CSS bars (no chart library, works with the CSP). CSV export per report (UTF-8 with BOM for Excel; cells that start with = + - @ are prefixed with an apostrophe so customer-typed text can't run as a formula).
+   - Still to do: saved and scheduled reports (emailed by the worker), revenue by trade/sub margin once job costing exists, marketing reports (blast and nurture results).
 12. **JRS migration** — `Oes.Migrator` dry runs, review queues (duplicate properties/contacts), cutover.
 13. **Mobile API hardening**, then the mobile app.
