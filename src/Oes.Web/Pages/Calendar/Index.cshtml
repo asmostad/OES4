@@ -47,7 +47,9 @@
                                     <input type="hidden" name="id" value="@a.Id"><input type="hidden" name="returnUrl" value="@self">
                                     <button class="btn btn-link btn-sm p-0" type="submit" name="status" value="completed">Done</button>
                                     <button class="btn btn-link btn-sm p-0 text-danger" type="submit" name="status" value="cancelled" data-confirm="Cancel this appointment?">Cancel</button>
+                                    <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#edit-appt-@a.Id.ToString("N")">Edit</button>
                                 </form>
+                                <div class="collapse" id="edit-appt-@a.Id.ToString("N")"><partial name="_AppointmentEditForm" model="a" /></div>
                             }
                         </div>
                     }

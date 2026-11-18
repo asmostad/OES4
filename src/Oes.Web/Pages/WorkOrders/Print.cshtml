@@ -1,0 +1,88 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.WorkOrders.PrintModel
+@using Oes.Domain.Crm
+@using Oes.Domain.Subcontractors
+@{
+    Layout = "_PrintLayout";
+    var d = Model.Detail;
+    var w = d.WorkOrder;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal x) => x.ToString("C2", us);
+    ViewData["Title"] = $"{w.Number} – {d.SubContact.DisplayName}";
+}
+<div class="print-toolbar no-print">
+    <a href="/WorkOrders/View/@w.Id" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Back to work order</a>
+    <span class="small text-muted">@Fmt.Cap(w.Status)@(w.Status == WorkOrderStatuses.Draft ? " · not issued yet" : "")</span>
+    <button type="button" class="btn btn-sm btn-primary" data-print><i class="bi bi-printer me-1"></i>Print / save as PDF</button>
+</div>
+
+<article class="proposal">
+    <header class="proposal-head">
+        <div>
+            <div class="proposal-company">@Model.Company.Name</div>
+            @if (Model.Company.PostalAddress is not null) { <div class="small text-muted pre-wrap">@Model.Company.PostalAddress</div> }
+        </div>
+        <div class="text-end">
+            <div class="proposal-title">Work order</div>
+            <div><strong>@w.Number</strong></div>
+            <div class="small text-muted">@(w.IssuedAt is { } i ? "Issued " + i.ToString("MMMM d, yyyy") : "Draft")</div>
+        </div>
+    </header>
+
+    <section class="proposal-parties">
+        <div>
+            <div class="label">Subcontractor</div>
+            <div class="fw-semibold">@d.SubContact.DisplayName</div>
+            @if (d.SubEmail is not null) { <div class="small">@d.SubEmail</div> }
+        </div>
+        <div>
+            <div class="label">Job site</div>
+            <div>@(d.Property?.Line1 ?? "—")</div>
+            @if (d.Property is not null) { <div class="small">@d.Property.CityLine</div> }
+            <div class="small text-muted">Project @d.Project.Number · @d.TradeName</div>
+        </div>
+        <div>
+            <div class="label">When</div>
+            <div>@(w.WorkDate?.ToString("dddd, MMMM d, yyyy") ?? "To be scheduled")</div>
+            @if (w.ArrivalTime is not null) { <div class="small">Arrive @w.ArrivalTime</div> }
+        </div>
+    </section>
+
+    @if (w.Instructions is not null || d.Property?.Notes is not null)
+    {
+        <section class="proposal-section">
+            <h2>Instructions</h2>
+            @if (w.Instructions is not null) { <div class="pre-wrap">@w.Instructions</div> }
+            @if (d.Property?.Notes is not null) { <div class="pre-wrap small text-muted mt-1">Site notes: @d.Property.Notes</div> }
+        </section>
+    }
+
+    <section class="proposal-section">
+        <div class="proposal-section-head"><h2>Scope and pay</h2></div>
+        <table class="table table-sm proposal-lines mb-1">
+            <thead><tr><th>Work</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+                @foreach (var l in d.Lines)
+                {
+                    <tr><td>@l.Description</td><td class="text-end">@l.Qty.ToString("0.##")</td><td>@l.Unit</td><td class="text-end">@M(l.Rate)</td><td class="text-end">@M(l.Amount)</td></tr>
+                }
+                @if (d.Lines.Count == 0) { <tr><td colspan="5" class="text-muted">No lines yet.</td></tr> }
+            </tbody>
+        </table>
+        <div class="proposal-totals"><table class="table table-sm mb-0"><tr class="grand"><td>Total</td><td class="text-end">@M(w.Amount)</td></tr></table></div>
+    </section>
+
+    <section class="proposal-terms">
+        <h2>Acceptance</h2>
+        <p>Work to the scope above at the rates shown. Report changes before doing extra work; extras are paid only when approved in writing.</p>
+        @if (w.AcceptedName is not null) { <p><strong>Accepted</strong> by @w.AcceptedName@(w.AcceptedAt is { } a ? " on " + a.ToString("MMMM d, yyyy") : "").</p> }
+    </section>
+
+    <section class="proposal-sign">
+        <div><div class="sign-line"></div><div class="label">Subcontractor signature</div></div>
+        <div><div class="sign-line"></div><div class="label">Date</div></div>
+        <div><div class="sign-line"></div><div class="label">For @Model.Company.Name</div></div>
+    </section>
+
+    <footer class="proposal-foot">@w.Number · printed @DateTime.UtcNow.ToString("yyyy-MM-dd")</footer>
+</article>

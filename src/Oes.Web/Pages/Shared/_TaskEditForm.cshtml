@@ -1,0 +1,21 @@
+@* Edit one task in place. *@
+@model Oes.Infrastructure.Work.TaskRow
+@inject Oes.Infrastructure.Crm.CrmLookups Lookups
+@{
+    var users = await Lookups.UsersAsync();
+    var self = Context.Request.Path + Context.Request.QueryString;
+    var key = Model.Id.ToString("N")[..8];
+}
+<form method="post" asp-antiforgery="true" action="/Work/Items?handler=UpdateTask" class="row g-2 mt-1">
+    <input type="hidden" name="id" value="@Model.Id"><input type="hidden" name="returnUrl" value="@self">
+    <div class="col-12"><input name="task.Title" value="@Model.Title" class="form-control form-control-sm" required maxlength="300" aria-label="Task"></div>
+    <div class="col-6"><input type="date" name="task.DueDate" value="@Model.DueLocal?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" aria-label="Due date"></div>
+    <div class="col-6"><input type="time" name="task.DueTime" value="@(Model.HasDueTime ? Model.DueLocal?.ToString("HH:mm") : "")" class="form-control form-control-sm" aria-label="Due time"></div>
+    <div class="col-12"><select name="task.AssignedToUserId" class="form-select form-select-sm" aria-label="Assigned to">
+        @foreach (var u in users) { <option value="@u.Value" selected="@(u.Value == Model.AssignedToUserId.ToString())">@u.Label</option> }</select></div>
+    <div class="col-12"><textarea name="task.Notes" class="form-control form-control-sm" rows="2" maxlength="5000" aria-label="Notes">@Model.Notes</textarea></div>
+    <div class="col-12 d-flex align-items-center">
+        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="task.Priority" value="high" id="tpe-@key" checked="@(Model.Priority == "high")"><label class="form-check-label small" for="tpe-@key">High priority</label></div>
+        <button class="btn btn-sm btn-primary ms-auto" type="submit">Save</button>
+    </div>
+</form>

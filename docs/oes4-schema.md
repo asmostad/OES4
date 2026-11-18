@@ -184,7 +184,7 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 | `busy_calendars` + `busy_blocks` | MembershipId, Label, IcsUrl (encrypted), ShowOnCalendar / StartAt, EndAt | Fetched through an SSRF-safe client |
 | `booking_types` | TenantId, Slug, Name, Duration, LocationKind, Buffers, MinNoticeMins, DaysAhead, SlotInterval, DailyCap, AssignmentMode, AsksAddress, CreatesOpportunity, QuestionsJson, IsPublic | **Built in M9** (+ Description, AppointmentTypeKey; assignment is round robin by fewest upcoming bookings) |
 | `booking_type_hosts`, `availability_rules` | Weekly hours per host, in the host's time zone | **Built in M9** in the company time zone; times stored as minutes since midnight |
-| `bookings` | TenantId, BookingTypeId, HostUserId, AppointmentId, OpportunityId, ContactId (matched, or a review queue), Name, Email, Phone, Answers, Status, RescheduleCount, SourceIp | Anonymous bookings never write onto existing contacts directly. Matches go to staff review. **Built in M9**: the visitor's details stay on the booking; staff accept (create or link) or dismiss; SlotKey (unique while booked) prevents double-booking |
+| `bookings` | TenantId, BookingTypeId, HostUserId, AppointmentId, OpportunityId, ContactId (matched, or a review queue), Name, Email, Phone, Answers, Status, RescheduleCount, SourceIp | Anonymous bookings never write onto existing contacts directly. Matches go to staff review. **Built in M9** (+ ReminderSentAt, RescheduleCount): the visitor's details stay on the booking; staff accept (create or link) or dismiss; SlotKey (unique while booked) prevents double-booking |
 
 ## 13. Communication
 

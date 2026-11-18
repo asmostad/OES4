@@ -195,7 +195,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Work orders on trades, with lines copied from the rates in effect on the work date.
    - Issuing emails a hashed, 60-day, revocable portal link; revise, new link and cancel all revoke it.
    - Sub portal (no sign-in, rate limited, no-referrer, noindex): accept or decline, then report completion with photos that roll up to the trade and project.
-   - Still to do: work order PDF. (Insurance-expiry alerts are done: worker `ChecksJob`.)
+   - Work order print view (`/WorkOrders/Print/{id}`; print or save as PDF from the browser, like the proposal). Server-side PDF rendering for both comes with Playwright later. Insurance-expiry alerts are done (worker `ChecksJob`).
 8. **Communication** (in progress: tasks, calendar, notifications, templates, one-to-one email and texts, consent and STOP done 2026-11-17)
    - Done:
      - Tasks: standalone or on any record, rolled up through record_links (a task on an opportunity shows on its property and contact). Date-only tasks are stored at noon in the company time zone; overdue/today grouping; mine/everyone (`tasks.view_all`); done-toggle logs to the record and notifies the creator.
@@ -212,7 +212,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Still to do (needs external credentials or later work):
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - Unmatched inbound texts (number on no contact) are stored but not yet shown in an inbox; MMS; email CC/BCC and attachments.
-     - Appointment attendees, all-day events, editing tasks/appointments in place. (Due/overdue, stale and expiry alerts are done: worker `ChecksJob`; automation rules are done.)
+     - Appointment attendees, all-day events. (Done since: editing tasks and appointments in place, with the assignee told when moved or handed over, and a booked appointment moving its booking; due/overdue, stale and expiry alerts; automation rules.)
 9. **Marketing** (done 2026-11-17: email blasts, unsubscribe, suppressions, online booking, nurture workflows; provider-dependent parts listed below)
    - Done:
      - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.
@@ -231,7 +231,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - The worker's `NurtureJob` runs due steps every minute. Each enrollment is leased with a conditional update before its step runs. Before every step it stops the enrollment if the contact replied (`StopOnReply`), the opportunity was won or lost (`StopWhenClosed`), the workflow was turned off or the contact archived. Consent is checked per message (blocked = skipped, not retried); provider failures retry 3 times with backoff. Texts wait for 8 am–8 pm company time. Emails come from the opportunity's (or contact's) owner and tasks go to them. Unsubscribing from any marketing email stops that contact's marketing workflows.
      - Every step run is recorded (done / skipped with the reason / failed) and the messages land on the record's timeline.
    - Still to do:
-     - Busy calendars (ICS feeds blocking booking times), rescheduling from the manage link. (Day-before reminder emails are done.)
+     - Busy calendars (ICS feeds blocking booking times). (Done since: day-before reminder emails; customers can move their booking from the manage link up to 3 times, to any open time, keeping the same host when free, with a new confirmation email.)
      - Stop on inbound email replies once mail sync exists. (Enrolling on stage entry is done through automation rules.)
      - Bounce and complaint handling (needs provider webhooks), open/click tracking (deliberately off for now), shared sender mailboxes.
 10. **AI assistant** — tools with record-scope enforcement, budgets, knowledge base.

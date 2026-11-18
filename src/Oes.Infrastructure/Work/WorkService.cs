@@ -238,6 +238,52 @@ public sealed class WorkService(
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Edits an appointment. The assignee is told when it's moved or handed to them. If it came from an
+    /// online booking, the booking moves with it (and its reminder is re-armed).
+    /// </summary>
+    public async Task UpdateAppointmentAsync(Guid id, AppointmentInput input, CancellationToken ct = default)
+    {
+        var a = await db.Appointments.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new RecordNotFoundException("Appointment");
+        var manage = await user.HasPermissionAsync(Permissions.CalendarManage, ct);
+        if (a.AssignedToUserId != scope.Me && a.CreatedByUserId != scope.Me && !manage) throw new RecordNotFoundException("Appointment");
+        if (a.Status == AppointmentStatuses.Cancelled) throw new CrmRuleException("This appointment was cancelled.");
+        if (string.IsNullOrWhiteSpace(input.Title)) throw new CrmRuleException("Give the appointment a title.");
+        if (input.DurationMinutes is < 5 or > 24 * 60) throw new CrmRuleException("Duration must be between 5 minutes and 24 hours.");
+        var assignee = await AssigneeAsync(input.AssignedToUserId ?? a.AssignedToUserId, ct);
+        if (assignee != a.AssignedToUserId && assignee != scope.Me && !manage)
+            throw new RecordForbiddenException("You can only put appointments on your own calendar.");
+
+        var starts = await time.ToUtcAsync(input.Date, input.StartTime);
+        var moved = starts != a.StartsAt || starts.AddMinutes(input.DurationMinutes) != a.EndsAt;
+        var reassigned = assignee != a.AssignedToUserId;
+        a.Title = input.Title.Trim();
+        a.TypeKey = string.IsNullOrWhiteSpace(input.TypeKey) ? a.TypeKey : input.TypeKey;
+        a.StartsAt = starts;
+        a.EndsAt = starts.AddMinutes(input.DurationMinutes);
+        a.Location = ContactService.Clean(input.Location);
+        a.Notes = ContactService.Clean(input.Notes);
+        a.AssignedToUserId = assignee;
+
+        var booking = await db.Bookings.FirstOrDefaultAsync(b => b.AppointmentId == a.Id && b.Status == Domain.Booking.BookingStatuses.Booked, ct);
+        if (booking is not null && (moved || reassigned))
+        {
+            booking.StartsAt = a.StartsAt; booking.EndsAt = a.EndsAt; booking.HostUserId = assignee;
+            booking.SlotKey = Scheduling.BookingService.SlotKey(assignee, a.StartsAt);
+            booking.ReminderSentAt = null;
+        }
+        var when = $"{input.Date:ddd MMM d} at {input.StartTime:h:mm tt}";
+        var url = RecordUrls.For(a.EntityType, a.EntityId) ?? $"/Calendar?date={input.Date:yyyy-MM-dd}";
+        if (reassigned) notifications.Notify(assignee, "appointment.assigned", $"New appointment: {a.Title}", when, url);
+        else if (moved) notifications.Notify(assignee, "appointment.moved", $"Moved: {a.Title}", $"Now {when}", url);
+        if (moved && a.EntityType is not null) await items.LogAsync(a.EntityType, a.EntityId!.Value, "appointment.moved", $"Appointment moved: {a.Title}, now {when}", ct);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException) when (booking is not null)
+        {
+            throw new CrmRuleException("They already have an online booking at that time.");
+        }
+    }
+
     /// <summary>Appointments between two local dates. Without calendar.view_all only your own (assigned or created).</summary>
     public async Task<List<AppointmentRow>> AppointmentsAsync(DateOnly from, DateOnly to, Guid? userId, string? entityType = null, Guid? entityId = null,
         bool includeCancelled = false, CancellationToken ct = default)

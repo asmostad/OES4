@@ -29,6 +29,12 @@ public class ItemsModel(WorkService work, NotificationService notifications) : C
     public Task<IActionResult> OnPostAppointmentAsync(AppointmentInput appointment, string? returnUrl) =>
         Run(returnUrl, () => work.CreateAppointmentAsync(appointment), "Appointment scheduled.");
 
+    public Task<IActionResult> OnPostUpdateTaskAsync(Guid id, TaskInput task, string? returnUrl) =>
+        Run(returnUrl, () => work.UpdateTaskAsync(id, task), "Task saved.");
+
+    public Task<IActionResult> OnPostUpdateAppointmentAsync(Guid id, AppointmentInput appointment, string? returnUrl) =>
+        Run(returnUrl, () => work.UpdateAppointmentAsync(id, appointment), "Appointment saved.");
+
     public Task<IActionResult> OnPostAppointmentStatusAsync(Guid id, string status, string? returnUrl) =>
         Run(returnUrl, () => work.SetAppointmentStatusAsync(id, status), "Appointment updated.");
 

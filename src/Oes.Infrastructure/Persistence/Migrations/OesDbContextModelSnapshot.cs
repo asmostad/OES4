@@ -199,6 +199,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ReminderSentAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int>("RescheduleCount")
+                        .HasColumnType("int");
+
                     b.Property<string>("ReviewStatus")
                         .IsRequired()
                         .HasMaxLength(20)

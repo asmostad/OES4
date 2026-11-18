@@ -57,7 +57,10 @@ public sealed class BookingRequest
 public sealed record PublicCompany(Guid TenantId, string Name, string Slug);
 public sealed record PublicBookingType(string Slug, string Name, string? Description, int DurationMinutes, bool AsksAddress);
 public sealed record BookedResult(Guid BookingId, DateTime StartsLocal, string HostName, string ManageToken);
-public sealed record ManageView(string Company, string TypeName, DateTime StartsLocal, int DurationMinutes, string? Address, string HostName, bool Cancelled, bool Past);
+public sealed record ManageView(string Company, string TypeName, DateTime StartsLocal, int DurationMinutes, string? Address, string HostName, bool Cancelled, bool Past)
+{
+    public bool CanReschedule { get; init; }
+}
 public sealed record ContactMatch(Guid ContactId, string Name, string Why);
 public sealed record InboxRow(BookingEntity Booking, string TypeName, string HostName, DateTime StartsLocal, List<ContactMatch> Matches);
 
@@ -192,18 +195,18 @@ public sealed class BookingService(
     }
 
     /// <summary>For each candidate slot in [from, to], the hosts free to take it.</summary>
-    private async Task<Dictionary<(DateOnly Day, TimeOnly Start), List<Guid>>> FreeHostsAsync(BookingType t, DateOnly from, DateOnly to, CancellationToken ct)
+    private async Task<Dictionary<(DateOnly Day, TimeOnly Start), List<Guid>>> FreeHostsAsync(BookingType t, DateOnly from, DateOnly to, CancellationToken ct, Guid? ignoreAppointmentId = null)
     {
         var hostIds = t.Hosts.Select(h => h.UserId).ToList();
         var activeHosts = await db.Memberships.Where(m => hostIds.Contains(m.UserId) && m.Status == Domain.Tenancy.MembershipStatus.Active).Select(m => m.UserId).ToListAsync(ct);
         var rules = await db.AvailabilityRules.Where(r => activeHosts.Contains(r.UserId)).ToListAsync(ct);
         var (rangeStart, rangeEnd) = await time.DayRangeUtcAsync(from, to);
         var pad = TimeSpan.FromMinutes(Math.Max(t.BufferBeforeMinutes, t.BufferAfterMinutes) + t.DurationMinutes);
-        var busy = await db.Appointments.Where(a => activeHosts.Contains(a.AssignedToUserId)
+        var busy = await db.Appointments.Where(a => activeHosts.Contains(a.AssignedToUserId) && a.Id != ignoreAppointmentId
                                                     && a.Status != AppointmentStatuses.Cancelled
                                                     && a.EndsAt > rangeStart - pad && a.StartsAt < rangeEnd + pad)
             .Select(a => new { Host = a.AssignedToUserId, a.StartsAt, a.EndsAt }).ToListAsync(ct);
-        var booked = await db.Bookings.Where(b => b.BookingTypeId == t.Id && b.Status == BookingStatuses.Booked && b.StartsAt >= rangeStart && b.StartsAt < rangeEnd)
+        var booked = await db.Bookings.Where(b => b.BookingTypeId == t.Id && b.AppointmentId != ignoreAppointmentId && b.Status == BookingStatuses.Booked && b.StartsAt >= rangeStart && b.StartsAt < rangeEnd)
             .Select(b => new { b.HostUserId, b.StartsAt }).ToListAsync(ct);
         var earliest = clock.UtcNow.AddMinutes(t.MinNoticeMinutes);
         var zone = await time.ZoneAsync();
@@ -308,7 +311,7 @@ public sealed class BookingService(
         throw new CrmRuleException("Sorry, that time was just taken. Please pick another.");
     }
 
-    private static string SlotKey(Guid host, DateTime startsAt) => $"{host:N}|{startsAt.Ticks}";
+    internal static string SlotKey(Guid host, DateTime startsAt) => $"{host:N}|{startsAt.Ticks}";
 
     private async Task SendConfirmationAsync(BookingEntity b, BookingType t, DateTime startsLocal, string hostName, string token, CancellationToken ct)
     {
@@ -340,8 +343,69 @@ public sealed class BookingService(
         if (await FromTokenAsync(raw, ct) is not { } x) return null;
         var company = await db.Tenants.Where(t => t.Id == x.B.TenantId).Select(t => t.Name).FirstAsync(ct);
         var host = await db.Users.Where(u => u.Id == x.B.HostUserId).Select(u => u.FirstName + " " + u.LastName).FirstAsync(ct);
+        var cancelled = x.B.Status == BookingStatuses.Cancelled;
+        var past = x.B.StartsAt <= clock.UtcNow;
         return new ManageView(company, x.T.Name, await time.ToLocalAsync(x.B.StartsAt), x.T.DurationMinutes,
-            x.B.Line1 is null ? null : $"{x.B.Line1}, {x.B.City}", host, x.B.Status == BookingStatuses.Cancelled, x.B.StartsAt <= clock.UtcNow);
+            x.B.Line1 is null ? null : $"{x.B.Line1}, {x.B.City}", host, cancelled, past)
+        { CanReschedule = !cancelled && !past && x.T.IsActive && x.B.RescheduleCount < MaxReschedules };
+    }
+
+    public const int MaxReschedules = 3;
+
+    /// <summary>Open times for moving this booking (its own current slot counts as free).</summary>
+    public async Task<SortedDictionary<DateOnly, List<TimeOnly>>> RescheduleSlotsAsync(string? raw, CancellationToken ct = default)
+    {
+        var result = new SortedDictionary<DateOnly, List<TimeOnly>>();
+        if (await FromTokenAsync(raw, ct) is not { } x || x.B.Status != BookingStatuses.Booked) return result;
+        var t = await db.BookingTypes.Include(y => y.Hosts).FirstAsync(y => y.Id == x.T.Id, ct);
+        var today = await time.TodayAsync();
+        var current = await time.ToLocalAsync(x.B.StartsAt);
+        foreach (var ((day, start), hosts) in await FreeHostsAsync(t, today, today.AddDays(t.DaysAhead - 1), ct, x.B.AppointmentId))
+        {
+            if (hosts.Count == 0 || (DateOnly.FromDateTime(current) == day && TimeOnly.FromDateTime(current) == start)) continue;
+            if (!result.TryGetValue(day, out var list)) result[day] = list = [];
+            list.Add(start);
+        }
+        foreach (var l in result.Values) l.Sort();
+        return result;
+    }
+
+    /// <summary>
+    /// Moves the booking to another open time: same host when they're free, otherwise whoever is.
+    /// The appointment moves with it, the reminder is re-armed, the host(s) are told and the customer gets a new confirmation.
+    /// </summary>
+    public async Task<DateTime> RescheduleByCustomerAsync(string? raw, DateOnly date, TimeOnly start, CancellationToken ct = default)
+    {
+        if (await FromTokenAsync(raw, ct) is not { } x) throw new RecordNotFoundException("Booking");
+        var b = x.B;
+        if (b.Status != BookingStatuses.Booked) throw new CrmRuleException("This appointment was cancelled. Please book a new one.");
+        if (b.StartsAt <= clock.UtcNow) throw new CrmRuleException("This appointment has already started. Please call us.");
+        if (b.RescheduleCount >= MaxReschedules) throw new CrmRuleException("This appointment has been moved several times already. Please call us to change it.");
+        var t = await db.BookingTypes.Include(y => y.Hosts).FirstAsync(y => y.Id == b.BookingTypeId && y.IsActive, ct);
+        var hosts = (await FreeHostsAsync(t, date, date, ct, b.AppointmentId)).GetValueOrDefault((date, start)) ?? [];
+        if (hosts.Count == 0) throw new CrmRuleException("Sorry, that time isn't available. Please pick another.");
+        var host = hosts.Contains(b.HostUserId) ? b.HostUserId : hosts[0];
+
+        var oldHost = b.HostUserId;
+        var oldLocal = await time.ToLocalAsync(b.StartsAt);
+        b.StartsAt = await time.ToUtcAsync(date, start);
+        b.EndsAt = b.StartsAt.AddMinutes(t.DurationMinutes);
+        b.HostUserId = host;
+        b.SlotKey = SlotKey(host, b.StartsAt);
+        b.ReminderSentAt = null;
+        b.RescheduleCount++;
+        var appt = await db.Appointments.FirstOrDefaultAsync(a => a.Id == b.AppointmentId, ct);
+        if (appt is not null) { appt.StartsAt = b.StartsAt; appt.EndsAt = b.EndsAt; appt.AssignedToUserId = host; }
+        var newLocal = await time.ToLocalAsync(b.StartsAt);
+        var name = $"{b.FirstName} {b.LastName}";
+        notifications.Notify(host, "booking.moved", $"Booking moved: {name}", $"{t.Name}, now {newLocal:ddd MMM d, h:mm tt} (was {oldLocal:ddd MMM d, h:mm tt})", "/Calendar");
+        if (oldHost != host) notifications.Notify(oldHost, "booking.moved", $"Booking moved to a teammate: {name}", $"Was {oldLocal:ddd MMM d, h:mm tt}", "/Calendar");
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException) { throw new CrmRuleException("Sorry, that time was just taken. Please pick another."); }
+
+        var hostName = await db.Users.Where(u => u.Id == host).Select(u => u.FirstName + " " + u.LastName).FirstAsync(ct);
+        await SendConfirmationAsync(b, t, newLocal, hostName, raw!, ct);
+        return newLocal;
     }
 
     public async Task<bool> CancelByCustomerAsync(string? raw, CancellationToken ct = default)

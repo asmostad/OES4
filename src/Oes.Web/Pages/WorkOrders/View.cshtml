@@ -25,6 +25,7 @@
 <partial name="_RecordHeader" model="header" />
 
 <div class="record-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="/WorkOrders/Print/@w.Id"><i class="bi bi-printer me-1"></i>Print / PDF</a>
     @if (edit && d.IsDraft) { <form method="post" asp-page-handler="Issue" class="d-inline"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-send me-1"></i>Issue to sub</button></form> }
     @if (edit && w.Status == WorkOrderStatuses.Issued)
     {

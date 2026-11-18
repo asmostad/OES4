@@ -24,6 +24,11 @@
                     @if (Model.ShowRecord && t.RecordUrl is not null) { <a href="@t.RecordUrl"><i class="bi bi-box-arrow-up-right"></i> @Oes.Infrastructure.Crm.RecordScope.Describe(t.EntityType!)</a> }
                 </div>
                 @if (t.Notes is not null) { <div class="small pre-wrap">@t.Notes</div> }
+                @if (t.CanEdit && t.CompletedAt is null)
+                {
+                    <button class="btn btn-link btn-sm p-0 small" type="button" data-bs-toggle="collapse" data-bs-target="#edit-task-@t.Id.ToString("N")">Edit</button>
+                    <div class="collapse" id="edit-task-@t.Id.ToString("N")"><partial name="_TaskEditForm" model="t" /></div>
+                }
             </div>
         </li>
     }

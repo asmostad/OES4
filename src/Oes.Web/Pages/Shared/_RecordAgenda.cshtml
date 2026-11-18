@@ -51,6 +51,11 @@
             <li class="list-group-item @(a.EndLocal < Model.NowLocal || a.Status == "completed" ? "text-muted" : "")">
                 <div class="fw-medium">@a.StartLocal.ToString("ddd MMM d, h:mm tt") · @a.Title</div>
                 <div class="text-muted">@a.AssigneeName@(a.Location is null ? "" : " · " + a.Location)</div>
+                @if (a.CanEdit && a.Status == "scheduled")
+                {
+                    <button class="btn btn-link btn-sm p-0 small" type="button" data-bs-toggle="collapse" data-bs-target="#edit-appt-@a.Id.ToString("N")">Edit</button>
+                    <div class="collapse" id="edit-appt-@a.Id.ToString("N")"><partial name="_AppointmentEditForm" model="a" /></div>
+                }
             </li>
         }
     </ul>
