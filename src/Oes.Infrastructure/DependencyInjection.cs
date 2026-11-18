@@ -69,6 +69,8 @@ public static class DependencyInjection
         var aiProvider = config.GetSection(Ai.AiOptions.Section)["Provider"];
         if (string.Equals(aiProvider, "Anthropic", StringComparison.OrdinalIgnoreCase)) services.AddSingleton<IAiClient, Ai.AnthropicAiClient>();
         else services.AddSingleton<IAiClient, Ai.NotConfiguredAiClient>();
+        services.AddScoped<Ai.AiUsageMeter>();
+        services.AddScoped<Ai.MeasurementExtractor>();
         services.AddScoped<Ai.AssistantTools>();
         services.AddScoped<Ai.AssistantService>();
 

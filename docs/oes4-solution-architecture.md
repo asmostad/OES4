@@ -162,7 +162,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Per-property measurements page by structure × trade.
    - Versions that are never overwritten, with a "vs previous" delta, revert by making an older version current, and the report file kept on the property.
    - Roof, elevation (per wall side) and linear modes.
-   - Still to do: AI extraction from EagleView/Hover PDFs (needs the AI client from milestone 10).
+   - AI reading of measurement reports (done 2026-11-18): on the entry page, "Read the PDF with AI" stores the report on the property, then one structured-output call (PDF document + a schema of that trade's fields, each a number or null) proposes values. They only pre-fill the form, highlighted, with the AI's notes; a person checks and saves, and the version keeps the report and the AI's raw answer (`ExtractionJson`). Spend counts toward the AI daily budgets.
 5. **Estimating** (core done 2026-11-17)
    - Done:
      - Catalog separate from many dated price lists, with a CSV importer, list copying and price editing; products.
@@ -241,7 +241,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - The transcript is stored append-only, blocks exactly as received (thinking signatures included), so each turn replays the history unchanged. Every tool call is logged with its input and outcome (`ai_tool_calls`).
    - Budgets: per-user and per-company daily spend (`Ai:DailyUserBudgetUsd`, default $3; `Ai:DailyTenantBudgetUsd`, default $30), computed from token usage at list price and checked before every model call inside the loop; at most `Ai:MaxToolRounds` (8) lookups per message. AI Usage page (`ai.manage`) shows spend by person and day.
    - "Ask the assistant about this" on opportunity, contact, property and project pages starts a conversation about that record.
-   - Still to do: knowledge base (company documents), streaming replies, per-tenant API keys, AI extraction of measurement reports and carrier scopes (the client is ready for them).
+   - Still to do: knowledge base (company documents), streaming replies, per-tenant API keys, AI import of carrier scopes. (AI reading of measurement reports is done; see milestone 4.)
 11. **Reports** (done 2026-11-17)
    - Pipeline (open opportunities by stage and owner), Sales (new leads, won, lost, win rate and won value by month, lead source and owner; lost reasons), Production (active projects and open trades by stage and trade type, backlog, sold and completed), Stale (opportunities and projects past their stage's limit, linked to the record), Tasks (open, overdue and done by person).
    - Every report runs on the same record scope as the lists, so a report never counts records the user can't see; `records.view_all` users get an owner filter. Needs `reports.view` (managers and admins by default). Date ranges are whole days in the company time zone. Won value is the signed project contract where there is one, otherwise the expected value.

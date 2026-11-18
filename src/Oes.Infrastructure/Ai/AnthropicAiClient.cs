@@ -85,6 +85,40 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
             ? value.ToLowerInvariant()
             : string.Concat(value.Select((c, i) => i > 0 && char.IsUpper(c) ? "_" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
 
+    /// <summary>One call: the PDF as a document block, then the instructions; structured output constrains the answer to the schema.</summary>
+    public async Task<AiExtractResponse> ExtractAsync(AiExtractRequest request, CancellationToken ct = default)
+    {
+        var schema = request.JsonSchema.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
+        var parameters = new MessageCreateParams
+        {
+            Model = _o.Model,
+            MaxTokens = request.MaxTokens,
+            Betas = [AnthropicBeta.ServerSideFallback2026_07_01],
+            Fallbacks = new Default(),
+            OutputConfig = new BetaOutputConfig { Effort = ParseEffort(_o.Effort), Format = new BetaJsonOutputFormat { Schema = schema } },
+            System = request.System,
+            Messages =
+            [
+                new BetaUserMessageParam
+                {
+                    Content = new List<BetaContentBlockParam>
+                    {
+                        new BetaRequestDocumentBlock { Source = new BetaBase64PdfSource { Data = Convert.ToBase64String(request.Pdf) } },
+                        new BetaTextBlockParam { Text = request.Instructions },
+                    },
+                },
+            ],
+        };
+        BetaMessage response = await Client.Beta.Messages.Create(parameters, ct);
+        var text = string.Concat(response.Content.Select(b => b.TryPickText(out var t) ? t.Text : ""));
+        var stop = WireName(response.StopReason?.ToString() ?? "end_turn");
+        var u = response.Usage;
+        var model = response.Model.ToString();
+        return new AiExtractResponse(stop is "refusal" or "max_tokens" || text.Length == 0 ? null : text, stop,
+            new AiUsage(u.InputTokens, u.OutputTokens, u.CacheReadInputTokens ?? 0, u.CacheCreationInputTokens ?? 0),
+            model.Contains('-') ? model : _o.Model);
+    }
+
     private static Effort ParseEffort(string? value) => value?.ToLowerInvariant() switch
     {
         "low" => Effort.Low,
@@ -141,5 +175,7 @@ public sealed class NotConfiguredAiClient(IOptions<AiOptions> options) : IAiClie
     public bool IsConfigured => false;
     public string Model => options.Value.Model;
     public Task<AiResponse> CreateAsync(AiRequest request, CancellationToken ct = default) =>
+        throw new InvalidOperationException("The AI assistant isn't connected.");
+    public Task<AiExtractResponse> ExtractAsync(AiExtractRequest request, CancellationToken ct = default) =>
         throw new InvalidOperationException("The AI assistant isn't connected.");
 }

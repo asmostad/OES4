@@ -3460,6 +3460,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("ExtractionJson")
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsCurrent")
                         .HasColumnType("tinyint(1)");
 

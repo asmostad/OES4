@@ -25,7 +25,7 @@ public sealed record UsageRow(string UserName, DateOnly Date, int Requests, long
 /// </summary>
 public sealed class AssistantService(
     OesDbContext db, RecordScope scope, ICurrentUser user, IClock clock, TenantTime time, IAiClient ai, AssistantTools tools,
-    IOptions<AiOptions> options, ILogger<AssistantService> log)
+    IOptions<AiOptions> options, AiUsageMeter meter, ILogger<AssistantService> log)
 {
     private readonly AiOptions _o = options.Value;
     public bool IsConfigured => ai.IsConfigured;
@@ -116,28 +116,6 @@ public sealed class AssistantService(
         _ => null,
     };
 
-    // ---------------- Budgets ----------------
-
-    /// <summary>Null when the user may make another model call; otherwise why not.</summary>
-    private async Task<string?> OverBudgetAsync(Guid me, DateOnly today, CancellationToken ct)
-    {
-        var mine = await db.AiUsageDaily.Where(u => u.UserId == me && u.Date == today).Select(u => (decimal?)u.CostUsd).FirstOrDefaultAsync(ct) ?? 0;
-        if (mine >= _o.DailyUserBudgetUsd) return "You've reached today's assistant limit. It resets tomorrow.";
-        var company = await db.AiUsageDaily.Where(u => u.Date == today).SumAsync(u => (decimal?)u.CostUsd, ct) ?? 0;
-        if (company >= _o.DailyTenantBudgetUsd) return "Your company has reached today's assistant limit. It resets tomorrow.";
-        return null;
-    }
-
-    private async Task<decimal> RecordUsageAsync(Guid me, DateOnly today, AiUsage u, CancellationToken ct)
-    {
-        var row = await db.AiUsageDaily.FirstOrDefaultAsync(x => x.UserId == me && x.Date == today, ct);
-        if (row is null) db.AiUsageDaily.Add(row = new AiUsageDaily { UserId = me, Date = today });
-        var cost = _o.Cost(u);
-        row.InputTokens += u.InputTokens; row.OutputTokens += u.OutputTokens; row.CacheReadTokens += u.CacheReadTokens;
-        row.CacheWriteTokens += u.CacheWriteTokens; row.Requests++; row.CostUsd += cost;
-        return cost;
-    }
-
     // ---------------- The loop ----------------
 
     private async Task<string> SystemPromptAsync(AiConversation c, CancellationToken ct)
@@ -173,7 +151,7 @@ public sealed class AssistantService(
         if (text.Length > 8000) throw new CrmRuleException("Keep messages under 8,000 characters.");
         if (!ai.IsConfigured) throw new CrmRuleException("The assistant isn't connected yet. An administrator needs to add the AI API key.");
         var today = await time.TodayAsync();
-        if (await OverBudgetAsync(me, today, ct) is { } over) throw new CrmRuleException(over);
+        if (await meter.OverBudgetAsync(me, today, ct) is { } over) throw new CrmRuleException(over);
 
         var history = await db.AiMessages.Where(m => m.ConversationId == c.Id).OrderBy(m => m.Seq).ToListAsync(ct);
         var seq = history.Count == 0 ? 0 : history[^1].Seq;
@@ -197,7 +175,7 @@ public sealed class AssistantService(
         var answer = new List<string>();
         for (var round = 0; ; round++)
         {
-            if (await OverBudgetAsync(me, today, ct) is { } stop) { answer.Add(stop); break; }
+            if (await meter.OverBudgetAsync(me, today, ct) is { } stop) { answer.Add(stop); break; }
             AiResponse response;
             try
             {
@@ -209,7 +187,7 @@ public sealed class AssistantService(
                 answer.Add("The assistant couldn't be reached. Try again in a minute.");
                 break;
             }
-            c.CostUsd += await RecordUsageAsync(me, today, response.Usage, ct);
+            c.CostUsd += await meter.RecordAsync(me, today, response.Usage, ct);
             await AppendAsync(AiMessage.Assistant, response.Content);
             answer.AddRange(response.Content.OfType<AiText>().Select(t => t.Text).Where(t => t.Length > 0));
 

@@ -377,7 +377,7 @@
     // ---------------- busy buttons ----------------
     // A submit button with data-busy-text shows it (and can't be pressed twice) while the form posts.
     document.addEventListener('submit', function (e) {
-        const b = e.target.querySelector('button[data-busy-text]');
+        const b = e.submitter && e.submitter.matches('[data-busy-text]') ? e.submitter : null;
         if (!b || e.defaultPrevented) return;
         b.disabled = true;
         b.textContent = b.getAttribute('data-busy-text');

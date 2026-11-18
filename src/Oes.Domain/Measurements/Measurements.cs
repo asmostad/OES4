@@ -61,6 +61,8 @@ public class MeasurementSet : TenantEntity
     public DateOnly? MeasuredOn { get; set; }
     public Guid? MeasuredByUserId { get; set; }
     public Guid? SupersedesId { get; set; }
+    /// <summary>When an AI read the report: its raw answer, kept for audit.</summary>
+    public string? ExtractionJson { get; set; }
     public string? Notes { get; set; }
 
     public List<MeasurementValue> Values { get; set; } = [];

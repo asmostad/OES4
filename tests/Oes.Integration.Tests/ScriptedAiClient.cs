@@ -14,6 +14,8 @@ public sealed class ScriptedAiClient : IAiClient
     public void Reset(params Func<AiRequest, AiResponse>[] steps)
     {
         _script.Clear();
+        Extractions.Clear();
+        NextExtraction = null;
         Requests.Clear();
         IsConfigured = true;
         foreach (var s in steps) _script.Enqueue(s);
@@ -24,6 +26,17 @@ public sealed class ScriptedAiClient : IAiClient
         Requests.Add(request);
         if (_script.Count == 0) throw new InvalidOperationException("The test didn't script this call.");
         return Task.FromResult(_script.Dequeue()(request));
+    }
+
+    /// <summary>The next ExtractAsync answer (JSON, or null with a stop reason); the requests it saw.</summary>
+    public (string? Json, string Stop)? NextExtraction { get; set; }
+    public List<AiExtractRequest> Extractions { get; } = [];
+
+    public Task<AiExtractResponse> ExtractAsync(AiExtractRequest request, CancellationToken ct = default)
+    {
+        Extractions.Add(request);
+        var (json, stop) = NextExtraction ?? throw new InvalidOperationException("The test didn't script this extraction.");
+        return Task.FromResult(new AiExtractResponse(json, stop, new AiUsage(20000, 500, 0, 0), "claude-opus-5-5"));
     }
 
     public static readonly AiUsage SmallUsage = new(1000, 200, 0, 0);

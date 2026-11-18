@@ -76,7 +76,7 @@
 | `property_contacts` | PropertyId, ContactId, RoleKey, IsPrimary, StartedOn, EndedOn | Many-to-many with history (house sold → end date) |
 | `property_structures` | PropertyId, Name (Main House, Detached Garage, Bldg B), Kind, Sort | Shared by measurements and price-book estimate areas |
 | `measurement_field_defs` | TenantId, TradeTypeId, Key, Label, Unit, Group, Mode (roof/elevation/opening), Sort | Generalizes OES3 `trade_measure_fields` to roofing too |
-| `measurement_sets` | PropertyId, StructureId, TradeTypeId, VersionNo, IsCurrent, Source (manual/eagleview/hover/quickmeasure/xactimate/ai_extract/other), SourceDocumentId, ExtractionJson, MeasuredOn, MeasuredBy, SupersedesId, Notes | **Never overwritten.** A new report means a new version. The source PDF is always kept. |
+| `measurement_sets` | PropertyId, StructureId, TradeTypeId, VersionNo, IsCurrent, Source (manual/eagleview/hover/quickmeasure/xactimate/ai_extract/other), SourceDocumentId, ExtractionJson, MeasuredOn, MeasuredBy, SupersedesId, Notes | **Never overwritten.** A new report means a new version. The source PDF is always kept. ExtractionJson added (M10) for AI-read reports. |
 | `measurement_values` | SetId, SurfaceKey (roof, front, rear, left, right, facet n), FieldKey, Value | |
 | `measurement_openings` | SetId, SurfaceKey, Kind (window/double_window/door/garage_door), WidthIn, HeightIn, Qty | Siding |
 

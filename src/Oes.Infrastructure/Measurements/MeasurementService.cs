@@ -16,6 +16,11 @@ public sealed class MeasurementInput
     public DateOnly? MeasuredOn { get; set; }
     public string? Notes { get; set; }
 
+    /// <summary>A report already stored on the property (e.g. the one the AI read), instead of uploading one.</summary>
+    public Guid? ReportDocumentId { get; set; }
+    /// <summary>What the AI read from the report, kept with the version for audit.</summary>
+    public string? ExtractionJson { get; set; }
+
     /// <summary>Keyed "surface|field" ("|total_area", "front|wall_area"). Blank values are skipped.</summary>
     public Dictionary<string, decimal?> Values { get; set; } = [];
 }
@@ -189,6 +194,12 @@ public sealed partial class MeasurementService(OesDbContext db, RecordScope scop
         if (values.Count == 0) throw new CrmRuleException("Enter at least one measurement.");
 
         Guid? documentId = null;
+        if (input.ReportDocumentId is { } existingDoc)
+        {
+            if (!await db.Documents.AnyAsync(d => d.Id == existingDoc && d.EntityType == EntityTypes.Property && d.EntityId == propertyId && d.ArchivedAt == null, ct))
+                throw new CrmRuleException("That report isn't on this property.");
+            documentId = existingDoc;
+        }
         if (report is { } r)
             documentId = await items.UploadAsync(EntityTypes.Property, propertyId, r.Content, r.FileName, r.ContentType, "measurement_report", ct);
 
@@ -203,6 +214,7 @@ public sealed partial class MeasurementService(OesDbContext db, RecordScope scop
             VersionNo = (previous?.VersionNo ?? 0) + 1, IsCurrent = true, Source = input.Source, SourceDocumentId = documentId,
             MeasuredOn = input.MeasuredOn ?? DateOnly.FromDateTime(clock.UtcNow), MeasuredByUserId = scope.Me,
             SupersedesId = previous?.Id, Notes = ContactService.Clean(input.Notes),
+            ExtractionJson = documentId is null ? null : input.ExtractionJson,
         };
         foreach (var v in values) v.SetId = set.Id;
         set.Values.AddRange(values);

@@ -26,6 +26,12 @@ public sealed record AiUsage(long InputTokens, long OutputTokens, long CacheRead
 /// <summary>StopReason is the API's: end_turn, tool_use, max_tokens, refusal, pause_turn…</summary>
 public sealed record AiResponse(IReadOnlyList<AiBlock> Content, string StopReason, AiUsage Usage, string Model);
 
+/// <summary>Read one document (a PDF) and answer with JSON that matches <see cref="JsonSchema"/> (structured output).</summary>
+public sealed record AiExtractRequest(string System, byte[] Pdf, string Instructions, JsonElement JsonSchema, int MaxTokens = 8000);
+
+/// <summary>Json is the model's answer (valid against the schema) or null when it stopped without one (refusal, cut off).</summary>
+public sealed record AiExtractResponse(string? Json, string StopReason, AiUsage Usage, string Model);
+
 /// <summary>The model behind the assistant (Anthropic's Claude in production; a scripted fake in tests).</summary>
 public interface IAiClient
 {
@@ -33,4 +39,5 @@ public interface IAiClient
     bool IsConfigured { get; }
     string Model { get; }
     Task<AiResponse> CreateAsync(AiRequest request, CancellationToken ct = default);
+    Task<AiExtractResponse> ExtractAsync(AiExtractRequest request, CancellationToken ct = default);
 }

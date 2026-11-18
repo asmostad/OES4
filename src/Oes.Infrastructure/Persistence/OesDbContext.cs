@@ -821,6 +821,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.ToTable("measurement_sets");
             e.Property(s => s.Source).HasMaxLength(30);
             e.Property(s => s.Notes).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(s => s.ExtractionJson).HasColumnType("text").Metadata.SetMaxLength(null);
             e.HasIndex(s => new { s.TenantId, s.PropertyId });
             e.HasIndex(s => new { s.TenantId, s.StructureId, s.TradeTypeId, s.VersionNo }).IsUnique();
             e.HasOne<Property>().WithMany().HasForeignKey(s => s.PropertyId).OnDelete(DeleteBehavior.Restrict);
