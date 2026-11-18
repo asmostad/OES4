@@ -240,4 +240,10 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Charts are server-rendered CSS bars (no chart library, works with the CSP). CSV export per report (UTF-8 with BOM for Excel; cells that start with = + - @ are prefixed with an apostrophe so customer-typed text can't run as a formula).
    - Still to do: saved and scheduled reports (emailed by the worker), revenue by trade/sub margin once job costing exists, marketing reports (blast and nurture results).
 12. **JRS migration** — `Oes.Migrator` dry runs, review queues (duplicate properties/contacts), cutover.
-13. **Mobile API hardening**, then the mobile app.
+13. **Mobile API hardening** (done 2026-11-17), then the mobile app.
+   - Token sign-in for the app: `POST /api/v1/auth/token` (email, password, optional tenantId; a user in several companies gets 409 with the list to choose from), `POST /api/v1/auth/refresh`, `POST /api/v1/auth/signout-everywhere`. ASP.NET Core bearer tokens: access 30 minutes, refresh 30 days. Refresh re-checks the security stamp (password change or sign-out-everywhere) and active membership; every request re-checks membership, so removing someone cuts off the app immediately. Password lockout applies; sign-ins are audited.
+   - One forwarding auth scheme: bearer tokens are honoured only on `/api` (a token never signs in to web pages); everything else uses the cookie. Anti-forgery is enforced for cookie-authenticated API calls and skipped for bearer calls (a cross-site page can't add an Authorization header; there is no CORS).
+   - Per-user API rate limit (token bucket, `RateLimits:ApiPerMinute`, default 300) on all controllers; the rate limiter now runs after authentication. Token endpoints use the login limit.
+   - Service errors become ProblemDetails for every API controller (404 not found or not visible, 403 forbidden, 422 rule broken).
+   - Field-app endpoints on the same services and record scope as the web: `my-day`, `tasks` (list, create, done), `appointments` (≤ 62 days), `opportunities/{id}` (with contact phone/email), `records/{type}/{id}/timeline`, `.../notes`, `.../photos` (images/PDF, 25 MB).
+   - Still to do: push notifications (`device_tokens`, APNs/FCM), offline sync and conflict handling, the app itself.

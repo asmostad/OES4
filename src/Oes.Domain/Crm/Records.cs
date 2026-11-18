@@ -13,6 +13,8 @@ public static class EntityTypes
     public const string Trade = "trade";
     public const string Claim = "claim";
     public const string WorkOrder = "work_order";
+
+    public static readonly string[] All = [Property, Contact, Opportunity, Estimate, Project, Trade, Claim, WorkOrder];
 }
 
 public static class ItemTypes

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -31,7 +32,21 @@ builder.Services
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
+// Web pages use the Identity cookie; the mobile app uses bearer tokens, accepted on /api only.
+builder.Services.AddAuthentication(o =>
+    {
+        o.DefaultScheme = ApiAuth.Scheme;
+        o.DefaultChallengeScheme = ApiAuth.Scheme;
+        o.DefaultForbidScheme = ApiAuth.Scheme;
+    })
+    .AddPolicyScheme(ApiAuth.Scheme, "Cookie or bearer", o =>
+        o.ForwardDefaultSelector = ctx => ApiAuth.IsBearer(ctx) ? IdentityConstants.BearerScheme : IdentityConstants.ApplicationScheme)
+    .AddBearerToken(IdentityConstants.BearerScheme, o =>
+    {
+        o.BearerTokenExpiration = TimeSpan.FromMinutes(30);
+        o.RefreshTokenExpiration = TimeSpan.FromDays(30);
+    })
+    .AddIdentityCookies();
 builder.Services.ConfigureApplicationCookie(o =>
 {
     o.Cookie.Name = "oes.auth";
@@ -83,7 +98,11 @@ builder.Services.AddRazorPages(o => o.Conventions
     .AllowAnonymousToPage("/Portal/Booking")
     .AllowAnonymousToFolder("/Book")
     .AllowAnonymousToPage("/Error"));
-builder.Services.AddControllers(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));
+builder.Services.AddControllers(o =>
+{
+    o.Filters.Add<CookieOnlyAntiforgeryFilter>();
+    o.Filters.Add<ApiExceptionFilter>();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi("v1");
 
@@ -98,6 +117,11 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("portal", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(loginPerMinute * 3, 30), Window = TimeSpan.FromMinutes(1) }));
+    // API calls: per signed-in user (or IP before sign-in). Generous for the app, a ceiling for scripts.
+    var apiPerMinute = builder.Configuration.GetValue("RateLimits:ApiPerMinute", 300);
+    o.AddPolicy("api", http => RateLimitPartition.GetTokenBucketLimiter(
+        http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new TokenBucketRateLimiterOptions { TokenLimit = apiPerMinute, TokensPerPeriod = apiPerMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true }));
 });
 
 builder.Services.AddHealthChecks().AddDbContextCheck<OesDbContext>("database");
@@ -129,8 +153,9 @@ app.UseSerilogRequestLogging();
 app.UseStatusCodePagesWithReExecute("/Error", "?code={0}");
 
 app.UseRouting();
-app.UseRateLimiter();
+
 app.UseAuthentication();
+app.UseRateLimiter(); // after authentication so API limits can be per user
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseMiddleware<RequireTenantMiddleware>();
 app.UseAuthorization();
@@ -138,7 +163,7 @@ app.UseAuthorization();
 app.MapStaticAssets().AllowAnonymous();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("api");
 
 app.Run();
 
