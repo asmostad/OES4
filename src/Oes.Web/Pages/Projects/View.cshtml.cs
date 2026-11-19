@@ -44,8 +44,19 @@ public class ViewModel(ProjectService projects, RecordItems items, CrmLookups lo
 
     public Task<IActionResult> OnPostRestoreAsync() => Do(() => projects.RestoreToBoardAsync(EntityTypes.Project, Id), "Back on the board.");
 
-    public Task<IActionResult> OnPostChangeOrderAsync(Guid? tradeId, string description, decimal amount, string? reason, bool isSupplement) =>
-        Do(() => projects.AddChangeOrderAsync(Id, tradeId, description, amount, reason, isSupplement), "Change order added. Record the customer's approval to add it to the contract.");
+    /// <summary>With an amount: a single-amount change order. Without: an itemized one, opened so its items can be added.</summary>
+    public Task<IActionResult> OnPostChangeOrderAsync(Guid? tradeId, string description, decimal? amount, string? reason, bool isSupplement) => Guard(async () =>
+    {
+        if (amount is { } a)
+        {
+            await projects.AddChangeOrderAsync(Id, tradeId, description, a, reason, isSupplement);
+            Flash("Change order added. Record the customer's approval to add it to the contract.");
+            return RedirectToPage(new { id = Id });
+        }
+        var coId = await projects.StartItemizedChangeOrderAsync(Id, tradeId, description, reason, isSupplement);
+        Flash("Change order started. Add its items, then print it for the customer to sign.");
+        return RedirectToPage("/Projects/ChangeOrder", new { id = coId });
+    });
 
     public Task<IActionResult> OnPostDecideChangeOrderAsync(Guid changeOrderId, bool approve, string? approvedByName) =>
         Do(() => projects.DecideChangeOrderAsync(changeOrderId, approve, approvedByName), approve ? "Change order approved." : "Change order rejected.");

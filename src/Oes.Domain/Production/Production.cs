@@ -124,9 +124,34 @@ public class ChangeOrder : TenantEntity
     public decimal Amount { get; set; }
     public string Status { get; set; } = ChangeOrderStatuses.Draft;
     public bool IsInsuranceSupplement { get; set; }
+    /// <summary>The amount is the sum of <see cref="ChangeOrderLine"/>s rather than typed in.</summary>
+    public bool IsItemized { get; set; }
     public string? ApprovedByName { get; set; }
     public DateTime? DecidedAt { get; set; }
     public Guid? DecidedByUserId { get; set; }
+}
+
+public static class ChangeOrderLineKinds
+{
+    public const string PriceBook = "price_book";
+    public const string Product = "product";
+    public const string Custom = "custom";
+}
+
+/// <summary>One item on an itemized change order. A negative quantity is a credit. Prices are copied when added.</summary>
+public class ChangeOrderLine : TenantEntity
+{
+    public Guid ChangeOrderId { get; set; }
+    public int Sort { get; set; }
+    public string Kind { get; set; } = ChangeOrderLineKinds.Custom;
+    public Guid? PriceListItemId { get; set; }
+    public Guid? ProductId { get; set; }
+    public string? Code { get; set; }
+    public string Description { get; set; } = "";
+    public decimal Qty { get; set; }
+    public string Unit { get; set; } = "EA";
+    public decimal UnitPrice { get; set; }
+    public decimal Amount { get; set; }
 }
 
 public static class RemovalReasons

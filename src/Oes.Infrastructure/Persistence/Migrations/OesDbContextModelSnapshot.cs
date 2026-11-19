@@ -4036,6 +4036,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsInsuranceSupplement")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<bool>("IsItemized")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<byte[]>("ProjectId")
                         .IsRequired()
                         .HasColumnType("binary(16)");
@@ -4070,6 +4073,75 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("change_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.ChangeOrderLine", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<byte[]>("ChangeOrderId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("PriceListItemId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ProductId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("Qty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangeOrderId");
+
+                    b.HasIndex("TenantId", "ChangeOrderId", "Sort");
+
+                    b.ToTable("change_order_lines", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Production.Project", b =>
@@ -5623,6 +5695,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.ChangeOrderLine", b =>
+                {
+                    b.HasOne("Oes.Domain.Production.ChangeOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ChangeOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

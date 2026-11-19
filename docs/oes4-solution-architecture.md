@@ -198,10 +198,10 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Forward-only automation (production start, project complete) with a move preview and "automatic" history.
      - Project and trade kanban boards (drag and drop), Remove from Board with reasons and restore.
      - Change orders with customer approval that adds to the contract (and to the trade amount).
+     - Itemized change orders (done 2026-11-18): leave the amount blank on the project page and the change order opens to take items from the job's price list (when the job came from a price-book estimate), products, or custom lines. A negative quantity is a credit, prices are copied when added, and the total is the sum of the lines. Items can be edited until the customer decides; an empty change order can't be approved. Every change order has its own page and a printable copy with the contract before and after and signature lines.
    - Still to do:
      - Configurable automation rules: done in milestone 8 (Administration › Automation).
      - Order sheet (with the takeoff engine).
-     - Line-level change orders.
 7. **Subcontractors** (done 2026-11-17)
    - Subs as organization contacts with a profile (trades, status).
    - Documents with expiry dates, with a cached earliest insurance expiry and badges.

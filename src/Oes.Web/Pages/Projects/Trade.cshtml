@@ -88,7 +88,7 @@
             <div class="card mb-3">
                 <div class="card-header">Change orders on this trade</div>
                 <ul class="list-group list-group-flush small">
-                    @foreach (var c in d.ChangeOrders) { <li class="list-group-item d-flex"><span>#@c.Sequence @c.Description</span><span class="ms-auto">@c.Amount.ToString("C2", us) · @Fmt.Cap(c.Status)</span></li> }
+                    @foreach (var c in d.ChangeOrders) { <li class="list-group-item d-flex"><a href="/Projects/ChangeOrder/@c.Id">#@c.Sequence @c.Description</a><span class="ms-auto">@c.Amount.ToString("C2", us) · @Fmt.Cap(c.Status)</span></li> }
                 </ul>
             </div>
         }

@@ -438,6 +438,7 @@ public sealed class ProjectService(OesDbContext db, RecordScope scope, RecordIte
         var co = await db.ChangeOrders.FirstOrDefaultAsync(c => c.Id == changeOrderId, ct) ?? throw new RecordNotFoundException("Change order");
         var p = await ProjectForEditAsync(co.ProjectId, ct);
         if (co.Status != ChangeOrderStatuses.Draft) throw new CrmRuleException("This change order has already been decided.");
+        if (approve && co.Amount == 0) throw new CrmRuleException(co.IsItemized ? "Add the change order's items first." : "The change order has no amount.");
         if (approve && string.IsNullOrWhiteSpace(approvedByName)) throw new CrmRuleException("Enter who approved it.");
         co.Status = approve ? ChangeOrderStatuses.Approved : ChangeOrderStatuses.Rejected;
         co.ApprovedByName = ContactService.Clean(approvedByName);
@@ -452,4 +453,141 @@ public sealed class ProjectService(OesDbContext db, RecordScope scope, RecordIte
             $"Change order #{co.Sequence} {(approve ? "approved by " + co.ApprovedByName : "rejected")} ({co.Amount:C2}). Contract now {p.ContractValue:C2}", ct);
         await db.SaveChangesAsync(ct);
     }
+
+    // ---------------- Itemized change orders ----------------
+
+    /// <summary>Starts a change order whose amount comes from its lines (added next, while it's a draft).</summary>
+    public async Task<Guid> StartItemizedChangeOrderAsync(Guid projectId, Guid? tradeId, string description, string? reason, bool isSupplement,
+        CancellationToken ct = default)
+    {
+        await ProjectForEditAsync(projectId, ct);
+        if (string.IsNullOrWhiteSpace(description)) throw new CrmRuleException("Describe the change.");
+        if (tradeId is { } tid && !await db.ProjectTrades.AnyAsync(t => t.Id == tid && t.ProjectId == projectId, ct)) throw new CrmRuleException("That trade isn't on this project.");
+        var seq = (await db.ChangeOrders.Where(c => c.ProjectId == projectId).MaxAsync(c => (int?)c.Sequence, ct) ?? 0) + 1;
+        var co = new ChangeOrder
+        {
+            ProjectId = projectId, ProjectTradeId = tradeId, Sequence = seq, Description = description.Trim(), IsItemized = true,
+            Reason = ContactService.Clean(reason), IsInsuranceSupplement = isSupplement,
+        };
+        db.ChangeOrders.Add(co);
+        await items.LogAsync(EntityTypes.Project, projectId, "change_order.created", $"Change order #{seq}: {co.Description} (itemized)", ct);
+        await db.SaveChangesAsync(ct);
+        return co.Id;
+    }
+
+    public async Task<ChangeOrderDetail> GetChangeOrderAsync(Guid id, CancellationToken ct = default)
+    {
+        var co = await db.ChangeOrders.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new RecordNotFoundException("Change order");
+        var p = await (await scope.ProjectsAsync(includeArchived: true)).FirstOrDefaultAsync(x => x.Id == co.ProjectId, ct)
+                ?? throw new RecordNotFoundException("Change order");
+        var opp = await db.Opportunities.FirstAsync(o => o.Id == p.OpportunityId, ct);
+        var contact = await db.Contacts.FirstAsync(c => c.Id == opp.PrimaryContactId, ct);
+        var property = p.PropertyId is null ? null : await db.Properties.FirstOrDefaultAsync(x => x.Id == p.PropertyId, ct);
+        var trade = co.ProjectTradeId is null ? null
+            : await (from t in db.ProjectTrades where t.Id == co.ProjectTradeId
+                     join tt in db.TradeTypes on t.TradeTypeId equals tt.Id select tt.Name).FirstOrDefaultAsync(ct);
+        var lines = await db.ChangeOrderLines.Where(l => l.ChangeOrderId == id).OrderBy(l => l.Sort).ToListAsync(ct);
+        Guid? priceListEstimate = p.EstimateId is { } eid && await db.Estimates.AnyAsync(e => e.Id == eid && e.PriceListId != null, ct) ? eid : null;
+        var canEdit = co.Status == ChangeOrderStatuses.Draft && co.IsItemized && p.ArchivedAt is null && await CanEditAsync(p);
+        return new ChangeOrderDetail(co, p, contact.DisplayName, property?.SingleLine, trade, lines, priceListEstimate, canEdit);
+    }
+
+    public async Task<Guid> AddChangeOrderPriceItemAsync(Guid changeOrderId, Guid priceListItemId, decimal qty, CancellationToken ct = default)
+    {
+        var (co, p) = await DraftItemizedAsync(changeOrderId, ct);
+        var listId = p.EstimateId is { } eid ? await db.Estimates.Where(e => e.Id == eid).Select(e => e.PriceListId).FirstOrDefaultAsync(ct) : null;
+        var row = await (from pli in db.PriceListItems
+                         join i in db.CatalogItems on pli.CatalogItemId equals i.Id
+                         join c in db.CatalogCategories on i.CategoryId equals c.Id
+                         where pli.Id == priceListItemId && pli.PriceListId == listId
+                         select new { pli, i, c }).FirstOrDefaultAsync(ct)
+                  ?? throw new CrmRuleException("That item isn't on this job's price list.");
+        var description = row.i.Description + (row.pli.Activity == Activities.Replace ? "" : " (" + Activities.Label(row.pli.Activity) + ")");
+        return await AddLineAsync(co, ChangeOrderLineKinds.PriceBook, row.c.Code + " " + row.i.Code, description, qty, row.i.Unit, row.pli.UnitPrice,
+            l => l.PriceListItemId = row.pli.Id, ct);
+    }
+
+    public async Task<Guid> AddChangeOrderProductAsync(Guid changeOrderId, Guid productId, decimal qty, CancellationToken ct = default)
+    {
+        var (co, _) = await DraftItemizedAsync(changeOrderId, ct);
+        var product = await db.Products.FirstOrDefaultAsync(x => x.Id == productId && x.IsActive, ct) ?? throw new CrmRuleException("Unknown product.");
+        return await AddLineAsync(co, ChangeOrderLineKinds.Product, product.Sku, product.Name, qty, product.Unit, product.DefaultPrice,
+            l => l.ProductId = product.Id, ct);
+    }
+
+    public async Task<Guid> AddChangeOrderCustomLineAsync(Guid changeOrderId, string description, decimal qty, string? unit, decimal unitPrice,
+        CancellationToken ct = default)
+    {
+        var (co, _) = await DraftItemizedAsync(changeOrderId, ct);
+        if (string.IsNullOrWhiteSpace(description)) throw new CrmRuleException("Describe the item.");
+        if (unitPrice < 0) throw new CrmRuleException("Use a negative quantity for a credit, not a negative price.");
+        return await AddLineAsync(co, ChangeOrderLineKinds.Custom, null, description.Trim(), qty, ContactService.Clean(unit)?.ToUpperInvariant() ?? "EA",
+            unitPrice, _ => { }, ct);
+    }
+
+    public async Task UpdateChangeOrderLineAsync(Guid lineId, decimal qty, decimal unitPrice, string? description, CancellationToken ct = default)
+    {
+        var line = await db.ChangeOrderLines.FirstOrDefaultAsync(l => l.Id == lineId, ct) ?? throw new RecordNotFoundException("Line");
+        var (co, _) = await DraftItemizedAsync(line.ChangeOrderId, ct);
+        CheckQty(qty);
+        if (unitPrice < 0) throw new CrmRuleException("Use a negative quantity for a credit, not a negative price.");
+        line.Qty = qty;
+        line.UnitPrice = unitPrice;
+        if (!string.IsNullOrWhiteSpace(description)) line.Description = description.Trim();
+        line.Amount = LineAmount(qty, unitPrice);
+        await db.SaveChangesAsync(ct);
+        await RecalcChangeOrderAsync(co, ct);
+    }
+
+    public async Task RemoveChangeOrderLineAsync(Guid lineId, CancellationToken ct = default)
+    {
+        var line = await db.ChangeOrderLines.FirstOrDefaultAsync(l => l.Id == lineId, ct) ?? throw new RecordNotFoundException("Line");
+        var (co, _) = await DraftItemizedAsync(line.ChangeOrderId, ct);
+        db.ChangeOrderLines.Remove(line);
+        await db.SaveChangesAsync(ct);
+        await RecalcChangeOrderAsync(co, ct);
+    }
+
+    private async Task<(ChangeOrder ChangeOrder, Project Project)> DraftItemizedAsync(Guid changeOrderId, CancellationToken ct)
+    {
+        var co = await db.ChangeOrders.FirstOrDefaultAsync(c => c.Id == changeOrderId, ct) ?? throw new RecordNotFoundException("Change order");
+        var p = await ProjectForEditAsync(co.ProjectId, ct);
+        if (!co.IsItemized) throw new CrmRuleException("This change order has a single amount, not items.");
+        if (co.Status != ChangeOrderStatuses.Draft) throw new CrmRuleException("This change order has been decided; start a new one for further changes.");
+        return (co, p);
+    }
+
+    private async Task<Guid> AddLineAsync(ChangeOrder co, string kind, string? code, string description, decimal qty, string unit, decimal unitPrice,
+        Action<ChangeOrderLine> extra, CancellationToken ct)
+    {
+        CheckQty(qty);
+        var sort = (await db.ChangeOrderLines.Where(l => l.ChangeOrderId == co.Id).MaxAsync(l => (int?)l.Sort, ct) ?? 0) + 10;
+        var line = new ChangeOrderLine
+        {
+            ChangeOrderId = co.Id, Sort = sort, Kind = kind, Code = code, Description = description[..Math.Min(description.Length, 1000)],
+            Qty = qty, Unit = unit, UnitPrice = unitPrice, Amount = LineAmount(qty, unitPrice),
+        };
+        extra(line);
+        db.ChangeOrderLines.Add(line);
+        await db.SaveChangesAsync(ct);
+        await RecalcChangeOrderAsync(co, ct);
+        return line.Id;
+    }
+
+    private static void CheckQty(decimal qty)
+    {
+        if (qty == 0) throw new CrmRuleException("Enter a quantity (negative for a credit).");
+        if (Math.Abs(qty) > 1_000_000) throw new CrmRuleException("Check the quantity.");
+    }
+
+    private static decimal LineAmount(decimal qty, decimal unitPrice) => Math.Round(qty * unitPrice, 2, MidpointRounding.AwayFromZero);
+
+    private async Task RecalcChangeOrderAsync(ChangeOrder co, CancellationToken ct)
+    {
+        co.Amount = await db.ChangeOrderLines.Where(l => l.ChangeOrderId == co.Id).SumAsync(l => l.Amount, ct);
+        await db.SaveChangesAsync(ct);
+    }
 }
+
+public sealed record ChangeOrderDetail(ChangeOrder ChangeOrder, Project Project, string CustomerName, string? Address, string? TradeName,
+    List<ChangeOrderLine> Lines, Guid? PriceListEstimateId, bool CanEdit);

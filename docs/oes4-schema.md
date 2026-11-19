@@ -140,7 +140,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `project_contacts` | ProjectId, ContactId, RoleKey, IsPrimary | Who signed, who pays, who to call |
 | `project_trades` | ProjectId, TradeTypeId, StageId, OwnerUserId, Description, MaterialDate, WorkDate, WorkTime, SubcontractorId, Status, Totals (cached), RemovedAt…, StatusBeforeRemoval | |
 | `order_sheet_lines` | ProjectTradeId, ProductId, Description, Qty, Unit, UnitCost, Color, Size, SupplierSku, Source (suggested/manual), Delivered | Production materials list. Never affects price. |
-| `change_orders` | TenantId, ProjectId, Number, Status (draft/issued/approved/rejected/cancelled), Reason, Amount, IssuedAt, ApprovedAt, PdfDocumentId, SignedDocumentId | |
+| `change_orders` | TenantId, ProjectId, ProjectTradeId, Sequence, Description, Reason, Amount, Status (draft/approved/rejected), IsInsuranceSupplement, IsItemized, ApprovedByName, DecidedAt + `change_order_lines` (Kind price_book/product/custom, Code, Description, Qty (negative = credit), Unit, UnitPrice, Amount) | **Built.** Itemized change orders total their lines. PDF/e-signature documents later. |
 | `change_order_lines` | ChangeOrderId, Action (add/remove/modify), same line shape as estimate lines | Same line model as estimates |
 | `stage_history` | TenantId, Level, ProjectId, ProjectTradeId, FromStageId, ToStageId, ByUserId, At, Note | |
 | `automation_rules` | TenantId, Trigger (stage_role_entered/project_created/work_date_set/all_trades_complete/…), StageRole, ActionsJson (email/sms template, task, notify role, document), Enabled | Keyed by role, not stage names |

@@ -86,6 +86,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<ProjectTrade> ProjectTrades => Set<ProjectTrade>();
     public DbSet<WorkflowStageChange> WorkflowStageChanges => Set<WorkflowStageChange>();
     public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
+    public DbSet<ChangeOrderLine> ChangeOrderLines => Set<ChangeOrderLine>();
 
     // Subcontractors
     public DbSet<Subcontractor> Subcontractors => Set<Subcontractor>();
@@ -688,6 +689,20 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(c => c.ApprovedByName).HasMaxLength(150);
             e.HasIndex(c => new { c.TenantId, c.ProjectId, c.Sequence }).IsUnique();
             e.HasOne<Project>().WithMany().HasForeignKey(c => c.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ChangeOrderLine>(e =>
+        {
+            e.ToTable("change_order_lines");
+            e.Property(l => l.Kind).HasMaxLength(20);
+            e.Property(l => l.Code).HasMaxLength(60);
+            e.Property(l => l.Description).HasMaxLength(1000);
+            e.Property(l => l.Unit).HasMaxLength(20);
+            e.Property(l => l.Qty).HasPrecision(12, 3);
+            e.Property(l => l.UnitPrice).HasPrecision(12, 2);
+            e.Property(l => l.Amount).HasPrecision(12, 2);
+            e.HasIndex(l => new { l.TenantId, l.ChangeOrderId, l.Sort });
+            e.HasOne<ChangeOrder>().WithMany().HasForeignKey(l => l.ChangeOrderId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

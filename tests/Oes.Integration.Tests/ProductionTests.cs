@@ -132,6 +132,66 @@ public sealed class ProductionTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task Itemized_change_orders_total_their_lines_and_lock_once_decided()
+    {
+        var sold = await SignedEstimateAsync();
+        await using var s = fx.ScopeAs(sold.Tenant, sold.Admin);
+        var svc = s.Get<ProjectService>();
+        var id = await svc.CreateFromEstimateAsync(sold.Estimate);
+        var gutters = (await svc.GetAsync(id)).Trades.Single(t => t.Type.Code == "gutters").Trade.Id;
+        var gutter = (await s.Get<CatalogService>().ProductsAsync("GUT", false)).Single().Id;
+
+        var co = await svc.StartItemizedChangeOrderAsync(id, gutters, "Gutter changes", "Customer asked at walkthrough", false);
+        await Assert.ThrowsAsync<CrmRuleException>(() => svc.DecideChangeOrderAsync(co, true, "Pro Duction")); // nothing in it yet
+        await Assert.ThrowsAsync<CrmRuleException>(() => svc.AddChangeOrderPriceItemAsync(co, Guid.NewGuid(), 1)); // line-item job: no price list
+        await Assert.ThrowsAsync<CrmRuleException>(() => svc.AddChangeOrderCustomLineAsync(co, "Nothing", 0, null, 5));
+
+        var more = await svc.AddChangeOrderProductAsync(co, gutter, 30);            // 30 LF x $10
+        await svc.AddChangeOrderCustomLineAsync(co, "Downspout extension", 2, "ea", 45.5m); // 91
+        var credit = await svc.AddChangeOrderCustomLineAsync(co, "No gutter guards", -1, null, 120m);
+        var d = await svc.GetChangeOrderAsync(co);
+        Assert.Equal((271m, true), (d.ChangeOrder.Amount, d.CanEdit));
+        Assert.Equal(["GUT", null, null], d.Lines.Select(l => l.Code));
+        Assert.Equal("EA", d.Lines[1].Unit);
+
+        await svc.UpdateChangeOrderLineAsync(more, 40, 10m, null);
+        await svc.RemoveChangeOrderLineAsync(credit);
+        Assert.Equal(491m, (await svc.GetChangeOrderAsync(co)).ChangeOrder.Amount);
+
+        await svc.DecideChangeOrderAsync(co, true, "Pro Duction");
+        var after = await svc.GetAsync(id);
+        Assert.Equal(sold.Total + 491m, after.Project.ContractValue);
+        Assert.Equal(1200m + 491m, after.Trades.Single(t => t.Trade.Id == gutters).Trade.Amount);
+        Assert.False((await svc.GetChangeOrderAsync(co)).CanEdit);
+        await Assert.ThrowsAsync<CrmRuleException>(() => svc.AddChangeOrderCustomLineAsync(co, "Late add", 1, null, 10));
+        var single = await svc.AddChangeOrderAsync(id, null, "Lump sum", 100m, null, false);
+        await Assert.ThrowsAsync<CrmRuleException>(() => svc.AddChangeOrderCustomLineAsync(single, "Item", 1, null, 10));
+
+        // The change order page and its printable copy.
+        var web = fx.App.Browser();
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = sold.Admin.Email!, ["Password"] = MySqlFixture.Password,
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(await web.GetStringAsync("/Account/Login"),
+                "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync($"/Projects/ChangeOrder/{co}");
+        Assert.Contains("Downspout extension", page);
+        Assert.Contains("Approved by Pro Duction", page);
+        var print = await web.GetStringAsync($"/Projects/ChangeOrder/{co}?print=true");
+        Assert.Contains("New contract total", print);
+        var projectPage = await web.GetStringAsync($"/Projects/View/{id}");
+        Assert.Contains($"/Projects/ChangeOrder/{co}", projectPage);
+        var start = await web.PostAsync($"/Projects/View/{id}?handler=ChangeOrder", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["description"] = "Skylight", ["amount"] = "", ["tradeId"] = "",
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(projectPage, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        Assert.StartsWith("/Projects/ChangeOrder/", start.Headers.Location!.OriginalString); // blank amount: itemized
+    }
+
+    [Fact]
     public async Task Removed_projects_leave_the_board_and_come_back()
     {
         var sold = await SignedEstimateAsync();
