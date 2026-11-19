@@ -39,6 +39,8 @@ public class Contact : TenantEntity, IArchivable
     public Guid? CreatedByUserId { get; set; }
 
     public DateTime? ArchivedAt { get; set; }
+    /// <summary>Set when this contact was merged into another; the other one holds everything now.</summary>
+    public Guid? MergedIntoId { get; set; }
 
     public List<ContactMethod> Methods { get; set; } = [];
 

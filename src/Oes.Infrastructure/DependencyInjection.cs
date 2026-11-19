@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<Crm.RecordScope>();
         services.AddScoped<Crm.RecordItems>();
         services.AddScoped<Crm.ContactService>();
+        services.AddScoped<Crm.MergeService>();
         services.AddScoped<Crm.PropertyService>();
         services.AddScoped<Crm.OpportunityService>();
         services.AddScoped<Crm.CrmLookups>();

@@ -32,6 +32,8 @@ public class Property : TenantEntity, IArchivable
     public string? Notes { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public DateTime? ArchivedAt { get; set; }
+    /// <summary>Set when this property was merged into another; the other one holds everything now.</summary>
+    public Guid? MergedIntoId { get; set; }
 
     public List<PropertyStructure> Structures { get; set; } = [];
 

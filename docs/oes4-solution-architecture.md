@@ -146,11 +146,12 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Notes, documents and activity with `record_links` rollups ("This record / Everything under it").
      - Record-level visibility (own + unassigned pool unless `records.view_all`).
      - Global search and typeahead pickers, level headers and breadcrumbs, a dashboard with pipeline numbers.
+     - Admin screens for pipeline stages, project/trade stages and pick lists (Administration › Lists).
+     - Merging duplicate contacts and properties (done 2026-11-18, permission `records.merge`): "Merge duplicate" on the record suggests likely duplicates (same phone, email or name; same or similar address), previews what moves, and lets you swap which one is kept. One transaction moves everything pointing at the duplicate (opportunities, property links, phone numbers and emails not already there, organization links, notes, documents, activity and rollup links, tasks, appointments, emails, texts, bookings, blasts, nurture runs, claims, estimates, projects, measurements, buildings, customer links and AI chats). Blank fields on the kept record are filled; nothing is overwritten. Opting out wins: if either contact had opted out of a channel, the kept contact ends up opted out (recorded with source "merge"). Duplicate buildings get "(from …)" added. The duplicate is archived with `MergedIntoId`, and its page links to the kept record.
    - Still to do:
      - Dispositions and the prospecting back/next list with locks.
-     - Saved views, campaigns, the property/contact merge tool.
+     - Saved views, campaigns.
      - Contact mailing addresses (consents were added in milestone 8).
-     - Admin screens for pipeline stages and pick lists (defaults are seeded).
 3. **Insurance** (done 2026-11-17)
    - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
    - Claims: optional until filed, and visibility follows the opportunity; notes roll up to the opportunity, property and contact.

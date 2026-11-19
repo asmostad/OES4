@@ -1491,6 +1491,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<byte[]>("MergedIntoId")
+                        .HasColumnType("binary(16)");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
@@ -2048,6 +2051,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("Longitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("decimal(9,6)");
+
+                    b.Property<byte[]>("MergedIntoId")
+                        .HasColumnType("binary(16)");
 
                     b.Property<string>("NormalizedKey")
                         .IsRequired()

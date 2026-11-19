@@ -1,0 +1,122 @@
+@page "/Merge/{type}/{id:guid}"
+@model Oes.Web.Pages.Records.MergeModel
+@{
+    ViewData["Title"] = $"Merge {Model.Noun}";
+    var p = Model.Preview;
+    var lookup = Model.IsContact ? "/api/v1/lookup/contacts" : "/api/v1/lookup/properties";
+}
+<div class="page-header">
+    <div>
+        <h1>Merge a duplicate @Model.Noun</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="@Model.BackUrl">@Model.KeepName</a></li>
+            <li class="breadcrumb-item active">Merge</li>
+        </ol></nav>
+    </div>
+</div>
+
+@if (p is null)
+{
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <p class="small text-muted">Pick the duplicate. Everything on it moves to <strong>@Model.KeepName</strong>, and the duplicate is archived. You'll see what moves before anything changes.</p>
+                    <form method="get" action="/Merge/@Model.Type/@Model.Id">
+                        <label class="form-label" for="dup">Duplicate @Model.Noun</label>
+                        <div class="typeahead mb-3" data-typeahead="@lookup">
+                            <input type="hidden" name="other" data-typeahead-value>
+                            <input id="dup" class="form-control" autocomplete="off" placeholder="Search…" data-typeahead-input>
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Compare</button>
+                        <a class="btn btn-outline-secondary" href="@Model.BackUrl">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">Likely duplicates</div>
+                @if (Model.Suggestions.Count == 0)
+                {
+                    <div class="card-body small text-muted">None found@(Model.IsContact ? " with the same phone, email or name" : " at the same address").</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var s in Model.Suggestions)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@s.Name <span class="small text-muted">· @s.Why</span></span>
+                                <a class="btn btn-sm btn-outline-primary" href="/Merge/@Model.Type/@Model.Id?other=@s.Id">Compare</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3 align-items-stretch mb-3">
+        <div class="col-md-5">
+            <div class="card h-100 border-success">
+                <div class="card-header text-success"><i class="bi bi-check-circle me-1"></i>Keep</div>
+                <div class="card-body">
+                    <div class="fw-semibold fs-5">@p.KeepName</div>
+                    <div class="small text-muted">Keeps its own details; blank fields are filled from the duplicate.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 d-flex flex-column align-items-center justify-content-center gap-2">
+            <i class="bi bi-arrow-left fs-3 text-muted" aria-hidden="true"></i>
+            <a class="btn btn-sm btn-outline-secondary" href="/Merge/@Model.Type/@p.MergeId?other=@p.KeepId"><i class="bi bi-arrow-left-right me-1"></i>Swap</a>
+        </div>
+        <div class="col-md-5">
+            <div class="card h-100 border-danger">
+                <div class="card-header text-danger"><i class="bi bi-archive me-1"></i>Merge in and archive</div>
+                <div class="card-body">
+                    <div class="fw-semibold fs-5"><a href="/@(Model.IsContact ? "Contacts" : "Properties")/View/@p.MergeId">@p.MergeName</a></div>
+                    @if (p.Moves.Count == 0)
+                    {
+                        <div class="small text-muted">Nothing else is attached to it.</div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted mb-1">Moves to the kept @Model.Noun:</div>
+                        <ul class="small mb-0">
+                            @foreach (var m in p.Moves) { <li>@m.Label: @m.Count</li> }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (p.Blockers.Count > 0)
+    {
+        <div class="alert alert-danger">@foreach (var b in p.Blockers) { <div>@b</div> }</div>
+        <a class="btn btn-outline-secondary" href="/Merge/@Model.Type/@Model.Id">Pick another</a>
+    }
+    else
+    {
+        <div class="alert alert-warning small">
+            @if (Model.IsContact)
+            {
+                <text>Phone numbers and emails the kept contact doesn't have are added. If either contact opted out of texts or emails, the kept contact stays opted out.</text>
+            }
+            else
+            {
+                <text>Buildings move with their measurements; a building name the kept property already uses gets "(from @p.MergeName.Split(',')[0])" added.</text>
+            }
+            This can't be undone automatically.
+        </div>
+        <form method="post" class="d-flex gap-2">
+            <input type="hidden" name="other" value="@p.MergeId">
+            <button type="submit" class="btn btn-danger"><i class="bi bi-intersect me-1"></i>Merge into @p.KeepName</button>
+            <a class="btn btn-outline-secondary" href="/Merge/@Model.Type/@Model.Id">Pick another</a>
+        </form>
+    }
+}

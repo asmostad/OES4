@@ -26,6 +26,7 @@ public class NewModel(OpportunityService opportunities, ContactService contacts,
     [BindProperty, StringLength(254), EmailAddress] public string? Email { get; set; }
     [BindProperty, StringLength(40)] public string? Phone { get; set; }
 
+    /// <summary>Optional; checked by PropertyService only when a street is entered.</summary>
     [BindProperty] public PropertyInput Address { get; set; } = new();
     [BindProperty] public OpportunityInput Input { get; set; } = new();
 
@@ -65,6 +66,7 @@ public class NewModel(OpportunityService opportunities, ContactService contacts,
     public async Task<IActionResult> OnPostAsync()
     {
         await LoadAsync();
+        ClearOptionalAddress(Address);
         if (!ModelState.IsValid) return Page();
         if (ContactId is null && string.IsNullOrWhiteSpace(FirstName) && string.IsNullOrWhiteSpace(LastName))
         {

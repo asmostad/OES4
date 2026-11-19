@@ -72,7 +72,7 @@
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `properties` | TenantId, address fields, **NormalizedKey** (unique per tenant), Lat, Lng, PropertyKind (residential/commercial/multi_family), ParentPropertyId (campus), Notes | **Root record.** Created at intake or when an address is first captured, with duplicate/near-match check. Has a merge tool. |
+| `properties` | TenantId, address fields, **NormalizedKey** (unique per tenant), Lat, Lng, PropertyKind (residential/commercial/multi_family), ParentPropertyId (campus), Notes | **Root record.** Created at intake or when an address is first captured, with duplicate/near-match check. Has a merge tool (built: archived duplicates keep `MergedIntoId`, also on `contacts`). |
 | `property_contacts` | PropertyId, ContactId, RoleKey, IsPrimary, StartedOn, EndedOn | Many-to-many with history (house sold → end date) |
 | `property_structures` | PropertyId, Name (Main House, Detached Garage, Bldg B), Kind, Sort | Shared by measurements and price-book estimate areas |
 | `measurement_field_defs` | TenantId, TradeTypeId, Key, Label, Unit, Group, Mode (roof/elevation/opening), Sort | Generalizes OES3 `trade_measure_fields` to roofing too |

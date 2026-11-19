@@ -43,6 +43,16 @@ public abstract class CrmPageModel : PageModel
         }
     }
 
+    /// <summary>
+    /// An optional address form (bound as "Address") left blank isn't an error. Its non-nullable strings would
+    /// otherwise count as required; PropertyService checks the address properly when a street is entered.
+    /// </summary>
+    protected void ClearOptionalAddress(Oes.Infrastructure.Crm.PropertyInput address)
+    {
+        if (!string.IsNullOrWhiteSpace(address.Line1)) return;
+        foreach (var key in ModelState.Keys.Where(k => k.StartsWith("Address.", StringComparison.Ordinal)).ToList()) ModelState.Remove(key);
+    }
+
     protected IActionResult BackTo(string? returnUrl, string fallback) =>
         LocalRedirect(!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : fallback);
 }

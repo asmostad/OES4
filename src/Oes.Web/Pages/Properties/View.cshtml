@@ -1,5 +1,6 @@
 @page "{id:guid}"
 @model Oes.Web.Pages.Properties.ViewModel
+@inject Oes.Application.Abstractions.ICurrentUser CurrentUser
 @{
     var p = Model.Detail.Property;
     ViewData["Title"] = p.Line1;
@@ -24,7 +25,13 @@
     <a class="btn btn-sm btn-primary" href="/Opportunities/New?propertyId=@p.Id"><i class="bi bi-funnel me-1"></i>New opportunity</a>
     <a class="btn btn-sm btn-outline-primary" href="/Measurements/Property/@p.Id"><i class="bi bi-rulers me-1"></i>Measurements</a>
     <a class="btn btn-sm btn-outline-secondary" href="https://www.google.com/maps/search/?api=1&query=@mapQuery" target="_blank" rel="noopener noreferrer"><i class="bi bi-geo-alt me-1"></i>Map</a>
+    @if (p.ArchivedAt is null && await CurrentUser.HasPermissionAsync(Oes.Application.Security.Permissions.RecordsMerge)) { <a class="btn btn-sm btn-outline-secondary" href="/Merge/property/@p.Id"><i class="bi bi-intersect me-1"></i>Merge duplicate</a> }
 </div>
+
+@if (p.ArchivedAt is not null)
+{
+    <div class="alert alert-secondary"><i class="bi bi-archive me-2"></i>This property was @(p.MergedIntoId is null ? "archived" : "merged") on @p.ArchivedAt.Value.ToString("MMM d, yyyy").@if (p.MergedIntoId is { } into) { <a class="ms-1" href="/Properties/View/@into">Open the property it was merged into</a> }</div>
+}
 
 @if (p.Notes is not null)
 {

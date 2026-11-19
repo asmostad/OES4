@@ -10,6 +10,7 @@ namespace Oes.Web.Pages.Contacts;
 public class NewModel(ContactService contacts, PropertyService properties, CrmLookups lookups, RecordScope scope) : CrmPageModel
 {
     [BindProperty] public ContactForm Form { get; set; } = new();
+    /// <summary>Optional; checked by PropertyService only when a street is entered.</summary>
     [BindProperty] public PropertyInput Address { get; set; } = new();
     [BindProperty] public string? AddressRole { get; set; } = "owner";
     [BindProperty] public bool CreateAnyway { get; set; }
@@ -35,6 +36,7 @@ public class NewModel(ContactService contacts, PropertyService properties, CrmLo
     public async Task<IActionResult> OnPostAsync()
     {
         await LoadAsync();
+        ClearOptionalAddress(Address);
         if (!ModelState.IsValid) return Redisplay();
 
         if (!CreateAnyway)
