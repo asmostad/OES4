@@ -1,0 +1,94 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Campaigns.ViewModel
+@using Oes.Domain.Crm
+@{
+    var d = Model.Detail;
+    var c = d.Campaign;
+    var s = d.Stats;
+    var isStatic = c.Mode == CampaignModes.Static;
+    ViewData["Title"] = c.Name;
+    var calls = d.Outcomes.Sum(o => o.Count);
+}
+<div class="page-header">
+    <div>
+        <h1>@c.Name @if (!c.IsActive) { <span class="badge bg-secondary-subtle text-secondary fs-6 align-middle">Off</span> }</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Campaigns">Lead Campaigns</a></li><li class="breadcrumb-item active">@c.Name</li></ol></nav>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/Campaigns/Edit/@c.Id"><i class="bi bi-pencil me-1"></i>Edit</a>
+        @if (c.IsActive) { <a class="btn btn-sm btn-primary" href="/Prospecting/Work?campaign=@c.Id"><i class="bi bi-telephone-outbound me-1"></i>Start calling</a> }
+    </div>
+</div>
+
+@if (c.Description is not null) { <p class="text-muted">@c.Description</p> }
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Leads</div><div class="fs-3 fw-semibold">@s.Leads</div></div></div></div>
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Due now</div><div class="fs-3 fw-semibold">@s.DueNow</div></div></div></div>
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Called</div><div class="fs-3 fw-semibold">@s.Called</div>
+        @if (s.Leads > 0) { <div class="progress mt-1" style="height:4px" role="progressbar" aria-label="Share called" aria-valuenow="@(100 * s.Called / s.Leads)" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:@(100 * s.Called / s.Leads)%"></div></div> }</div></div></div>
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Won</div><div class="fs-3 fw-semibold text-success">@s.Won</div></div></div></div>
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Lost</div><div class="fs-3 fw-semibold text-danger">@s.Lost</div></div></div></div>
+    <div class="col-6 col-lg-2"><div class="card stat-card h-100"><div class="card-body"><div class="small text-muted">Still open</div><div class="fs-3 fw-semibold">@s.StillOpen</div></div></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header">Call outcomes since the campaign started</div>
+            <ul class="list-group list-group-flush">
+                @if (calls == 0) { <li class="list-group-item small text-muted">No calls yet.</li> }
+                @foreach (var (name, color, count) in d.Outcomes)
+                {
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <span class="badge" style="background:@color">&nbsp;</span><span class="flex-grow-1">@name</span>
+                        <span class="fw-semibold">@count</span><span class="small text-muted" style="width:3rem;text-align:right">@(100 * count / calls)%</span>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header">How leads are chosen</div>
+            <div class="card-body small">
+                <div class="mb-2">@(isStatic ? "A fixed list, built from these filters." : "Live filters: every open lead that matches now.")</div>
+                <ul class="mb-0 ps-3">@foreach (var line in Model.CriteriaText) { <li>@line</li> }</ul>
+                @if (isStatic)
+                {
+                    <form method="post" asp-page-handler="AddMatches" class="mt-3">
+                        <button class="btn btn-sm btn-outline-primary" type="submit" disabled="@(d.NewMatches == 0)">
+                            <i class="bi bi-plus-lg me-1"></i>Add @d.NewMatches new matching lead@(d.NewMatches == 1 ? "" : "s")</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="card-header">Leads @if (s.Leads > d.Leads.Count) { <span class="small text-muted">(first @d.Leads.Count of @s.Leads)</span> }</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>Lead</th><th>Stage</th><th class="text-end">Attempts</th><th>Last outcome</th><th>Next call</th>@if (isStatic) { <th></th> }</tr></thead>
+                    <tbody>
+                        @if (d.Leads.Count == 0) { <tr><td colspan="6" class="small text-muted">No leads@(isStatic ? " in this list" : " match right now").</td></tr> }
+                        @foreach (var l in d.Leads)
+                        {
+                            <tr class="@(l.Outcome == Outcomes.Open ? "" : "text-muted")">
+                                <td><a href="/Opportunities/View/@l.Id">@l.ContactName</a> <span class="small text-muted">@l.Number</span>
+                                    @if (l.Address is not null) { <div class="small text-muted">@l.Address</div> }</td>
+                                <td><span class="badge" style="background:@l.StageColor">@l.StageName</span></td>
+                                <td class="text-end">@l.Attempts</td>
+                                <td class="small">@l.LastOutcome</td>
+                                <td class="small">@(l.Outcome != Outcomes.Open ? Fmt.Cap(l.Outcome) : l.RecycleAt is { } r && r > DateTime.UtcNow ? r.ToString("MMM d") : "Due")</td>
+                                @if (isStatic)
+                                {
+                                    <td class="text-end"><form method="post" asp-page-handler="Remove"><input type="hidden" name="opportunityId" value="@l.Id">
+                                        <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="Remove from campaign" data-confirm="Take this lead out of the campaign?"><i class="bi bi-x-circle"></i></button></form></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

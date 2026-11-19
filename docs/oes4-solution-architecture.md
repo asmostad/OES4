@@ -138,7 +138,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Solution skeleton; CI.
    - Tenancy + Identity + roles/permissions + tenant isolation tests.
    - App shell with the OES3 look; audit log; file store; SES system mail.
-2. **CRM core** (most of it done 2026-11-16)
+2. **CRM core** (done 2026-11-18)
    - Done:
      - Contacts (person/org) and properties with structures, property ↔ contact links with roles and history.
      - Duplicate-address detection by normalized key.
@@ -160,8 +160,12 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - A "Views" menu saves what's on screen under a name and switches between views. A view keeps only that list's known filters (never paging), so it always shows what the viewer may see, and "mine" means the viewer. Saving with an existing name replaces it; up to 30 personal views per person.
        - Managers (`records.view_all`) can share a view with everyone and remove shared views; shared changes are audited.
        - A personal view can be your default: opening the list with no filters goes to it, and "No filters" (`?reset=1`) shows everything.
-   - Still to do:
-     - Lead campaigns.
+     - Lead campaigns (done 2026-11-18, permission `leads.campaigns`; Administration › Leads & Marketing › Lead Campaigns):
+       - A campaign picks open leads by stage, lead source, storm, property ZIP codes, at most N attempts, created dates and "unassigned only", with a live count while editing.
+       - Two kinds. A fixed list (`campaign_members`) takes the matches when it's created, and newer matches are added on request ("Add N new matching leads"); single leads can be taken out. Live filters always take whatever matches now. A campaign can't switch kinds.
+       - Reps pick a campaign in Prospecting (and the app API: `GET /api/v1/campaigns`, `campaignId` on counts and next). A campaign's leads come up whatever their stage, still within the rep's own record visibility.
+       - The campaign page shows leads, due now, called (with a progress bar), won, lost and still open, the call outcomes since it started, and the leads with stage, attempts, last outcome and next call.
+       - OES3 campaigns were saved filters only; saved views now cover that, and campaigns add the tracking.
 3. **Insurance** (done 2026-11-17)
    - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
    - Claims: optional until filed, and visibility follows the opportunity; notes roll up to the opportunity, property and contact.

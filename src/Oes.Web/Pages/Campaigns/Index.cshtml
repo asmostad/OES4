@@ -1,0 +1,46 @@
+@page
+@model Oes.Web.Pages.Campaigns.IndexModel
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Lead Campaigns";
+}
+<div class="page-header">
+    <div>
+        <h1>Lead Campaigns</h1>
+        <p class="page-subtitle">Groups of leads for reps to work in <a href="/Prospecting">Prospecting</a>: a storm area, a lead source, old leads to revive.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Campaigns/Edit"><i class="bi bi-plus-lg me-1"></i> New campaign</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead><tr><th>Campaign</th><th>Kind</th><th class="text-end">Leads</th><th class="text-end">Due now</th><th class="text-end">Called</th><th class="text-end">Won</th><th class="text-end">Lost</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-muted small">No campaigns yet. Start one to give reps a focused list to call.</td></tr>
+                }
+                @foreach (var r in Model.Rows)
+                {
+                    var c = r.Campaign;
+                    var s = r.Stats;
+                    <tr class="@(c.IsActive ? "" : "text-muted")">
+                        <td><a href="/Campaigns/View/@c.Id" class="fw-medium">@c.Name</a>@if (!c.IsActive) { <span class="badge bg-secondary-subtle text-secondary ms-1">Off</span> }
+                            @if (c.Description is not null) { <div class="small text-muted">@c.Description</div> }</td>
+                        <td class="small">@(c.Mode == CampaignModes.Static ? "Fixed list" : "Live filters")</td>
+                        <td class="text-end">@s.Leads</td>
+                        <td class="text-end">@s.DueNow</td>
+                        <td class="text-end">@s.Called@if (s.Leads > 0) { <span class="small text-muted"> (@((100 * s.Called / s.Leads))%)</span> }</td>
+                        <td class="text-end">@s.Won</td>
+                        <td class="text-end">@s.Lost</td>
+                        <td class="text-end">@if (c.IsActive && s.DueNow > 0) { <a class="btn btn-sm btn-outline-primary" href="/Prospecting/Work?campaign=@c.Id"><i class="bi bi-telephone-outbound me-1"></i>Call</a> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="mt-2 small">
+    @if (Model.Inactive) { <a href="/Campaigns">Hide campaigns that are off</a> } else { <a href="/Campaigns?inactive=true">Show campaigns that are off</a> }
+</div>

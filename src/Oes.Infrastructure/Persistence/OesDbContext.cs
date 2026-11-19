@@ -48,6 +48,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Disposition> Dispositions => Set<Disposition>();
     public DbSet<OpportunityDisposition> OpportunityDispositions => Set<OpportunityDisposition>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<CampaignMember> CampaignMembers => Set<CampaignMember>();
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Document> Documents => Set<Document>();
@@ -1073,6 +1075,25 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(d => d.LostReasonKey).HasMaxLength(60);
             e.HasIndex(d => new { d.TenantId, d.Sort });
             e.HasOne<PipelineStage>().WithMany().HasForeignKey(d => d.MovesToStageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Campaign>(e =>
+        {
+            e.ToTable("campaigns");
+            e.Property(c => c.Name).HasMaxLength(100);
+            e.Property(c => c.Description).HasMaxLength(500);
+            e.Property(c => c.Mode).HasMaxLength(20);
+            e.Property(c => c.CriteriaJson).HasMaxLength(4000);
+            e.HasIndex(c => new { c.TenantId, c.IsActive });
+        });
+
+        b.Entity<CampaignMember>(e =>
+        {
+            e.ToTable("campaign_members");
+            e.HasIndex(m => new { m.TenantId, m.CampaignId, m.OpportunityId }).IsUnique();
+            e.HasIndex(m => new { m.TenantId, m.OpportunityId });
+            e.HasOne<Campaign>().WithMany().HasForeignKey(m => m.CampaignId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Opportunity>().WithMany().HasForeignKey(m => m.OpportunityId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<SavedView>(e =>

@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<Crm.ListSettingsService>();
         services.AddScoped<Crm.ProspectingService>();
         services.AddScoped<Crm.SavedViewService>();
+        services.AddScoped<Crm.CampaignQuery>();
+        services.AddScoped<Crm.CampaignService>();
 
         services.AddScoped<Insurance.CarrierService>();
         services.AddScoped<Insurance.StormService>();

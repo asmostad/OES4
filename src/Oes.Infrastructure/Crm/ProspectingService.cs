@@ -10,7 +10,7 @@ using Oes.Infrastructure.Work;
 namespace Oes.Infrastructure.Crm;
 
 /// <summary>Which leads to call. Mine = only leads the user owns; otherwise everything they can see.</summary>
-public sealed record ProspectFilter(Guid? StageId = null, string? SourceKey = null, Guid? StormId = null, bool Mine = false);
+public sealed record ProspectFilter(Guid? StageId = null, string? SourceKey = null, Guid? StormId = null, bool Mine = false, Guid? CampaignId = null);
 
 public sealed record CallRow(DateTime At, string Disposition, string Color, string? By, string? Note);
 
@@ -26,7 +26,7 @@ public sealed record ProspectCard(
 /// </summary>
 public sealed class ProspectingService(
     OesDbContext db, RecordScope scope, IClock clock, TenantTime time, RecordItems items, OpportunityService opportunities,
-    ConsentService consents)
+    ConsentService consents, CampaignQuery campaigns)
 {
     public static readonly TimeSpan LockFor = TimeSpan.FromMinutes(15);
 
@@ -39,12 +39,14 @@ public sealed class ProspectingService(
     private async Task<IQueryable<Opportunity>> DueAsync(ProspectFilter f)
     {
         var now = clock.UtcNow;
+        // A campaign chooses its own leads, whatever their stage.
+        var anyStage = f.CampaignId is not null;
         var q = (await scope.OpportunitiesAsync()).Where(o => o.Outcome == Outcomes.Open
             && (o.RecycleAt == null || o.RecycleAt <= now)
-            && db.PipelineStages.Any(s => s.Id == o.StageId && s.InProspecting)
+            && (anyStage || db.PipelineStages.Any(s => s.Id == o.StageId && s.InProspecting))
             && !db.Dispositions.Any(d => d.Id == o.LastDispositionId && d.IsDoNotContact)
             && db.Contacts.Any(c => c.Id == o.PrimaryContactId && c.ArchivedAt == null));
-        return Filtered(q, f);
+        return await Filtered(q, f);
     }
 
     public sealed record QueueCounts(int Due, int BeingWorked, int CallBacksLater);
@@ -64,14 +66,16 @@ public sealed class ProspectingService(
     private async Task<int> LaterAsync(ProspectFilter f, CancellationToken ct)
     {
         var now = clock.UtcNow;
+        var anyStage = f.CampaignId is not null;
         var q = (await scope.OpportunitiesAsync()).Where(o => o.Outcome == Outcomes.Open && o.RecycleAt > now
-            && db.PipelineStages.Any(s => s.Id == o.StageId && s.InProspecting)
+            && (anyStage || db.PipelineStages.Any(s => s.Id == o.StageId && s.InProspecting))
             && !db.Dispositions.Any(d => d.Id == o.LastDispositionId && d.IsDoNotContact));
-        return await Filtered(q, f).CountAsync(ct);
+        return await (await Filtered(q, f)).CountAsync(ct);
     }
 
-    private IQueryable<Opportunity> Filtered(IQueryable<Opportunity> q, ProspectFilter f)
+    private async Task<IQueryable<Opportunity>> Filtered(IQueryable<Opportunity> q, ProspectFilter f)
     {
+        if (f.CampaignId is { } campaign) q = await campaigns.RestrictAsync(q, campaign);
         if (f.StageId is { } stage) q = q.Where(o => o.StageId == stage);
         if (!string.IsNullOrWhiteSpace(f.SourceKey)) q = q.Where(o => o.SourceKey == f.SourceKey);
         if (f.StormId is { } storm) q = q.Where(o => o.StormEventId == storm);

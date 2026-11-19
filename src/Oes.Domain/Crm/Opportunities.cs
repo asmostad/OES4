@@ -132,3 +132,31 @@ public class SavedView : TenantEntity
     public string CriteriaJson { get; set; } = "{}";
     public bool IsDefault { get; set; }
 }
+
+public static class CampaignModes
+{
+    /// <summary>Whatever matches the filters right now.</summary>
+    public const string Dynamic = "dynamic";
+    /// <summary>A fixed list built from the filters, so progress can be tracked.</summary>
+    public const string Static = "static";
+}
+
+/// <summary>
+/// A lead campaign ("lead bank"): a set of open leads to call, defined by filters. Static
+/// campaigns snapshot the matches into campaign_members; dynamic ones re-run the filters.
+/// </summary>
+public class Campaign : TenantEntity
+{
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public string Mode { get; set; } = CampaignModes.Static;
+    public string CriteriaJson { get; set; } = "{}";
+    public bool IsActive { get; set; } = true;
+    public Guid? CreatedByUserId { get; set; }
+}
+
+public class CampaignMember : TenantEntity
+{
+    public Guid CampaignId { get; set; }
+    public Guid OpportunityId { get; set; }
+}

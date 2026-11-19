@@ -108,13 +108,13 @@ public sealed class ProspectingApiController(ProspectingService prospecting) : C
         (await prospecting.DispositionsAsync(ct)).Select(d => new DispositionItem(d.Id, d.Name, d.Color, d.RecycleDays, d.IsDoNotContact)).ToList();
 
     [HttpGet("counts")]
-    public Task<ProspectingService.QueueCounts> Counts(Guid? stageId, string? source, Guid? stormId, bool mine = false, CancellationToken ct = default) =>
-        prospecting.CountsAsync(new ProspectFilter(stageId, source, stormId, mine), ct);
+    public Task<ProspectingService.QueueCounts> Counts(Guid? stageId, string? source, Guid? stormId, bool mine = false, Guid? campaignId = null, CancellationToken ct = default) =>
+        prospecting.CountsAsync(new ProspectFilter(stageId, source, stormId, mine, campaignId), ct);
 
     /// <summary>Claims the next due lead; 204 when the list is done.</summary>
     [HttpPost("next")]
-    public async Task<IActionResult> Next(Guid? stageId, string? source, Guid? stormId, bool mine = false, [FromQuery] Guid[]? skip = null, CancellationToken ct = default) =>
-        await prospecting.NextAsync(new ProspectFilter(stageId, source, stormId, mine), skip ?? [], ct) is { } id ? Ok(new NextLead(id)) : NoContent();
+    public async Task<IActionResult> Next(Guid? stageId, string? source, Guid? stormId, bool mine = false, Guid? campaignId = null, [FromQuery] Guid[]? skip = null, CancellationToken ct = default) =>
+        await prospecting.NextAsync(new ProspectFilter(stageId, source, stormId, mine, campaignId), skip ?? [], ct) is { } id ? Ok(new NextLead(id)) : NoContent();
 
     [HttpPost("{id:guid}/disposition")]
     public async Task<IActionResult> Disposition(Guid id, DispositionRequest body, CancellationToken ct)
@@ -129,4 +129,16 @@ public sealed class ProspectingApiController(ProspectingService prospecting) : C
         await prospecting.ReleaseAsync(id, ct);
         return NoContent();
     }
+}
+
+public sealed record CampaignItem(Guid Id, string Name, string Mode);
+
+/// <summary>Active lead campaigns, so the app can offer them on the call list.</summary>
+[ApiController]
+[Route("api/v1/campaigns")]
+public sealed class CampaignsApiController(CampaignService campaigns) : ControllerBase
+{
+    [HttpGet]
+    public async Task<List<CampaignItem>> Active(CancellationToken ct) =>
+        (await campaigns.ActiveAsync(ct)).Select(c => new CampaignItem(c.Id, c.Name, c.Mode)).ToList();
 }

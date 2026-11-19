@@ -18,6 +18,16 @@
                 <p class="small text-muted">Work through open leads one at a time: call, pick what happened, and the next lead comes up. Leads nobody has called yet come first,
                     then call-backs that are due. While you have a lead open, nobody else gets it.</p>
                 <form method="get" action="/Prospecting/Work" class="row g-2">
+                    @if (Model.Campaigns.Count > 0)
+                    {
+                        <div class="col-12">
+                            <label class="form-label small" for="p-campaign">Campaign</label>
+                            <select id="p-campaign" name="campaign" class="form-select form-select-sm">
+                                <option value="">No campaign: everything in the call-list stages</option>
+                                @foreach (var c in Model.Campaigns) { <option value="@c.Id" selected="@(Model.Campaign == c.Id)">@c.Name</option> }
+                            </select>
+                        </div>
+                    }
                     <div class="col-sm-6">
                         <label class="form-label small" for="p-stage">Stage</label>
                         <select id="p-stage" name="stage" class="form-select form-select-sm">
