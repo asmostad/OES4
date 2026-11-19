@@ -4662,6 +4662,77 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("workflow_stage_changes", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Reports.SavedReport", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("From")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("LastSentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime?>("NextSendAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("OwnerFilterId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("RangeKey")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Schedule")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<int>("ScheduleDay")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("To")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UserId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextSendAt");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.ToTable("saved_reports", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Subcontractors.Subcontractor", b =>
                 {
                     b.Property<byte[]>("Id")

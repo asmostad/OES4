@@ -41,6 +41,8 @@ public sealed record Kpi(string Label, object Value, string Kind = "number");
 
 public sealed record Report(string Title, List<Kpi> Kpis, List<ReportTable> Tables);
 
+public sealed record ReportKind(string Key, string Title, string Icon, string Blurb, bool UsesRange);
+
 /// <summary>
 /// Reports over what the user may see: the same record scope as every list (own and unassigned
 /// records, or everything with records.view_all), so a report never reveals hidden records.
@@ -48,6 +50,29 @@ public sealed record Report(string Title, List<Kpi> Kpis, List<ReportTable> Tabl
 /// </summary>
 public sealed class ReportService(OesDbContext db, RecordScope scope, ICurrentUser user, TenantTime time, CrmLookups lookups, IClock clock)
 {
+    public static readonly IReadOnlyList<ReportKind> Kinds =
+    [
+        new("pipeline", "Pipeline", "bi-funnel", "Open opportunities by stage and owner, right now.", false),
+        new("sales", "Sales", "bi-trophy", "New leads, wins, losses and win rate by month, source and owner.", true),
+        new("production", "Production", "bi-kanban", "Active projects and trades by stage, backlog, sold and completed.", true),
+        new("stale", "Stale", "bi-hourglass-split", "Opportunities and projects stuck in a stage too long.", false),
+        new("tasks", "Tasks", "bi-check2-square", "Open, overdue and finished tasks by person.", true),
+        new("calls", "Prospecting calls", "bi-telephone-outbound", "Call outcomes by outcome and by person.", true),
+        new("marketing", "Marketing", "bi-megaphone", "Email blast results and the leads they brought in, and nurture workflows.", true),
+    ];
+
+    public Task<Report> RunAsync(string kind, ReportFilter f, CancellationToken ct = default) => kind switch
+    {
+        "pipeline" => PipelineAsync(f, ct),
+        "sales" => SalesAsync(f, ct),
+        "production" => ProductionAsync(f, ct),
+        "stale" => StaleAsync(f, ct),
+        "calls" => CallsAsync(f, ct),
+        "marketing" => MarketingAsync(f, ct),
+        "tasks" => TasksAsync(f, ct),
+        _ => throw new CrmRuleException("Unknown report."),
+    };
+
     private async Task<IQueryable<Opportunity>> OppsAsync(ReportFilter f)
     {
         await scope.EnsurePermissionAsync(Permissions.ReportsView);

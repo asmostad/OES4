@@ -10,18 +10,9 @@ using Oes.Web.Infrastructure;
 namespace Oes.Web.Pages.Reports;
 
 [HasPermission(Permissions.ReportsView)]
-public class IndexModel(ReportService reports, CrmLookups lookups, TenantTime time, ICurrentUser user) : CrmPageModel
+public class IndexModel(ReportService reports, SavedReportService saved, CrmLookups lookups, TenantTime time, ICurrentUser user) : CrmPageModel
 {
-    public static readonly (string Key, string Title, string Icon, string Blurb, bool UsesRange)[] Kinds =
-    [
-        ("pipeline", "Pipeline", "bi-funnel", "Open opportunities by stage and owner, right now.", false),
-        ("sales", "Sales", "bi-trophy", "New leads, wins, losses and win rate by month, source and owner.", true),
-        ("production", "Production", "bi-kanban", "Active projects and trades by stage, backlog, sold and completed.", true),
-        ("stale", "Stale", "bi-hourglass-split", "Opportunities and projects stuck in a stage too long.", false),
-        ("tasks", "Tasks", "bi-check2-square", "Open, overdue and finished tasks by person.", true),
-        ("calls", "Prospecting calls", "bi-telephone-outbound", "Call outcomes by outcome and by person.", true),
-        ("marketing", "Marketing", "bi-megaphone", "Email blast results and the leads they brought in, and nurture workflows.", true),
-    ];
+    public static IReadOnlyList<ReportKind> Kinds => ReportService.Kinds;
 
     [BindProperty(SupportsGet = true)] public string? Kind { get; set; }
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }
@@ -30,15 +21,16 @@ public class IndexModel(ReportService reports, CrmLookups lookups, TenantTime ti
     [BindProperty(SupportsGet = true)] public string? Format { get; set; }
 
     public Report? Result { get; private set; }
-    public (string Key, string Title, string Icon, string Blurb, bool UsesRange) Current { get; private set; }
+    public ReportKind Current { get; private set; } = null!;
     public List<Option> Users { get; private set; } = [];
     public bool CanPickOwner { get; private set; }
+    public List<SavedReportRow> Saved { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync() => Guard(async () =>
     {
-        if (Kind is null) return Page();
-        Current = Kinds.FirstOrDefault(k => k.Key == Kind);
-        if (Current.Key is null) return NotFound();
+        if (Kind is null) { Saved = await saved.MineAsync(); return Page(); }
+        if (Kinds.FirstOrDefault(k => k.Key == Kind) is not { } kind) return NotFound();
+        Current = kind;
 
         var today = await time.TodayAsync();
         To ??= today;
@@ -49,17 +41,39 @@ public class IndexModel(ReportService reports, CrmLookups lookups, TenantTime ti
         if (CanPickOwner) Users = await lookups.UsersAsync();
         var filter = new ReportFilter(From.Value, To.Value, CanPickOwner || Kind == "tasks" ? Owner : null);
 
-        Result = Kind switch
-        {
-            "pipeline" => await reports.PipelineAsync(filter),
-            "sales" => await reports.SalesAsync(filter),
-            "production" => await reports.ProductionAsync(filter),
-            "stale" => await reports.StaleAsync(filter),
-            "calls" => await reports.CallsAsync(filter),
-            "marketing" => await reports.MarketingAsync(filter),
-            _ => await reports.TasksAsync(filter),
-        };
+        Result = await reports.RunAsync(Kind, filter);
         return Format == "csv" ? Csv(Result) : Page();
+    });
+
+    /// <summary>Saves the report on screen. Weekly and monthly days come from separate fields.</summary>
+    public Task<IActionResult> OnPostSaveAsync(string name, string rangeKey, string schedule, int weeklyDay, int monthlyDay) => Guard(async () =>
+    {
+        await saved.SaveAsync(new SavedReportInput
+        {
+            Name = name, Kind = Kind ?? "", RangeKey = rangeKey, From = From, To = To, OwnerFilterId = Owner, Schedule = schedule,
+            ScheduleDay = schedule == Oes.Domain.Reports.ReportSchedules.Monthly ? monthlyDay : weeklyDay,
+        });
+        Flash(schedule == Oes.Domain.Reports.ReportSchedules.None ? "Report saved." : "Report saved. It will be emailed to you on schedule.");
+        return RedirectToPage(new { kind = (string?)null });
+    }, () =>
+    {
+        var errors = ModelState[""]?.Errors.Select(e => e.ErrorMessage).ToList();
+        if (errors is { Count: > 0 }) Flash(string.Join(" ", errors), "danger");
+        return RedirectToPage(new { kind = Kind, from = From, to = To, owner = Owner });
+    });
+
+    public Task<IActionResult> OnPostDeleteAsync(Guid id) => Guard(async () =>
+    {
+        await saved.DeleteAsync(id);
+        Flash("Saved report deleted.");
+        return RedirectToPage(new { kind = (string?)null });
+    });
+
+    public Task<IActionResult> OnPostSendAsync(Guid id) => Guard(async () =>
+    {
+        await saved.SendNowAsync(id);
+        Flash("Sent to your email.");
+        return RedirectToPage(new { kind = (string?)null });
     });
 
     private FileContentResult Csv(Report r)

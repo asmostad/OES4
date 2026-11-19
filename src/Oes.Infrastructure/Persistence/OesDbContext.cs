@@ -48,6 +48,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Disposition> Dispositions => Set<Disposition>();
     public DbSet<OpportunityDisposition> OpportunityDispositions => Set<OpportunityDisposition>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
+    public DbSet<Domain.Reports.SavedReport> SavedReports => Set<Domain.Reports.SavedReport>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignMember> CampaignMembers => Set<CampaignMember>();
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
@@ -1173,6 +1174,18 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(m => new { m.TenantId, m.OpportunityId });
             e.HasOne<Campaign>().WithMany().HasForeignKey(m => m.CampaignId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Opportunity>().WithMany().HasForeignKey(m => m.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Domain.Reports.SavedReport>(e =>
+        {
+            e.ToTable("saved_reports");
+            e.Property(r => r.Name).HasMaxLength(100);
+            e.Property(r => r.Kind).HasMaxLength(30);
+            e.Property(r => r.RangeKey).HasMaxLength(20);
+            e.Property(r => r.Schedule).HasMaxLength(10);
+            e.Property(r => r.LastError).HasMaxLength(500);
+            e.HasIndex(r => new { r.TenantId, r.UserId });
+            e.HasIndex(r => r.NextSendAt);
         });
 
         b.Entity<SavedView>(e =>

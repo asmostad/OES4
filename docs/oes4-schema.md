@@ -90,6 +90,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `opportunity_contacts` | OpportunityId, ContactId, RoleKey | Spouse, property manager, public adjuster… |
 | `opportunity_stage_history` | OpportunityId, FromStageId, ToStageId, DispositionId, ByUserId, At, Note | Stale detection and conversion reports |
 | `saved_views` | TenantId, UserId (null = shared), ListKey, Name, CriteriaJson (the list's known query-string filters), IsDefault (personal views only) | Saved filters on every list. **Built** (2026-11-18) |
+| `saved_reports` | TenantId, UserId, Name, Kind, RangeKey (rolling or fixed), From, To, OwnerFilterId, Schedule (none/weekly/monthly), ScheduleDay, NextSendAt, LastSentAt, LastError | Saved and emailed reports, always run as their owner. **Built** (2026-11-19) |
 | `campaigns` | TenantId, Name, Description, Mode (dynamic/static), CriteriaJson (stage, source, storm, ZIPs, max attempts, created range, unassigned only), IsActive + `campaign_members` (CampaignId, OpportunityId) | Lead banks. Static lists track progress (OES3 campaigns were filters only). **Built** (2026-11-18) |
 
 **Converting:** a won opportunity creates/links an estimate and later a project at its property. A contact can have many opportunities over time.

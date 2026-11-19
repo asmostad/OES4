@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<Admin.SettingsService>();
         services.AddScoped<Scheduling.BookingService>();
         services.AddScoped<Reports.ReportService>();
+        services.AddScoped<Reports.SavedReportService>();
 
         services.Configure<FileStoreOptions>(config.GetSection(FileStoreOptions.Section));
         services.AddScoped<IFileStore, DiskFileStore>();

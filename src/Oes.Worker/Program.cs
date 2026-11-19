@@ -17,5 +17,6 @@ builder.Services.AddHostedService<NurtureJob>();
 builder.Services.AddHostedService<ChecksJob>();
 builder.Services.AddHostedService<CleanupJob>();
 builder.Services.AddHostedService<AutomationJob>();
+builder.Services.AddHostedService<ReportsJob>();
 
 builder.Build().Run();

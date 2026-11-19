@@ -33,6 +33,29 @@
 
 @if (Model.Result is null)
 {
+    @if (Model.Saved.Count > 0)
+    {
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-bookmark-star me-2"></i>My saved reports</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var s in Model.Saved)
+                {
+                    <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                        <i class="bi @s.Kind.Icon text-primary"></i>
+                        <div class="flex-grow-1">
+                            <a href="@s.Url" class="fw-medium">@s.Report.Name</a>
+                            <div class="small text-muted">@s.Kind.Title · @s.RangeText@if (s.ScheduleText is not null) { <text> · @s.ScheduleText@(s.NextSendLocal is { } n ? $", next {n:ddd MMM d}" : "")</text> }</div>
+                            @if (s.Report.LastError is not null) { <div class="small text-danger">@s.Report.LastError</div> }
+                        </div>
+                        <form method="post" asp-page-handler="Send" asp-route-kind=""><input type="hidden" name="id" value="@s.Report.Id">
+                            <button class="btn btn-sm btn-outline-secondary" type="submit" title="Email it to me now"><i class="bi bi-envelope"></i></button></form>
+                        <form method="post" asp-page-handler="Delete" asp-route-kind=""><input type="hidden" name="id" value="@s.Report.Id">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Delete" data-confirm="Delete the saved report &quot;@s.Report.Name&quot;?"><i class="bi bi-trash"></i></button></form>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
     <div class="row g-3">
         @foreach (var k in Oes.Web.Pages.Reports.IndexModel.Kinds)
         {
@@ -66,7 +89,38 @@ else
         }
         <button class="btn btn-sm btn-primary" type="submit">Update</button>
         @if (!Model.Current.UsesRange) { <span class="small text-muted ms-2">As of now.</span> }
+        <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#save-report"><i class="bi bi-bookmark-plus me-1"></i>Save this report</button>
     </div></form>
+
+    <div class="collapse mb-3" id="save-report"><div class="card"><div class="card-body">
+        <form method="post" asp-page-handler="Save" class="row g-2 align-items-end">
+            <input type="hidden" name="from" value="@Model.From?.ToString("yyyy-MM-dd")"><input type="hidden" name="to" value="@Model.To?.ToString("yyyy-MM-dd")">
+            @if (Model.Owner is not null) { <input type="hidden" name="owner" value="@Model.Owner"> }
+            <div class="col-md-4"><label class="form-label small mb-0" for="sr-name">Name</label>
+                <input id="sr-name" name="name" class="form-control form-control-sm" maxlength="100" required value="@Model.Current.Title"></div>
+            @if (Model.Current.UsesRange)
+            {
+                <div class="col-md-3"><label class="form-label small mb-0" for="sr-range">Dates</label>
+                    <select id="sr-range" name="rangeKey" class="form-select form-select-sm">
+                        @foreach (var (key, label) in Oes.Domain.Reports.ReportRanges.All) { <option value="@key" selected="@(key == Oes.Domain.Reports.ReportRanges.ThisMonth)">@label@(key == Oes.Domain.Reports.ReportRanges.Fixed ? $" ({Model.From:MMM d}–{Model.To:MMM d, yyyy})" : "")</option> }
+                    </select></div>
+            }
+            else { <input type="hidden" name="rangeKey" value="this_month"> }
+            <div class="col-md-2"><label class="form-label small mb-0" for="sr-sched">Email it to me</label>
+                <select id="sr-sched" name="schedule" class="form-select form-select-sm">
+                    <option value="none">No</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label small mb-0" for="sr-wday">Weekly on / monthly on day</label>
+                <div class="d-flex gap-1">
+                    <select id="sr-wday" name="weeklyDay" class="form-select form-select-sm" aria-label="Weekday">
+                        @for (var d = 0; d < 7; d++) { <option value="@d" selected="@(d == 1)">@(((DayOfWeek)d).ToString()[..3])</option> }
+                    </select>
+                    <input type="number" name="monthlyDay" min="1" max="28" value="1" class="form-control form-control-sm" style="max-width:70px" aria-label="Day of month">
+                </div></div>
+            <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit">Save</button></div>
+            <div class="col-12 form-text mt-0">Emails go to you at 7 am company time and show only what you can see. Saving with an existing name replaces it.</div>
+        </form>
+    </div></div></div>
 
     <div class="row g-3 mb-3">
         @foreach (var k in r.Kpis)
