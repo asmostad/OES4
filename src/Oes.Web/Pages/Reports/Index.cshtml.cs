@@ -19,6 +19,8 @@ public class IndexModel(ReportService reports, CrmLookups lookups, TenantTime ti
         ("production", "Production", "bi-kanban", "Active projects and trades by stage, backlog, sold and completed.", true),
         ("stale", "Stale", "bi-hourglass-split", "Opportunities and projects stuck in a stage too long.", false),
         ("tasks", "Tasks", "bi-check2-square", "Open, overdue and finished tasks by person.", true),
+        ("calls", "Prospecting calls", "bi-telephone-outbound", "Call outcomes by outcome and by person.", true),
+        ("marketing", "Marketing", "bi-megaphone", "Email blast results and the leads they brought in, and nurture workflows.", true),
     ];
 
     [BindProperty(SupportsGet = true)] public string? Kind { get; set; }
@@ -53,6 +55,8 @@ public class IndexModel(ReportService reports, CrmLookups lookups, TenantTime ti
             "sales" => await reports.SalesAsync(filter),
             "production" => await reports.ProductionAsync(filter),
             "stale" => await reports.StaleAsync(filter),
+            "calls" => await reports.CallsAsync(filter),
+            "marketing" => await reports.MarketingAsync(filter),
             _ => await reports.TasksAsync(filter),
         };
         return Format == "csv" ? Csv(Result) : Page();

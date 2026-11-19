@@ -257,4 +257,109 @@ public sealed class ReportService(OesDbContext db, RecordScope scope, ICurrentUs
             new Kpi("Done in range", rows.Count(r => r.CompletedAt != null)),
         ], [byUser]);
     }
+
+    // ---------------- Marketing (blasts and nurture workflows) ----------------
+
+    /// <summary>
+    /// Email blasts started in the range (sent, failed, skipped, unsubscribes and new leads from
+    /// recipients within 30 days) and nurture workflows (enrollments started in the range and how
+    /// they ended). Lead and win counts only include opportunities the user can see.
+    /// </summary>
+    public async Task<Report> MarketingAsync(ReportFilter f, CancellationToken ct = default)
+    {
+        var opps = await OppsAsync(f);
+        var (start, end) = await time.DayRangeUtcAsync(f.From, f.To);
+
+        var blasts = await db.Blasts.Where(b => b.StartedAt >= start && b.StartedAt < end).OrderBy(b => b.StartedAt)
+            .Select(b => new { b.Id, b.Name, StartedAt = b.StartedAt!.Value }).ToListAsync(ct);
+        var blastIds = blasts.Select(b => b.Id).ToList();
+        var recipients = await db.BlastRecipients.Where(r => blastIds.Contains(r.BlastId))
+            .Select(r => new { r.BlastId, r.ContactId, r.Address, r.Status }).ToListAsync(ct);
+        var addresses = recipients.Select(r => r.Address).Distinct().ToList();
+        var unsubscribes = await db.Suppressions.Where(s => s.Channel == Domain.Communication.Channels.Email
+                && s.Reason == Domain.Communication.SuppressionReasons.Unsubscribe && addresses.Contains(s.Address))
+            .Select(s => new { s.Address, s.CreatedAt }).ToListAsync(ct);
+        var contactIds = recipients.Select(r => r.ContactId).Distinct().ToList();
+        var leads = await opps.Where(o => contactIds.Contains(o.PrimaryContactId) && o.CreatedAt >= start)
+            .Select(o => new { o.PrimaryContactId, o.CreatedAt, o.Outcome }).ToListAsync(ct);
+
+        var blastTable = new ReportTable("Email blasts", "Blast", "Sent on", "Sent", "Failed", "Skipped", "Unsubscribed", "New leads (30 days)", "Won") { BarColumn = 2 };
+        int sentTotal = 0, unsubTotal = 0, leadTotal = 0, wonTotal = 0;
+        foreach (var b in blasts)
+        {
+            var rs = recipients.Where(r => r.BlastId == b.Id).ToList();
+            var sent = rs.Where(r => r.Status == Domain.Communication.BlastRecipientStatuses.Sent).ToList();
+            var window = b.StartedAt.AddDays(30);
+            var sentAddresses = sent.Select(r => r.Address).ToHashSet();
+            var sentContacts = sent.Select(r => r.ContactId).ToHashSet();
+            var unsub = unsubscribes.Count(u => sentAddresses.Contains(u.Address) && u.CreatedAt >= b.StartedAt && u.CreatedAt < window);
+            var newLeads = leads.Where(l => sentContacts.Contains(l.PrimaryContactId) && l.CreatedAt >= b.StartedAt && l.CreatedAt < window).ToList();
+            var won = newLeads.Count(l => l.Outcome == Outcomes.Won);
+            blastTable.Add([b.Name, DateOnly.FromDateTime(await time.ToLocalAsync(b.StartedAt)).ToString("MMM d, yyyy"), sent.Count,
+                rs.Count(r => r.Status == Domain.Communication.BlastRecipientStatuses.Failed), rs.Count(r => r.Status == Domain.Communication.BlastRecipientStatuses.Skipped),
+                unsub, newLeads.Count, won], link: $"/Blasts/View?id={b.Id}");
+            sentTotal += sent.Count; unsubTotal += unsub; leadTotal += newLeads.Count; wonTotal += won;
+        }
+        if (blasts.Count > 0) blastTable.Totals = ["Total", "", sentTotal, null, null, unsubTotal, leadTotal, wonTotal];
+
+        var sequences = await db.Sequences.Select(s => new { s.Id, s.Name }).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        var enrollments = await db.Enrollments.Where(e => e.CreatedAt >= start && e.CreatedAt < end)
+            .Select(e => new { e.SequenceId, e.Status, e.StopReason, e.OpportunityId }).ToListAsync(ct);
+        var enrolledOpps = enrollments.Where(e => e.OpportunityId != null).Select(e => e.OpportunityId!.Value).Distinct().ToList();
+        var wonOpps = (await opps.Where(o => enrolledOpps.Contains(o.Id) && o.Outcome == Outcomes.Won).Select(o => o.Id).ToListAsync(ct)).ToHashSet();
+        var nurture = new ReportTable("Nurture workflows (enrolled in range)", "Workflow", "Enrolled", "Still running", "Finished", "Stopped", "Opportunities won") { BarColumn = 1 };
+        foreach (var g in enrollments.GroupBy(e => e.SequenceId).OrderByDescending(g => g.Count()))
+            nurture.Add([sequences.GetValueOrDefault(g.Key, "Deleted workflow"), g.Count(),
+                g.Count(e => e.Status == Domain.Communication.EnrollmentStatuses.Active), g.Count(e => e.Status == Domain.Communication.EnrollmentStatuses.Completed),
+                g.Count(e => e.Status == Domain.Communication.EnrollmentStatuses.Stopped),
+                g.Where(e => e.OpportunityId is { } id && wonOpps.Contains(id)).Select(e => e.OpportunityId).Distinct().Count()],
+                link: $"/Admin/NurtureEdit?id={g.Key}");
+
+        var stops = new ReportTable("Why nurture runs stopped", "Reason", "Runs") { BarColumn = 1 };
+        foreach (var g in enrollments.Where(e => e.Status == Domain.Communication.EnrollmentStatuses.Stopped)
+                     .GroupBy(e => string.IsNullOrWhiteSpace(e.StopReason) ? "Not recorded" : Fmt(e.StopReason!)).OrderByDescending(g => g.Count()))
+            stops.Add([g.Key, g.Count()]);
+
+        return new Report("Marketing", [
+            new Kpi("Blast emails sent", sentTotal),
+            new Kpi("Unsubscribed after a blast", unsubTotal),
+            new Kpi("New leads from blasts", leadTotal),
+            new Kpi("Nurture enrollments", enrollments.Count),
+        ], [blastTable, nurture, stops]);
+
+        static string Fmt(string s) => char.ToUpperInvariant(s[0]) + s[1..].Replace('_', ' ');
+    }
+
+    // ---------------- Prospecting calls ----------------
+
+    /// <summary>Call outcomes recorded in the range, by outcome and by person, over leads the user can see.</summary>
+    public async Task<Report> CallsAsync(ReportFilter f, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.ReportsView);
+        var opps = await scope.OpportunitiesAsync(includeArchived: true);
+        var (start, end) = await time.DayRangeUtcAsync(f.From, f.To);
+        var calls = db.OpportunityDispositions.Where(d => d.CreatedAt >= start && d.CreatedAt < end && opps.Any(o => o.Id == d.OpportunityId));
+        if (f.OwnerId is { } owner) calls = calls.Where(d => d.ByUserId == owner);
+        var rows = await (from c in calls
+                          join d in db.Dispositions on c.DispositionId equals d.Id
+                          select new { c.ByUserId, c.OpportunityId, d.Name, d.Color, d.Sort, d.CountsAsAttempt, d.IsDoNotContact, d.MovesToStageId }).ToListAsync(ct);
+        var openStages = (await db.PipelineStages.Where(s => s.Outcome == Outcomes.Open).Select(s => s.Id).ToListAsync(ct)).ToHashSet();
+        bool Forward(Guid? stage) => stage is { } s && openStages.Contains(s);
+
+        var byOutcome = new ReportTable("Calls by outcome", "Outcome", "Calls", "Share") { BarColumn = 1, PercentColumns = [2] };
+        foreach (var g in rows.GroupBy(r => new { r.Name, r.Color, r.Sort }).OrderBy(g => g.Key.Sort))
+            byOutcome.Add([g.Key.Name, g.Count(), rows.Count == 0 ? 0m : (decimal)g.Count() / rows.Count], g.Key.Color);
+
+        var names = await UserNamesAsync(ct);
+        var byPerson = new ReportTable("Calls by person", "Person", "Calls", "Leads called", "Moved forward", "Do not contact") { BarColumn = 1 };
+        foreach (var g in rows.GroupBy(r => r.ByUserId).OrderByDescending(g => g.Count()))
+            byPerson.Add([Owner(names, g.Key), g.Count(), g.Select(r => r.OpportunityId).Distinct().Count(), g.Count(r => Forward(r.MovesToStageId)), g.Count(r => r.IsDoNotContact)]);
+
+        return new Report("Prospecting calls", [
+            new Kpi("Calls logged", rows.Count),
+            new Kpi("Leads called", rows.Select(r => r.OpportunityId).Distinct().Count()),
+            new Kpi("Moved forward", rows.Count(r => Forward(r.MovesToStageId))),
+            new Kpi("Do not contact", rows.Count(r => r.IsDoNotContact)),
+        ], [byOutcome, byPerson]);
+    }
 }
