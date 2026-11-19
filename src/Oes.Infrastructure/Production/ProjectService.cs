@@ -235,7 +235,7 @@ public sealed class ProjectService(OesDbContext db, RecordScope scope, RecordIte
         return p;
     }
 
-    private async Task<(ProjectTrade Trade, Project Project)> TradeForAsync(Guid tradeId, bool advance, CancellationToken ct)
+    internal async Task<(ProjectTrade Trade, Project Project)> TradeForAsync(Guid tradeId, bool advance, CancellationToken ct)
     {
         var t = await db.ProjectTrades.FirstOrDefaultAsync(x => x.Id == tradeId, ct) ?? throw new RecordNotFoundException("Trade");
         var p = await (await scope.ProjectsAsync()).FirstOrDefaultAsync(x => x.Id == t.ProjectId, ct) ?? throw new RecordNotFoundException("Trade");

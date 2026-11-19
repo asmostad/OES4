@@ -91,6 +91,41 @@ public class ProjectTrade : TenantEntity
     public DateTime? RemovedFromBoardAt { get; set; }
     public string? RemovalReasonKey { get; set; }
     public string? RemovalNote { get; set; }
+
+    // Materials order (the order sheet)
+    /// <summary>The last takeoff run for the order sheet (slot picks and options).</summary>
+    public string? OrderTakeoffJson { get; set; }
+    public string? OrderSupplier { get; set; }
+    public string? OrderNotes { get; set; }
+    public DateTime? OrderedAt { get; set; }
+    public Guid? OrderedByUserId { get; set; }
+}
+
+public static class OrderLineSources
+{
+    public const string Takeoff = "takeoff";
+    public const string Estimate = "estimate";
+    public const string Manual = "manual";
+}
+
+/// <summary>
+/// A line on a trade's materials order. Kept apart from what was sold (the estimate sets the price;
+/// production decides what to buy). Filled from the takeoff, copied from the sold estimate, or added by hand.
+/// </summary>
+public class OrderSheetLine : TenantEntity
+{
+    public Guid ProjectTradeId { get; set; }
+    public int Sort { get; set; }
+    public string Source { get; set; } = OrderLineSources.Manual;
+    public Guid? ProductId { get; set; }
+    public Guid? TakeoffRuleId { get; set; }
+    public string? Sku { get; set; }
+    public string Description { get; set; } = "";
+    public decimal Qty { get; set; }
+    public string Unit { get; set; } = "EA";
+    /// <summary>Color, size or other detail for the supplier.</summary>
+    public string? Notes { get; set; }
+    public decimal? UnitCost { get; set; }
 }
 
 /// <summary>Stage history for projects and trades (who moved what, when, and what automation did).</summary>

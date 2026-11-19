@@ -23,6 +23,7 @@
 
 <div class="record-toolbar">
     <a class="btn btn-sm btn-outline-secondary" href="/Workflow?trade=@d.Type.Id"><i class="bi bi-kanban me-1"></i>@d.Type.Name board</a>
+    <a class="btn btn-sm btn-outline-primary" href="/Projects/OrderSheet/@d.Trade.Id"><i class="bi bi-truck me-1"></i>Order sheet@(d.Trade.OrderedAt is null ? "" : " · ordered")</a>
     @if (d.CanEdit)
     {
         @if (t.RemovedFromBoardAt is null)

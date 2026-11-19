@@ -85,6 +85,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<WorkflowStage> WorkflowStages => Set<WorkflowStage>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<ProjectTrade> ProjectTrades => Set<ProjectTrade>();
+    public DbSet<OrderSheetLine> OrderSheetLines => Set<OrderSheetLine>();
     public DbSet<WorkflowStageChange> WorkflowStageChanges => Set<WorkflowStageChange>();
     public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
     public DbSet<ChangeOrderLine> ChangeOrderLines => Set<ChangeOrderLine>();
@@ -657,6 +658,20 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasOne<WorkflowStage>().WithMany().HasForeignKey(p => p.StageId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        b.Entity<OrderSheetLine>(e =>
+        {
+            e.ToTable("order_sheet_lines");
+            e.Property(l => l.Source).HasMaxLength(20);
+            e.Property(l => l.Sku).HasMaxLength(60);
+            e.Property(l => l.Description).HasMaxLength(500);
+            e.Property(l => l.Qty).HasPrecision(12, 3);
+            e.Property(l => l.Unit).HasMaxLength(20);
+            e.Property(l => l.Notes).HasMaxLength(300);
+            e.Property(l => l.UnitCost).HasPrecision(12, 4);
+            e.HasIndex(l => new { l.TenantId, l.ProjectTradeId, l.Sort });
+            e.HasOne<ProjectTrade>().WithMany().HasForeignKey(l => l.ProjectTradeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         b.Entity<ProjectTrade>(e =>
         {
             e.ToTable("project_trades");
@@ -665,6 +680,9 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(t => t.CrewNote).HasMaxLength(500);
             e.Property(t => t.RemovalReasonKey).HasMaxLength(60);
             e.Property(t => t.RemovalNote).HasMaxLength(500);
+            e.Property(t => t.OrderTakeoffJson).HasMaxLength(2000);
+            e.Property(t => t.OrderSupplier).HasMaxLength(150);
+            e.Property(t => t.OrderNotes).HasMaxLength(1000);
             e.HasIndex(t => new { t.TenantId, t.ProjectId });
             e.HasIndex(t => new { t.TenantId, t.StageId });
             e.HasOne<Project>().WithMany().HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);

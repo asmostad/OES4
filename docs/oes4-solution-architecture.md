@@ -195,8 +195,8 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - On an estimate section with measurements, "Takeoff" shows the drivers, slot pickers (pre-filled from the last run, or the only product in a slot), options and a priced preview, then puts the lines on the estimate. A re-run replaces only the lines the takeoff made (`EstimateLines.TakeoffRuleId`); hand-added lines stay.
    - Still to do:
      - Server-side PDF (Playwright).
-     - The order sheet (production), built on the takeoff engine.
-6. **Production** (core done 2026-11-17)
+     - Scope-of-work wording templates per rule (OES3 had them).
+6. **Production** (done 2026-11-19)
    - Done:
      - Projects from signed estimates (one trade per estimate trade, contract = signed total).
      - Per-tenant project and trade stages with roles, which are unique per level and editable.
@@ -205,9 +205,11 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Project and trade kanban boards (drag and drop), Remove from Board with reasons and restore.
      - Change orders with customer approval that adds to the contract (and to the trade amount).
      - Itemized change orders (done 2026-11-18): leave the amount blank on the project page and the change order opens to take items from the job's price list (when the job came from a price-book estimate), products, or custom lines. A negative quantity is a credit, prices are copied when added, and the total is the sum of the lines. Items can be edited until the customer decides; an empty change order can't be approved. Every change order has its own page and a printable copy with the contract before and after and signature lines.
-   - Still to do:
-     - Configurable automation rules: done in milestone 8 (Administration › Automation).
-     - Order sheet (with the takeoff engine).
+     - Order sheets (done 2026-11-19): each trade has a materials order, kept apart from what was sold (the estimate sets the price; production decides what to buy).
+       - Fill it from the takeoff rules, using every building's current measurements for the trade, with the same slot pickers and options as estimates (the last picks are remembered). Or copy the sold estimate's material product lines for that trade. Or add products or anything else by hand.
+       - Refilling replaces only the lines that source made and nobody changed; editing a line makes it the person's.
+       - A printable material order for the supplier (SKU, item, quantity, color/notes, deliver-to address, needed-by date, delivery notes). "Mark as ordered" records the supplier, notes, who and when, and can be reopened.
+   - Automation rules are configurable in milestone 8 (Administration › Automation).
 7. **Subcontractors** (done 2026-11-17)
    - Subs as organization contacts with a profile (trades, status).
    - Documents with expiry dates, with a cached earliest insurance expiry and badges.

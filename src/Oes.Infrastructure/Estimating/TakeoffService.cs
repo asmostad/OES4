@@ -47,6 +47,11 @@ public sealed record SectionTakeoff(
     EstimateSection Section, TradeType Trade, List<TakeoffDriver> Drivers, Dictionary<string, decimal> Values, bool HasMeasurements,
     Dictionary<string, List<Product>> SlotProducts, List<TakeoffOption> Options, TakeoffChoicesInput Choices, List<TakeoffLine> Lines);
 
+/// <summary>A takeoff over one trade's measurements (an estimate section, or a project trade's order sheet).</summary>
+public sealed record TakeoffRun(
+    TradeType Trade, List<TakeoffDriver> Drivers, Dictionary<string, decimal> Values, bool HasMeasurements,
+    Dictionary<string, List<Product>> SlotProducts, List<TakeoffOption> Options, TakeoffChoicesInput Choices, List<TakeoffLine> Lines);
+
 public sealed class TakeoffChoicesInput
 {
     public Dictionary<string, Guid?> Slots { get; set; } = [];
@@ -149,17 +154,26 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         var detail = await estimates.GetAsync(estimateId, ct); // visibility
         var section = detail.Sections.Select(s => s.Section).FirstOrDefault(s => s.Id == sectionId) ?? throw new RecordNotFoundException("Section");
         if (section.TradeTypeId is not { } tradeId) throw new CrmRuleException("Pick the section's trade before running a takeoff.");
-        var trade = await db.TradeTypes.FirstAsync(t => t.Id == tradeId, ct);
-        var fields = await db.MeasurementFieldDefs.Where(f => f.TradeTypeId == tradeId).ToListAsync(ct);
-
         var setId = section.MeasurementSetId ?? (section.StructureId is { } sid
             ? await db.MeasurementSets.Where(s => s.StructureId == sid && s.TradeTypeId == tradeId && s.IsCurrent).Select(s => (Guid?)s.Id).FirstOrDefaultAsync(ct)
             : null);
         var measured = setId is null ? new Dictionary<string, decimal>()
             : await db.MeasurementValues.Where(v => v.SetId == setId).GroupBy(v => v.FieldKey)
                 .Select(g => new { g.Key, Sum = g.Sum(v => v.Value) }).ToDictionaryAsync(x => x.Key, x => x.Sum, ct);
-        var values = TakeoffEngine.Values(measured, fields);
+        var run = await BuildAsync(tradeId, measured, section.TakeoffJson, choices, ct);
+        return new SectionTakeoff(section, run.Trade, run.Drivers, run.Values, run.HasMeasurements, run.SlotProducts, run.Options, run.Choices, run.Lines);
+    }
 
+    /// <summary>
+    /// Runs a trade's rules on measured values (field key to value). With no choices: the last run's
+    /// (<paramref name="lastJson"/>), else defaults: options on by default, and a slot with one product picks it.
+    /// </summary>
+    public async Task<TakeoffRun> BuildAsync(Guid tradeId, Dictionary<string, decimal> measured, string? lastJson, TakeoffChoicesInput? choices,
+        CancellationToken ct = default)
+    {
+        var trade = await db.TradeTypes.FirstAsync(t => t.Id == tradeId, ct);
+        var fields = await db.MeasurementFieldDefs.Where(f => f.TradeTypeId == tradeId).ToListAsync(ct);
+        var values = TakeoffEngine.Values(measured, fields);
         var rules = await db.TakeoffRules.Where(r => r.TradeTypeId == tradeId && r.IsActive).ToListAsync(ct);
         var slots = rules.Where(r => r.Slot != null).Select(r => r.Slot!).Distinct().ToList();
         var candidates = await db.Products.Where(p => p.IsActive && p.TakeoffSlot != null && slots.Contains(p.TakeoffSlot) && (p.TradeTypeId == null || p.TradeTypeId == tradeId))
@@ -168,8 +182,7 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         var options = rules.Where(r => r.OptionKey != null).GroupBy(r => r.OptionKey!)
             .Select(g => new TakeoffOption(g.Key, g.First().OptionLabel ?? TakeoffEngine.Label(g.Key), g.First().OptionDefaultOn)).ToList();
 
-        // No choices given: the last run on this section, else defaults (options on by default; a slot with one product picks it).
-        choices ??= Read(section.TakeoffJson) ?? new TakeoffChoicesInput
+        choices ??= Read(lastJson) ?? new TakeoffChoicesInput
         {
             Options = options.Where(o => o.DefaultOn).Select(o => o.Key).ToList(),
             Slots = slotProducts.Where(kv => kv.Value.Count == 1).ToDictionary(kv => kv.Key, kv => (Guid?)kv.Value[0].Id),
@@ -181,7 +194,7 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         var fixedProducts = await db.Products.Where(p => fixedIds.Contains(p.Id) && p.IsActive).ToDictionaryAsync(p => p.Id, ct);
 
         var lines = TakeoffEngine.Run(rules, values, fixedProducts, new TakeoffChoices(choices.Options.ToHashSet(), picked));
-        return new SectionTakeoff(section, trade, TakeoffEngine.Drivers(trade, fields), values, measured.Count > 0, slotProducts, options, choices, lines);
+        return new TakeoffRun(trade, TakeoffEngine.Drivers(trade, fields), values, measured.Count > 0, slotProducts, options, choices, lines);
     }
 
     /// <summary>Runs the takeoff and replaces the section's generated lines. Returns how many lines were added.</summary>
@@ -191,6 +204,8 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         if (!run.HasMeasurements) throw new CrmRuleException("This section has no measurements to take off from.");
         return await estimates.ReplaceTakeoffLinesAsync(estimateId, sectionId, run.Lines, JsonSerializer.Serialize(choices, Json), ct);
     }
+
+    public static string Write(TakeoffChoicesInput choices) => JsonSerializer.Serialize(choices, Json);
 
     private static TakeoffChoicesInput? Read(string? json)
     {

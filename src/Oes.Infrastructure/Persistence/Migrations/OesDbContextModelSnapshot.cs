@@ -4284,6 +4284,75 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("change_order_lines", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Production.OrderSheetLine", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<byte[]>("ProductId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ProjectTradeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<decimal>("Qty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<byte[]>("TakeoffRuleId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("decimal(12,4)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectTradeId");
+
+                    b.HasIndex("TenantId", "ProjectTradeId", "Sort");
+
+                    b.ToTable("order_sheet_lines", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Production.Project", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -4414,6 +4483,24 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("MaterialDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("OrderNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("OrderSupplier")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("OrderTakeoffJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("OrderedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("OrderedByUserId")
+                        .HasColumnType("binary(16)");
 
                     b.Property<byte[]>("ProjectId")
                         .IsRequired()
@@ -5857,6 +5944,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasOne("Oes.Domain.Production.ChangeOrder", null)
                         .WithMany()
                         .HasForeignKey("ChangeOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Production.OrderSheetLine", b =>
+                {
+                    b.HasOne("Oes.Domain.Production.ProjectTrade", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectTradeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<Estimating.EstimateService>();
         services.AddScoped<Estimating.TakeoffService>();
         services.AddScoped<Production.ProjectService>();
+        services.AddScoped<Production.OrderSheetService>();
         services.AddScoped<Security.AccessTokenService>();
         services.AddScoped<Subcontractors.SubcontractorService>();
         services.AddScoped<Subcontractors.WorkOrderService>();

@@ -132,6 +132,82 @@ public sealed class ProductionTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task Order_sheets_fill_from_the_estimate_and_the_takeoff_and_keep_hand_edits()
+    {
+        var sold = await SignedEstimateAsync();
+        await using var s = fx.ScopeAs(sold.Tenant, sold.Admin);
+        var svc = s.Get<ProjectService>();
+        var orders = s.Get<OrderSheetService>();
+        var id = await svc.CreateFromEstimateAsync(sold.Estimate);
+        var project = (await svc.GetAsync(id)).Project;
+        var roof = (await svc.GetAsync(id)).Trades.Single(t => t.Type.Code == "roofing").Trade.Id;
+
+        // From the sold estimate: its material product lines for this trade only.
+        var sheet = await orders.GetAsync(roof);
+        Assert.Equal(1, sheet.EstimateLines);
+        Assert.False(sheet.Takeoff.HasMeasurements);
+        await Assert.ThrowsAsync<CrmRuleException>(() => orders.FillFromTakeoffAsync(roof, new TakeoffChoicesInput()));
+        Assert.Equal(1, await orders.CopyFromEstimateAsync(roof));
+        var copied = (await orders.GetAsync(roof)).Lines.Single();
+        Assert.Equal(("ROOF-SQ", 25m, OrderLineSources.Estimate), (copied.Sku, copied.Qty, copied.Source));
+
+        // From the takeoff: the property's roofing measurements and a product tagged for the shingle slot.
+        var roofing = (await s.Get<MeasurementService>().TradesAsync()).Single(x => x.Code == "roofing");
+        var structure = (await s.Get<PropertyService>().GetAsync(project.PropertyId!.Value)).Structures.Single().Id;
+        await s.Get<MeasurementService>().SaveVersionAsync(project.PropertyId!.Value, structure, roofing.Id,
+            new MeasurementInput { Values = new() { ["|total_area"] = 1500m, ["|ridges"] = 30m } });
+        var shingle = await s.Get<CatalogService>().SaveProductAsync(null, new ProductInput { Sku = "SHG", Name = "Shingle bundle", Unit = "SQ", DefaultPrice = 120m, TakeoffSlot = "shingle" });
+        var choices = (await orders.GetAsync(roof)).Takeoff.Choices;
+        Assert.Equal(shingle, choices.Slots["shingle"]); // the only product in the slot
+        Assert.Equal(1, await orders.FillFromTakeoffAsync(roof, choices)); // 15 SQ + 10% -> 16.5
+        var lines = (await orders.GetAsync(roof)).Lines;
+        Assert.Equal(2, lines.Count);
+        var fromTakeoff = lines.Single(l => l.Source == OrderLineSources.Takeoff);
+        Assert.Equal(16.5m, fromTakeoff.Qty);
+
+        // A person's change is kept on refills; a hand-added line too.
+        await orders.UpdateLineAsync(fromTakeoff.Id, 18, "Weathered wood");
+        var hand = await orders.AddLineAsync(roof, null, "Coil nails", 4, "box", null);
+        await orders.FillFromTakeoffAsync(roof, choices);
+        lines = (await orders.GetAsync(roof)).Lines;
+        Assert.Equal(4, lines.Count); // estimate copy, edited takeoff line, hand line, fresh takeoff line
+        Assert.Contains(lines, l => l.Qty == 18m && l.Notes == "Weathered wood" && l.Source == OrderLineSources.Manual);
+        Assert.Equal("BOX", lines.Single(l => l.Id == hand).Unit);
+        await orders.RemoveLineAsync(lines.Single(l => l.Source == OrderLineSources.Takeoff).Id);
+
+        // Ordering needs a supplier; it can be reopened.
+        await Assert.ThrowsAsync<CrmRuleException>(() => orders.MarkOrderedAsync(roof, true, " ", null));
+        await orders.MarkOrderedAsync(roof, true, "ABC Supply", "Drop in the driveway");
+        var trade = (await svc.GetTradeAsync(roof)).Trade;
+        Assert.Equal(("ABC Supply", true), (trade.OrderSupplier, trade.OrderedAt != null));
+
+        // The page, its printable copy and the takeoff form.
+        var web = fx.App.Browser();
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = sold.Admin.Email!, ["Password"] = MySqlFixture.Password,
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(await web.GetStringAsync("/Account/Login"),
+                "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync($"/Projects/OrderSheet/{roof}");
+        Assert.Contains("Ordered from <strong>ABC Supply</strong>", page);
+        Assert.Contains("Coil nails", page);
+        var print = await web.GetStringAsync($"/Projects/OrderSheet/{roof}?print=true");
+        Assert.Contains("Material order", print);
+        Assert.Contains("Drop in the driveway", print);
+        Assert.Contains($"/Projects/OrderSheet/{roof}", await web.GetStringAsync($"/Projects/Trade/{roof}"));
+        var fill = await web.PostAsync($"/Projects/OrderSheet/{roof}?handler=Takeoff", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Choices.Slots[shingle]"] = shingle.ToString(),
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(page, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, fill.StatusCode);
+        await using var check = fx.ScopeAs(sold.Tenant, sold.Admin);
+        Assert.Single((await check.Get<OrderSheetService>().GetAsync(roof)).Lines, l => l.Source == OrderLineSources.Takeoff);
+    }
+
+    [Fact]
     public async Task Itemized_change_orders_total_their_lines_and_lock_once_decided()
     {
         var sold = await SignedEstimateAsync();
