@@ -67,7 +67,7 @@
                     </div>
                     <form method="post" asp-page-handler="ShowCalendar" class="mt-1">
                         <input type="hidden" name="id" value="@c.Id"><input type="hidden" name="user" value="@Model.UserId"><input type="hidden" name="show" value="@(c.ShowOnCalendar ? "false" : "true")">
-                        <button class="btn btn-sm btn-link p-0 small" type="submit">@(c.ShowOnCalendar ? "Hide busy times from the OES calendar" : "Show busy times on the OES calendar")</button>
+                        <button class="btn btn-sm btn-link p-0 small" type="submit">@(c.ShowOnCalendar ? "Hide busy times from the Pich calendar" : "Show busy times on the Pich calendar")</button>
                     </form>
                 </li>
             }
@@ -82,7 +82,7 @@
                 </div>
             </form>
             <div class="form-text">Use the calendar's secret or private address in iCal format (Google: Settings › your calendar › "Secret address in iCal format"; Outlook: Publish calendar › ICS).
-                OES keeps only when you're busy, never what the events are, and reads it every 15 minutes.</div>
+                Pich keeps only when you're busy, never what the events are, and reads it every 15 minutes.</div>
         </div>
     </div>
 </div></div>

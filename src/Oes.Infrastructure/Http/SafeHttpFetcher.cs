@@ -88,7 +88,7 @@ public sealed class SafeHttpFetcher : ISafeFetcher
                 };
                 using var http = new HttpClient(handler) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
                 using var req = new HttpRequestMessage(HttpMethod.Get, uri);
-                req.Headers.UserAgent.Add(new ProductInfoHeaderValue("OES-Calendar", "1.0"));
+                req.Headers.UserAgent.Add(new ProductInfoHeaderValue("Pich-Calendar", "1.0"));
                 using var res = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
                 if ((int)res.StatusCode is >= 300 and < 400 && res.Headers.Location is { } location)
                 {

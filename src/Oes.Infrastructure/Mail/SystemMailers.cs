@@ -14,7 +14,7 @@ public sealed class SystemMailOptions
     public string Provider { get; set; } = "Pickup";
 
     public string FromAddress { get; set; } = "no-reply@example.com";
-    public string FromName { get; set; } = "OES";
+    public string FromName { get; set; } = "Pich";
 
     /// <summary>AWS region for SES, e.g. us-east-2. Credentials come from the standard AWS chain, never config files.</summary>
     public string? SesRegion { get; set; }

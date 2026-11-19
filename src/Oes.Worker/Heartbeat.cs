@@ -5,9 +5,9 @@ public sealed class Heartbeat(ILogger<Heartbeat> log) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        log.LogInformation("OES4 Worker started");
+        log.LogInformation("Pich worker started");
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
-        do { log.LogInformation("OES4 Worker heartbeat at {Time:O}", DateTimeOffset.UtcNow); }
+        do { log.LogInformation("Pich worker heartbeat at {Time:O}", DateTimeOffset.UtcNow); }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 }

@@ -39,14 +39,14 @@ public class ForgotPasswordModel(
 
         await mailer.SendAsync(new SystemEmail(
             user.Email!,
-            "Reset your OES password",
+            "Reset your Pich password",
             $"""
              <p>Hi {HtmlEncoder.Default.Encode(user.FirstName)},</p>
              <p>Someone asked to reset the password for your OES account. If it was you, use this link within 24 hours:</p>
              <p><a href="{HtmlEncoder.Default.Encode(link)}">Reset my password</a></p>
              <p>If you didn't ask for this, you can ignore this email; your password won't change.</p>
              """,
-            $"Reset your OES password: {link}"));
+            $"Reset your Pich password: {link}"));
         log.LogInformation("Password reset email sent to user {UserId}", user.Id);
         return Page();
     }

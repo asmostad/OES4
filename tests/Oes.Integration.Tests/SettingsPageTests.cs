@@ -18,6 +18,10 @@ public sealed class SettingsPageTests(MySqlFixture fx)
         await web.GetAsync("/Account/SelectTenant");
 
         var page = await web.GetStringAsync("/Admin/Settings");
+        Assert.Contains("<title>Settings - Pich</title>", page); // the Pich brand in the shell
+        Assert.Contains("class=\"pich-wordmark\" src=\"/img/brand/pich-wordmark-white", page);
+        Assert.Contains("/css/pich-brand", page);
+        Assert.Contains("Pich Roofing Software", await fx.App.Browser().GetStringAsync("/Account/Login"));
         Assert.Contains("Estimates &amp; proposals", page);
         Assert.Contains("name=\"Estimates.ValidDays\" value=\"30\"", page);
 

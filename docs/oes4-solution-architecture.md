@@ -2,6 +2,12 @@
 
 **Status:** draft for review, 2026-11-16. It builds on [oes4-design-decisions.md](oes4-design-decisions.md) and [oes4-schema.md](oes4-schema.md).
 
+**Product name: Pich** (decided 2026-11-19). The brand package is in `assets/brand/pich-v1` (draft 1: logos, colors, type; raster drafts until a vector P and outlined wordmark are approved). In the app:
+- The staff app shell shows the Pich wordmark (white on the navy sidebar), the white lockup on the sign-in page, the orange badge as the favicon and app icon, "– Pich" in page titles, and Pich in system emails, help text and the AI assistant's instructions. Web-sized, transparent copies are cut from the drafts into `wwwroot/img/brand` (not redrawn).
+- `wwwroot/css/pich-brand.css` maps the brand onto the existing styles: navy #062536 for the sidebar, text, buttons and links; cloud #F4F6F7 background; slate #526570 secondary text; orange #FF7900 only as an accent (current menu item, focus ring, the short rule under page titles), because white on orange and orange on white are too low-contrast for text. Status, stage and trade colors are unchanged. Inter was already the UI font.
+- What contractors send their customers (proposals, change orders, material orders, emails, texts, booking pages, the portal) carries each company's own name, not Pich.
+- Internal names stay: code namespaces (`Oes.*`), the database, cookies, CSS class prefixes, and the data-protection application name "OES4" (changing it would sign everyone out and make stored encrypted links unreadable).
+
 ## 1. Stack
 
 | Layer | Choice | Why |

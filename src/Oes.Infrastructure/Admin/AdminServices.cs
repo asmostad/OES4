@@ -84,16 +84,16 @@ public sealed class TenantAdminService(
             var token = await users.GeneratePasswordResetTokenAsync(user);
             var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
             link = $"{baseUrl.TrimEnd('/')}/Account/ResetPassword?userId={user.Id}&code={code}";
-            body = $"<p>Hi {enc.Encode(user.FirstName)},</p><p>You've been invited to <strong>{enc.Encode(tenantName)}</strong> on OES.</p>" +
+            body = $"<p>Hi {enc.Encode(user.FirstName)},</p><p>You've been invited to <strong>{enc.Encode(tenantName)}</strong> on Pich.</p>" +
                    $"<p><a href=\"{enc.Encode(link)}\">Set your password</a> to get started. The link works for 24 hours.</p>";
         }
         else
         {
             link = $"{baseUrl.TrimEnd('/')}/Account/Login";
-            body = $"<p>Hi {enc.Encode(user.FirstName)},</p><p>You've been added to <strong>{enc.Encode(tenantName)}</strong> on OES. " +
+            body = $"<p>Hi {enc.Encode(user.FirstName)},</p><p>You've been added to <strong>{enc.Encode(tenantName)}</strong> on Pich. " +
                    $"Sign in with your existing account and choose it from the company list.</p><p><a href=\"{enc.Encode(link)}\">Sign in</a></p>";
         }
-        await mailer.SendAsync(new SystemEmail(email, $"You've been invited to {tenantName} on OES", body, link), ct);
+        await mailer.SendAsync(new SystemEmail(email, $"You've been invited to {tenantName} on Pich", body, link), ct);
     }
 
     public async Task SetMemberRolesAsync(Guid membershipId, IReadOnlyList<Guid> roleIds, CancellationToken ct = default)

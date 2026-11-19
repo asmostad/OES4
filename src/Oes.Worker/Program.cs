@@ -6,7 +6,7 @@ using Oes.Worker;
 // each one works per tenant in its own DI scope. Hangfire can replace the timers when jobs
 // need retries with backoff and a dashboard.
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddWindowsService(o => o.ServiceName = "OES4 Worker");
+builder.Services.AddWindowsService(o => o.ServiceName = "Pich Worker");
 builder.Services.AddOesInfrastructure(builder.Configuration);
 // The shared registrations include web-only services (user admin needs ASP.NET Identity), which
 // jobs never resolve. Keep scope checks, but don't fail startup validating services jobs don't use.

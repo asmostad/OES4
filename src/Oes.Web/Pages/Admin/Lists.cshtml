@@ -26,7 +26,7 @@
 @if (Model.WorkflowLevel is { } level)
 {
     var roles = level == Oes.Domain.Production.WorkflowLevels.Project ? Oes.Domain.Production.StageRoles.Project : Oes.Domain.Production.StageRoles.Trade;
-    <p class="small text-muted">Rename and reorder freely. The <strong>role</strong> tells OES what a stage means: gates (dates before deliveries and work) and automation
+    <p class="small text-muted">Rename and reorder freely. The <strong>role</strong> tells Pich what a stage means: gates (dates before deliveries and work) and automation
         (the project starts production when a trade's materials are ordered, and completes when every trade is complete) use roles, never names.</p>
     <div class="card">
         <div class="table-responsive">

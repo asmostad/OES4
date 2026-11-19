@@ -213,7 +213,7 @@ public sealed class SavedReportService(OesDbContext db, RecordScope scope, ICurr
             if (t.Rows.Count == 0) sb.Append($"<tr><td colspan=\"{t.Columns.Length}\" style=\"color:#6b7280;padding:4px 6px\">Nothing in this range.</td></tr>");
             sb.Append("</table>");
         }
-        sb.Append($"<p style=\"margin-top:20px\"><a href=\"{E(link)}\">Open the report in OES</a></p>");
+        sb.Append($"<p style=\"margin-top:20px\"><a href=\"{E(link)}\">Open the report in Pich</a></p>");
         sb.Append("<p style=\"color:#9ca3af;font-size:12px\">You saved this report and asked for it by email. Change or stop it on the Reports page.</p></div>");
         return sb.ToString();
     }
