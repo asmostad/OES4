@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<Crm.OpportunityService>();
         services.AddScoped<Crm.CrmLookups>();
         services.AddScoped<Crm.ListSettingsService>();
+        services.AddScoped<Crm.ProspectingService>();
 
         services.AddScoped<Insurance.CarrierService>();
         services.AddScoped<Insurance.StormService>();

@@ -14,6 +14,7 @@
 
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link @(Model.List == "stages" ? "active" : "")" href="?list=stages">Pipeline stages</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.List == "dispositions" ? "active" : "")" href="?list=dispositions">Call outcomes</a></li>
     <li class="nav-item"><a class="nav-link @(Model.List == "project_stages" ? "active" : "")" href="?list=project_stages">Project stages</a></li>
     <li class="nav-item"><a class="nav-link @(Model.List == "trade_stages" ? "active" : "")" href="?list=trade_stages">Trade stages</a></li>
     @foreach (var (key, label) in ListSettingsService.EditableLists)
@@ -66,14 +67,70 @@
         </div>
     </div>
 }
-else if (Model.List == "stages")
+else if (Model.List == "dispositions")
 {
-    <p class="small text-muted">Rename, recolor and reorder freely. Automation and reports use each stage's role (open, won, lost), never its name.
-        "Stale after" flags cards that sit in a stage too long.</p>
+    var openStages = Model.Stages.Where(s => s.IsActive).ToList();
+    <p class="small text-muted">What reps pick after each call in <a href="/Prospecting">Prospecting</a> (and on an opportunity). Each outcome says when the lead comes back to the
+        call list, and can move it to a stage. "Do not contact" takes the lead off the list for good and opts the contact out of marketing emails and texts.
+        Moving to a lost stage uses the lost reason you pick here.</p>
     <div class="card">
         <div class="table-responsive">
             <table class="table mb-0 align-middle">
-                <thead><tr><th style="width:90px">Order</th><th>Name</th><th>Color</th><th>Stale after (hours)</th><th>Active</th><th></th></tr></thead>
+                <thead><tr><th style="width:80px">Order</th><th>Name</th><th>Color</th><th>Call back after (days)</th><th>Moves to stage</th><th>Lost reason</th>
+                    <th title="Counts as a contact attempt">Attempt</th><th>Do not contact</th><th>Active</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var d in Model.Dispositions)
+                    {
+                        var fid = "d-" + d.Id.ToString("N");
+                        <tr class="@(d.IsActive ? "" : "text-muted")">
+                            <td class="text-nowrap">
+                                <form method="post" asp-page-handler="MoveDisposition" class="d-inline"><input type="hidden" name="id" value="@d.Id"><input type="hidden" name="direction" value="-1"><input type="hidden" name="list" value="dispositions">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move up"><i class="bi bi-arrow-up"></i></button></form>
+                                <form method="post" asp-page-handler="MoveDisposition" class="d-inline"><input type="hidden" name="id" value="@d.Id"><input type="hidden" name="direction" value="1"><input type="hidden" name="list" value="dispositions">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move down"><i class="bi bi-arrow-down"></i></button></form>
+                            </td>
+                            <td><form method="post" asp-page-handler="Disposition" id="@fid"><input type="hidden" name="disposition.Id" value="@d.Id"><input type="hidden" name="list" value="dispositions"></form>
+                                <input form="@fid" name="disposition.Name" value="@d.Name" class="form-control form-control-sm" maxlength="100" required aria-label="Name"></td>
+                            <td><input form="@fid" type="color" name="disposition.Color" value="@d.Color" class="form-control form-control-sm form-control-color" aria-label="Color"></td>
+                            <td><input form="@fid" type="number" min="1" max="365" name="disposition.RecycleDays" value="@d.RecycleDays" class="form-control form-control-sm" style="max-width:90px" aria-label="Call back after days"></td>
+                            <td><select form="@fid" name="disposition.MovesToStageId" class="form-select form-select-sm" aria-label="Moves to stage">
+                                <option value="">(stays)</option>
+                                @foreach (var s in openStages) { <option value="@s.Id" selected="@(d.MovesToStageId == s.Id)">@s.Name</option> }</select></td>
+                            <td><select form="@fid" name="disposition.LostReasonKey" class="form-select form-select-sm" aria-label="Lost reason">
+                                <option value="">—</option>
+                                @foreach (var v in Model.Values.Where(v => v.IsActive)) { <option value="@v.Key" selected="@(d.LostReasonKey == v.Key)">@v.Label</option> }</select></td>
+                            <td><input form="@fid" type="checkbox" name="disposition.CountsAsAttempt" value="true" class="form-check-input" checked="@d.CountsAsAttempt" aria-label="Counts as an attempt"></td>
+                            <td><input form="@fid" type="checkbox" name="disposition.IsDoNotContact" value="true" class="form-check-input" checked="@d.IsDoNotContact" aria-label="Do not contact"></td>
+                            <td><input form="@fid" type="checkbox" name="disposition.IsActive" value="true" class="form-check-input" checked="@d.IsActive" aria-label="Active"></td>
+                            <td><button form="@fid" class="btn btn-sm btn-primary" type="submit">Save</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-body border-top">
+            <form method="post" asp-page-handler="Disposition" class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="hidden" name="list" value="dispositions"><input type="hidden" name="disposition.IsActive" value="true"><input type="hidden" name="disposition.CountsAsAttempt" value="true">
+                <input name="disposition.Name" class="form-control form-control-sm w-auto" placeholder="New call outcome" maxlength="100" required aria-label="New call outcome">
+                <input type="color" name="disposition.Color" value="#64748b" class="form-control form-control-sm form-control-color" aria-label="Color">
+                <input type="number" min="1" max="365" name="disposition.RecycleDays" class="form-control form-control-sm" style="max-width:170px" placeholder="Call back after (days)" aria-label="Call back after days">
+                <select name="disposition.MovesToStageId" class="form-select form-select-sm w-auto" aria-label="Moves to stage">
+                    <option value="">Stage stays</option>
+                    @foreach (var s in openStages) { <option value="@s.Id">Moves to @s.Name</option> }
+                </select>
+                <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-plus-lg"></i> Add</button>
+            </form>
+        </div>
+    </div>
+}
+else if (Model.List == "stages")
+{
+    <p class="small text-muted">Rename, recolor and reorder freely. Automation and reports use each stage's role (open, won, lost), never its name.
+        "Stale after" flags cards that sit in a stage too long. Open leads in a "Call list" stage show up in <a href="/Prospecting">Prospecting</a>.</p>
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead><tr><th style="width:90px">Order</th><th>Name</th><th>Color</th><th>Stale after (hours)</th><th title="Open leads in this stage show up in the prospecting call list">Call list</th><th>Active</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var s in Model.Stages)
                     {
@@ -96,6 +153,7 @@ else if (Model.List == "stages")
                             </td>
                             <td><input form="@formId" type="color" name="stage.Color" value="@s.Color" class="form-control form-control-sm form-control-color" aria-label="Color"></td>
                             <td>@if (s.Outcome == Outcomes.Open) { <input form="@formId" type="number" min="1" name="stage.StaleAfterHours" value="@s.StaleAfterHours" class="form-control form-control-sm" style="max-width:110px" aria-label="Stale after hours"> }</td>
+                            <td>@if (s.Outcome == Outcomes.Open) { <input form="@formId" type="checkbox" name="stage.InProspecting" value="true" class="form-check-input" checked="@s.InProspecting" aria-label="On the call list"> }</td>
                             <td><input form="@formId" type="checkbox" name="stage.IsActive" value="true" class="form-check-input" checked="@s.IsActive" disabled="@(s.Outcome != Outcomes.Open)" aria-label="Active">
                                 @if (s.Outcome != Outcomes.Open) { <input form="@formId" type="hidden" name="stage.IsActive" value="true"> }</td>
                             <td class="text-end text-nowrap">

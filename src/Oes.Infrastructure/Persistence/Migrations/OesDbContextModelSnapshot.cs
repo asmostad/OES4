@@ -1634,6 +1634,63 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("contact_relationships", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Crm.Disposition", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<bool>("CountsAsAttempt")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDoNotContact")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("LostReasonKey")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<byte[]>("MovesToStageId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int?>("RecycleDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MovesToStageId");
+
+                    b.HasIndex("TenantId", "Sort");
+
+                    b.ToTable("dispositions", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Crm.Document", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -1833,6 +1890,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("LastContactAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<byte[]>("LastDispositionId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("LockedByUserId")
+                        .HasColumnType("binary(16)");
+
                     b.Property<string>("LostReasonKey")
                         .HasMaxLength(60)
                         .HasColumnType("varchar(60)");
@@ -1866,6 +1932,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<byte[]>("PropertyId")
                         .HasColumnType("binary(16)");
 
+                    b.Property<DateTime?>("RecycleAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("SourceKey")
                         .HasMaxLength(60)
                         .HasColumnType("varchar(60)");
@@ -1892,6 +1961,8 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("LastDispositionId");
+
                     b.HasIndex("PrimaryContactId");
 
                     b.HasIndex("PropertyId");
@@ -1911,7 +1982,53 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "StageId");
 
+                    b.HasIndex("TenantId", "Outcome", "RecycleAt");
+
                     b.ToTable("opportunities", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Crm.OpportunityDisposition", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("DispositionId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<byte[]>("OpportunityId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DispositionId");
+
+                    b.HasIndex("OpportunityId");
+
+                    b.HasIndex("TenantId", "OpportunityId");
+
+                    b.HasIndex("TenantId", "ByUserId", "CreatedAt");
+
+                    b.ToTable("opportunity_dispositions", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Crm.OpportunityStageChange", b =>
@@ -1968,6 +2085,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("InProspecting")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
@@ -5011,8 +5131,21 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Oes.Domain.Crm.Disposition", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.PipelineStage", null)
+                        .WithMany()
+                        .HasForeignKey("MovesToStageId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Oes.Domain.Crm.Opportunity", b =>
                 {
+                    b.HasOne("Oes.Domain.Crm.Disposition", null)
+                        .WithMany()
+                        .HasForeignKey("LastDispositionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Oes.Domain.Crm.Contact", null)
                         .WithMany()
                         .HasForeignKey("PrimaryContactId")
@@ -5034,6 +5167,21 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("StormEventId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Crm.OpportunityDisposition", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.Disposition", null)
+                        .WithMany()
+                        .HasForeignKey("DispositionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Crm.Opportunity", null)
+                        .WithMany()
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Oes.Domain.Crm.PropertyContact", b =>

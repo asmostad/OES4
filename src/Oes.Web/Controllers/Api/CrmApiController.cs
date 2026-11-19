@@ -90,3 +90,43 @@ public sealed class OpportunitiesApiController(OpportunityService opportunities)
         catch (CrmRuleException ex) { return Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest); }
     }
 }
+
+public sealed record DispositionRequest(Guid DispositionId, string? Note, DateOnly? CallBackOn);
+public sealed record DispositionItem(Guid Id, string Name, string Color, int? RecycleDays, bool IsDoNotContact);
+public sealed record NextLead(Guid OpportunityId);
+
+/// <summary>
+/// The prospecting call list for the mobile app: claim the next lead (locked to the caller),
+/// record the outcome, or release it. Same rules as the web page; errors become ProblemDetails.
+/// </summary>
+[ApiController]
+[Route("api/v1/prospecting")]
+public sealed class ProspectingApiController(ProspectingService prospecting) : ControllerBase
+{
+    [HttpGet("dispositions")]
+    public async Task<List<DispositionItem>> Dispositions(CancellationToken ct) =>
+        (await prospecting.DispositionsAsync(ct)).Select(d => new DispositionItem(d.Id, d.Name, d.Color, d.RecycleDays, d.IsDoNotContact)).ToList();
+
+    [HttpGet("counts")]
+    public Task<ProspectingService.QueueCounts> Counts(Guid? stageId, string? source, Guid? stormId, bool mine = false, CancellationToken ct = default) =>
+        prospecting.CountsAsync(new ProspectFilter(stageId, source, stormId, mine), ct);
+
+    /// <summary>Claims the next due lead; 204 when the list is done.</summary>
+    [HttpPost("next")]
+    public async Task<IActionResult> Next(Guid? stageId, string? source, Guid? stormId, bool mine = false, [FromQuery] Guid[]? skip = null, CancellationToken ct = default) =>
+        await prospecting.NextAsync(new ProspectFilter(stageId, source, stormId, mine), skip ?? [], ct) is { } id ? Ok(new NextLead(id)) : NoContent();
+
+    [HttpPost("{id:guid}/disposition")]
+    public async Task<IActionResult> Disposition(Guid id, DispositionRequest body, CancellationToken ct)
+    {
+        await prospecting.ApplyAsync(id, body.DispositionId, body.Note, body.CallBackOn, ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/release")]
+    public async Task<IActionResult> Release(Guid id, CancellationToken ct)
+    {
+        await prospecting.ReleaseAsync(id, ct);
+        return NoContent();
+    }
+}

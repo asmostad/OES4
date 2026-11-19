@@ -44,6 +44,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<PipelineStage> PipelineStages => Set<PipelineStage>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
     public DbSet<OpportunityStageChange> OpportunityStageChanges => Set<OpportunityStageChange>();
+    public DbSet<Disposition> Dispositions => Set<Disposition>();
+    public DbSet<OpportunityDisposition> OpportunityDispositions => Set<OpportunityDisposition>();
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Document> Documents => Set<Document>();
@@ -1040,9 +1042,31 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(o => new { o.TenantId, o.OwnerUserId });
             e.HasIndex(o => new { o.TenantId, o.PropertyId });
             e.HasIndex(o => new { o.TenantId, o.PrimaryContactId });
+            e.HasIndex(o => new { o.TenantId, o.Outcome, o.RecycleAt });
+            e.HasOne<Disposition>().WithMany().HasForeignKey(o => o.LastDispositionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Contact>().WithMany().HasForeignKey(o => o.PrimaryContactId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Property>().WithMany().HasForeignKey(o => o.PropertyId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<PipelineStage>().WithMany().HasForeignKey(o => o.StageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Disposition>(e =>
+        {
+            e.ToTable("dispositions");
+            e.Property(d => d.Name).HasMaxLength(100);
+            e.Property(d => d.Color).HasMaxLength(20);
+            e.Property(d => d.LostReasonKey).HasMaxLength(60);
+            e.HasIndex(d => new { d.TenantId, d.Sort });
+            e.HasOne<PipelineStage>().WithMany().HasForeignKey(d => d.MovesToStageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<OpportunityDisposition>(e =>
+        {
+            e.ToTable("opportunity_dispositions");
+            e.Property(d => d.Note).HasMaxLength(500);
+            e.HasIndex(d => new { d.TenantId, d.OpportunityId });
+            e.HasIndex(d => new { d.TenantId, d.ByUserId, d.CreatedAt });
+            e.HasOne<Opportunity>().WithMany().HasForeignKey(d => d.OpportunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Disposition>().WithMany().HasForeignKey(d => d.DispositionId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<OpportunityStageChange>(e =>

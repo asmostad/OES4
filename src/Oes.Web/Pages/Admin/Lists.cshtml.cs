@@ -13,6 +13,7 @@ public class ListsModel(ListSettingsService settings) : CrmPageModel
 
     public List<PipelineStage> Stages { get; private set; } = [];
     public List<LookupValue> Values { get; private set; } = [];
+    public List<Disposition> Dispositions { get; private set; } = [];
 
     public List<Oes.Domain.Production.WorkflowStage> WorkflowStages { get; private set; } = [];
     public string? WorkflowLevel => List switch { "project_stages" => Oes.Domain.Production.WorkflowLevels.Project, "trade_stages" => Oes.Domain.Production.WorkflowLevels.Trade, _ => null };
@@ -26,6 +27,13 @@ public class ListsModel(ListSettingsService settings) : CrmPageModel
     public async Task OnGetAsync()
     {
         if (WorkflowLevel is { } level) { WorkflowStages = await settings.WorkflowStagesAsync(level); return; }
+        if (List == "dispositions")
+        {
+            Dispositions = await settings.DispositionsAsync();
+            Stages = await settings.StagesAsync();
+            Values = await settings.ValuesAsync(LookupTypes.LostReason);
+            return;
+        }
         if (List == "stages") Stages = await settings.StagesAsync();
         else if (ListSettingsService.EditableLists.ContainsKey(List)) Values = await settings.ValuesAsync(List);
         else List = "stages";
@@ -37,6 +45,11 @@ public class ListsModel(ListSettingsService settings) : CrmPageModel
     public Task<IActionResult> OnPostMoveAsync(Guid id, int direction) => Run(() => settings.MoveStageAsync(id, direction), null);
 
     public Task<IActionResult> OnPostDefaultAsync(Guid id) => Run(() => settings.SetDefaultStageAsync(id), "Default stage changed.");
+
+    public Task<IActionResult> OnPostDispositionAsync(DispositionInput disposition) =>
+        Run(() => settings.SaveDispositionAsync(disposition), "Call outcome saved.");
+
+    public Task<IActionResult> OnPostMoveDispositionAsync(Guid id, int direction) => Run(() => settings.MoveDispositionAsync(id, direction), null);
 
     public Task<IActionResult> OnPostValueAsync(Guid? id, string label, bool isActive) =>
         Run(() => settings.SaveValueAsync(List, id, label, isActive), "Saved.");

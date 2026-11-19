@@ -7,7 +7,8 @@ namespace Oes.Web.Pages.Opportunities;
 
 public class ViewModel(OpportunityService opportunities, RecordItems items, CrmLookups lookups,
     Oes.Infrastructure.Insurance.ClaimService claims, Oes.Infrastructure.Insurance.StormService storms,
-    Oes.Infrastructure.Estimating.EstimateService estimates, Oes.Infrastructure.Production.ProjectService projects) : CrmPageModel
+    Oes.Infrastructure.Estimating.EstimateService estimates, Oes.Infrastructure.Production.ProjectService projects,
+    ProspectingService prospecting, Oes.Application.Abstractions.ICurrentUser user) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
 
@@ -22,6 +23,9 @@ public class ViewModel(OpportunityService opportunities, RecordItems items, CrmL
     public Oes.Domain.Insurance.StormEvent? SuggestedStorm { get; private set; }
     public List<Oes.Infrastructure.Estimating.EstimateRow> Estimates { get; private set; } = [];
     public List<Oes.Infrastructure.Production.ProjectRow> Projects { get; private set; } = [];
+    /// <summary>Call outcomes, when the user can set them on this open opportunity.</summary>
+    public List<Disposition> Dispositions { get; private set; } = [];
+    public string? LastDisposition { get; private set; }
 
     public Task<IActionResult> OnGetAsync(string? tab) => Guard(async () =>
     {
@@ -35,6 +39,9 @@ public class ViewModel(OpportunityService opportunities, RecordItems items, CrmL
         Estimates = await estimates.ListAsync(null, null, false, Id);
         Projects = await projects.ListAsync(null, null, true, false, Id);
         var o = Detail.Opportunity;
+        if (o.Outcome == Outcomes.Open && Detail.CanEdit && await user.HasPermissionAsync(Oes.Application.Security.Permissions.LeadsProspect))
+            Dispositions = await prospecting.DispositionsAsync();
+        if (o.LastDispositionId is { } lastId) LastDisposition = (await prospecting.DispositionsAsync()).FirstOrDefault(d => d.Id == lastId)?.Name;
         if (o.StormEventId is { } stormId) Storm = await storms.GetAsync(stormId);
         else if (o.IsInsurance && Detail.Property is not null)
             SuggestedStorm = await storms.SuggestAsync(Detail.Property.PostalCode, o.DateOfLoss);
@@ -59,6 +66,13 @@ public class ViewModel(OpportunityService opportunities, RecordItems items, CrmL
     {
         await opportunities.AttachNewPropertyAsync(Id, address);
         Flash("Property attached.");
+        return RedirectToPage(new { id = Id });
+    });
+
+    public Task<IActionResult> OnPostDispositionAsync(Guid dispositionId, string? note) => Guard(async () =>
+    {
+        await prospecting.ApplyAsync(Id, dispositionId, note);
+        Flash("Call logged.");
         return RedirectToPage(new { id = Id });
     });
 

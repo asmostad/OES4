@@ -1,0 +1,71 @@
+@page
+@model Oes.Web.Pages.Prospecting.IndexModel
+@{
+    ViewData["Title"] = "Prospecting";
+    var c = Model.Counts;
+}
+<div class="page-header">
+    <div>
+        <h1>Prospecting</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">CRM</li><li class="breadcrumb-item active">Prospecting</li></ol></nav>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body">
+                <p class="small text-muted">Work through open leads one at a time: call, pick what happened, and the next lead comes up. Leads nobody has called yet come first,
+                    then call-backs that are due. While you have a lead open, nobody else gets it.</p>
+                <form method="get" action="/Prospecting/Work" class="row g-2">
+                    <div class="col-sm-6">
+                        <label class="form-label small" for="p-stage">Stage</label>
+                        <select id="p-stage" name="stage" class="form-select form-select-sm">
+                            <option value="">All call-list stages</option>
+                            @foreach (var s in Model.Stages) { <option value="@s.Id" selected="@(Model.Stage == s.Id)">@s.Name</option> }
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small" for="p-source">Lead source</label>
+                        <select id="p-source" name="source" class="form-select form-select-sm">
+                            <option value="">Any source</option>
+                            @foreach (var s in Model.Sources) { <option value="@s.Value" selected="@(Model.Source == s.Value)">@s.Label</option> }
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small" for="p-storm">Storm</label>
+                        <select id="p-storm" name="storm" class="form-select form-select-sm">
+                            <option value="">Any storm</option>
+                            @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(Model.Storm == s.Id)">@s.Name (@s.EventDate.ToString("MMM d, yyyy"))</option> }
+                        </select>
+                    </div>
+                    <div class="col-sm-6 d-flex align-items-end">
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" name="mine" value="true" id="p-mine" checked="@Model.Mine">
+                            <label class="form-check-label small" for="p-mine">Only leads assigned to me</label>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary" disabled="@(Model.Stages.Count == 0 || Model.Dispositions.Count == 0)"><i class="bi bi-telephone-outbound me-1"></i>Start calling</button>
+                        <button type="submit" class="btn btn-outline-secondary" formaction="/Prospecting">Update counts</button>
+                    </div>
+                </form>
+                @if (Model.Stages.Count == 0)
+                {
+                    <div class="alert alert-warning small mt-3 mb-0">No pipeline stage feeds the call list yet. An admin can tick "Call list" on a stage in Administration › Pipeline &amp; Lists.</div>
+                }
+                else if (Model.Dispositions.Count == 0)
+                {
+                    <div class="alert alert-warning small mt-3 mb-0">There are no call outcomes yet. An admin can add them under Administration › Pipeline &amp; Lists › Call outcomes.</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="row g-3">
+            <div class="col-6"><div class="card stat-card"><div class="card-body"><div class="small text-muted">Due now</div><div class="fs-3 fw-semibold">@c.Due</div></div></div></div>
+            <div class="col-6"><div class="card stat-card"><div class="card-body"><div class="small text-muted">Being worked by others</div><div class="fs-3 fw-semibold">@c.BeingWorked</div></div></div></div>
+            <div class="col-12"><div class="card stat-card"><div class="card-body"><div class="small text-muted">Call-backs scheduled for later</div><div class="fs-3 fw-semibold">@c.CallBacksLater</div></div></div></div>
+        </div>
+    </div>
+</div>

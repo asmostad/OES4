@@ -40,6 +40,7 @@ public static class Navigation
             new("Properties", "bi-house-door", "/Properties"),
             new("Contacts", "bi-people", "/Contacts"),
             new("Opportunities", "bi-funnel", "/Opportunities"),
+            new("Prospecting", "bi-telephone-outbound", "/Prospecting", Permissions.LeadsProspect),
             new("Measurements", "bi-rulers", "/Measurements"),
             new("Estimates", "bi-file-earmark-text", "/Estimates", Match: ["/Estimates/View", "/Estimates/New", "/Estimates/Index"]),
             new("Price Approvals", "bi-patch-check", "/Estimates/Approvals", Permissions.PricingApprove),

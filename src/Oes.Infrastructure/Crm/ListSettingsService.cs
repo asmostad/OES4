@@ -13,6 +13,20 @@ public sealed class StageInput
     public string Name { get; set; } = "";
     public string Color { get; set; } = "#3b82f6";
     public int? StaleAfterHours { get; set; }
+    public bool InProspecting { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class DispositionInput
+{
+    public Guid? Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Color { get; set; } = "#64748b";
+    public int? RecycleDays { get; set; }
+    public Guid? MovesToStageId { get; set; }
+    public string? LostReasonKey { get; set; }
+    public bool CountsAsAttempt { get; set; }
+    public bool IsDoNotContact { get; set; }
     public bool IsActive { get; set; } = true;
 }
 
@@ -64,6 +78,7 @@ public sealed partial class ListSettingsService(OesDbContext db, RecordScope sco
         stage.Name = name;
         stage.Color = input.Color.ToLowerInvariant();
         stage.StaleAfterHours = stage.Outcome == Outcomes.Open ? input.StaleAfterHours : null;
+        stage.InProspecting = stage.Outcome == Outcomes.Open && input.InProspecting;
         stage.IsActive = input.IsActive;
         audit.Record(input.Id is null ? "stage.created" : "stage.updated", "PipelineStage", stage.Id, $"Stage {name}");
         await db.SaveChangesAsync(ct);
@@ -87,6 +102,62 @@ public sealed partial class ListSettingsService(OesDbContext db, RecordScope sco
         var target = stages.FirstOrDefault(s => s.Id == id) ?? throw new RecordNotFoundException("Stage");
         if (target.Outcome != Outcomes.Open || !target.IsActive) throw new CrmRuleException("The default stage must be an active open stage.");
         foreach (var s in stages) s.IsDefault = s.Id == id;
+        await db.SaveChangesAsync(ct);
+    }
+
+    // ---------------- Dispositions (call outcomes) ----------------
+
+    public Task<List<Disposition>> DispositionsAsync(CancellationToken ct = default) =>
+        db.Dispositions.OrderBy(d => d.Sort).ToListAsync(ct);
+
+    public async Task SaveDispositionAsync(DispositionInput input, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.SettingsManage);
+        var name = input.Name.Trim();
+        if (name.Length == 0) throw new CrmRuleException("Name is required.");
+        if (!HexColor().IsMatch(input.Color)) throw new CrmRuleException("Color must look like #3b82f6.");
+        if (input.RecycleDays is < 1 or > 365) throw new CrmRuleException("Call back after 1 to 365 days.");
+        PipelineStage? stage = null;
+        if (input.MovesToStageId is { } sid)
+            stage = await db.PipelineStages.FirstOrDefaultAsync(s => s.Id == sid && s.IsActive, ct) ?? throw new CrmRuleException("Unknown pipeline stage.");
+        string? lostReason = null;
+        if (stage?.Outcome == Outcomes.Lost)
+        {
+            lostReason = ContactService.Clean(input.LostReasonKey);
+            if (lostReason is null || !await db.LookupValues.AnyAsync(l => l.Type == LookupTypes.LostReason && l.Key == lostReason && l.IsActive, ct))
+                throw new CrmRuleException("Pick the lost reason to use when this moves a lead to a lost stage.");
+        }
+        if (input.RecycleDays is null && stage is null && !input.IsDoNotContact)
+            throw new CrmRuleException("Say when the lead comes back to the call list, pick a stage to move it to, or mark it do not contact.");
+
+        Disposition d;
+        if (input.Id is { } id)
+            d = await db.Dispositions.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new RecordNotFoundException("Disposition");
+        else
+        {
+            d = new Disposition { Sort = (await db.Dispositions.MaxAsync(x => (int?)x.Sort, ct) ?? 0) + 10 };
+            db.Dispositions.Add(d);
+        }
+        d.Name = name;
+        d.Color = input.Color.ToLowerInvariant();
+        d.RecycleDays = input.IsDoNotContact ? null : input.RecycleDays;
+        d.MovesToStageId = stage?.Id;
+        d.LostReasonKey = lostReason;
+        d.CountsAsAttempt = input.CountsAsAttempt;
+        d.IsDoNotContact = input.IsDoNotContact;
+        d.IsActive = input.IsActive;
+        audit.Record(input.Id is null ? "disposition.created" : "disposition.updated", "Disposition", d.Id, $"Disposition {name}");
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task MoveDispositionAsync(Guid id, int direction, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.SettingsManage);
+        var all = await db.Dispositions.OrderBy(d => d.Sort).ToListAsync(ct);
+        var i = all.FindIndex(d => d.Id == id);
+        var j = i + Math.Sign(direction);
+        if (i < 0 || j < 0 || j >= all.Count) return;
+        (all[i].Sort, all[j].Sort) = (all[j].Sort, all[i].Sort);
         await db.SaveChangesAsync(ct);
     }
 

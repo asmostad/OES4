@@ -18,6 +18,8 @@ public class PipelineStage : TenantEntity
     public string Outcome { get; set; } = Outcomes.Open;
     public bool IsDefault { get; set; }
     public int? StaleAfterHours { get; set; }
+    /// <summary>Open opportunities in this stage show up in the prospecting call list.</summary>
+    public bool InProspecting { get; set; }
     public bool IsActive { get; set; } = true;
 }
 
@@ -45,6 +47,12 @@ public class Opportunity : TenantEntity, IArchivable
 
     public int ContactAttempts { get; set; }
     public DateTime? LastContactAt { get; set; }
+    public Guid? LastDispositionId { get; set; }
+    /// <summary>When the lead comes back to the call list; null = due now.</summary>
+    public DateTime? RecycleAt { get; set; }
+    /// <summary>Who is working it in the call list (expires after a few minutes).</summary>
+    public Guid? LockedByUserId { get; set; }
+    public DateTime? LockedAt { get; set; }
     public DateTime? StageChangedAt { get; set; }
     public DateTime? WonAt { get; set; }
     public DateTime? ClosedAt { get; set; }
@@ -81,4 +89,32 @@ public static class LookupTypes
     public const string LostReason = "lost_reason";
     public const string Peril = "peril";
     public const string DocumentCategory = "document_category";
+}
+
+/// <summary>
+/// A call outcome ("No answer", "Appointment set"…). Decides when the lead comes back to the
+/// call list, whether it counts as a contact attempt, and optionally moves the stage.
+/// </summary>
+public class Disposition : TenantEntity
+{
+    public string Name { get; set; } = "";
+    public int Sort { get; set; }
+    public string Color { get; set; } = "#64748b";
+    public int? RecycleDays { get; set; }
+    public Guid? MovesToStageId { get; set; }
+    /// <summary>Used when the stage it moves to is a lost stage.</summary>
+    public string? LostReasonKey { get; set; }
+    public bool CountsAsAttempt { get; set; } = true;
+    /// <summary>Takes the lead off the call list for good and opts the contact out of marketing.</summary>
+    public bool IsDoNotContact { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>Each disposition set on an opportunity (call history).</summary>
+public class OpportunityDisposition : TenantEntity
+{
+    public Guid OpportunityId { get; set; }
+    public Guid DispositionId { get; set; }
+    public Guid? ByUserId { get; set; }
+    public string? Note { get; set; }
 }

@@ -23,6 +23,19 @@ public static class TenantDefaults
         ("Lost", "#ef4444", Outcomes.Lost, null),
     ];
 
+    /// <summary>Starter call outcomes. "Stage" is matched by name to the default stages above.</summary>
+    public static readonly (string Name, string Color, int? RecycleDays, bool Attempt, string? Stage, string? LostReason, bool DoNotContact)[] Dispositions =
+    [
+        ("No answer", "#94a3b8", 1, true, null, null, false),
+        ("Left voicemail", "#64748b", 2, true, null, null, false),
+        ("Call back later", "#0ea5e9", 7, true, "Contacted", null, false),
+        ("Spoke - not ready yet", "#f59e0b", 30, true, "Contacted", null, false),
+        ("Inspection set", "#10b981", null, true, "Inspection Scheduled", null, false),
+        ("Not interested", "#ef4444", null, true, "Lost", "not_interested", false),
+        ("Wrong number", "#a855f7", 90, false, null, null, false),
+        ("Do not contact", "#334155", null, true, null, null, true),
+    ];
+
     public static readonly Dictionary<string, (string Key, string Label)[]> Lookups = new()
     {
         [LookupTypes.LeadSource] =
@@ -102,7 +115,21 @@ public static class TenantDefaults
                 db.PipelineStages.Add(new PipelineStage
                 {
                     TenantId = tenantId, Name = name, Color = color, Outcome = outcome, StaleAfterHours = stale,
-                    Sort = sort += 10, IsDefault = sort == 10,
+                    Sort = sort += 10, IsDefault = sort == 10, InProspecting = sort <= 20,
+                });
+        }
+
+        if (!await db.Dispositions.IgnoreQueryFilters(filter).AnyAsync(d => d.TenantId == tenantId, ct))
+        {
+            var stages = db.PipelineStages.Local.Where(s => s.TenantId == tenantId).ToList();
+            if (stages.Count == 0) stages = await db.PipelineStages.IgnoreQueryFilters(filter).Where(s => s.TenantId == tenantId).ToListAsync(ct);
+            var sort = 0;
+            foreach (var d in Dispositions)
+                db.Dispositions.Add(new Disposition
+                {
+                    TenantId = tenantId, Name = d.Name, Color = d.Color, RecycleDays = d.RecycleDays, CountsAsAttempt = d.Attempt,
+                    IsDoNotContact = d.DoNotContact, LostReasonKey = d.LostReason, Sort = sort += 10,
+                    MovesToStageId = d.Stage is null ? null : stages.FirstOrDefault(s => s.Name == d.Stage)?.Id,
                 });
         }
 

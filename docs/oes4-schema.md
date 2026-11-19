@@ -54,7 +54,7 @@
   - subcontractor_doc_type, payment_method, removal_reason
 - **`trade_types`**: Name, Code, MeasurementMode (roof/elevation/none), Color, Icon, Sort. Behavior keys off `Code` and `MeasurementMode`, never the name.
 - **`pipeline_stages`** (opportunities): Name, Sort, Color, StaleAfterHours, Outcome (open/won/lost), IsDefault.
-- **`dispositions`** (call outcomes): Name, RecycleDays, MovesToStageId, CountsAsAttempt, IsDoNotContact.
+- **`dispositions`** (call outcomes): Name, Sort, Color, RecycleDays, MovesToStageId, LostReasonKey (used when it moves to a lost stage), CountsAsAttempt, IsDoNotContact, IsActive. **Built** (2026-11-18), with `opportunity_dispositions` (OpportunityId, DispositionId, ByUserId, Note) as the call history. `pipeline_stages` gained InProspecting (the stage feeds the call list).
 - **`workflow_stages`**: Level (project/trade), Name, Sort, Color, **Role** (initial, production_start, materials_ordered, materials_delivered, labor, closeout_docs, final_walkthrough, complete, invoiced, paid, closed), GatesJson (e.g. requires material date / work date / subcontractor), StaleAfterDays.
 
 ## 3. Contacts
@@ -86,7 +86,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `opportunities` | TenantId, Number, Name, **PrimaryContactId** (required), **PropertyId (nullable)**, OwnerUserId, SourceKey, StageId, Outcome (open/won/lost/recycled), LostReasonKey, ExpectedValue, IsInsurance, PerilKey, DateOfLoss, StormEventId (nullable), ContactAttempts, LastContactAt, LastDispositionId, RecycleAt, LockedBy, LockedAt, WonAt, ClosedAt | **A lead is an opportunity.** It can exist without a property; it attaches to one (existing or new) when the address is collected. |
+| `opportunities` | TenantId, Number, Name, **PrimaryContactId** (required), **PropertyId (nullable)**, OwnerUserId, SourceKey, StageId, Outcome (open/won/lost/recycled), LostReasonKey, ExpectedValue, IsInsurance, PerilKey, DateOfLoss, StormEventId (nullable), ContactAttempts, LastContactAt, LastDispositionId, RecycleAt, LockedByUserId, LockedAt (call-list lock, 15 minutes), WonAt, ClosedAt | **A lead is an opportunity.** It can exist without a property; it attaches to one (existing or new) when the address is collected. |
 | `opportunity_contacts` | OpportunityId, ContactId, RoleKey | Spouse, property manager, public adjuster… |
 | `opportunity_stage_history` | OpportunityId, FromStageId, ToStageId, DispositionId, ByUserId, At, Note | Stale detection and conversion reports |
 | `saved_views` | TenantId, UserId (null = shared), ListKey, Name, CriteriaJson, SortJson, IsDefault | Saved filters on every list |
