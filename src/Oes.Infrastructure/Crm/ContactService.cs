@@ -37,7 +37,17 @@ public sealed record OpportunityBrief(Guid Id, string Number, string Name, strin
 
 public sealed record ContactDetail(
     Contact Contact, string? OwnerName, List<ContactMethod> Methods, List<ContactPropertyRow> Properties,
-    List<ContactRelationRow> Organizations, List<ContactRelationRow> People, List<OpportunityBrief> Opportunities, bool CanEdit);
+    List<ContactRelationRow> Organizations, List<ContactRelationRow> People, List<OpportunityBrief> Opportunities, bool CanEdit,
+    List<ContactAddress> Addresses);
+
+public sealed class AddressInput
+{
+    public string? Line1 { get; set; }
+    public string? Line2 { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? PostalCode { get; set; }
+}
 
 public sealed record PagedResult<T>(List<T> Items, int Total, int Page, int PageSize)
 {
@@ -105,7 +115,8 @@ public sealed class ContactService(OesDbContext db, RecordScope scope, RecordIte
             props.Select(p => new ContactPropertyRow(p.Id, p.PropertyId,
                 new Property { Line1 = p.Line1, Line2 = p.Line2, City = p.City, State = p.State, PostalCode = p.PostalCode }.SingleLine,
                 p.RoleKey, p.IsPrimary, p.EndedOn == null)).ToList(),
-            orgs, people, opps, await scope.CanEditAsync(contact.OwnerUserId));
+            orgs, people, opps, await scope.CanEditAsync(contact.OwnerUserId),
+            await db.ContactAddresses.Where(a => a.ContactId == id).OrderBy(a => a.Kind == ContactAddressKinds.Billing).ToListAsync(ct));
     }
 
     internal async Task<List<OpportunityBrief>> OpportunityBriefsAsync(IQueryable<Opportunity> opps, CancellationToken ct) =>
@@ -270,6 +281,48 @@ public sealed class ContactService(OesDbContext db, RecordScope scope, RecordIte
         if (!await db.Memberships.AnyAsync(m => m.UserId == ownerUserId && m.Status == Domain.Tenancy.MembershipStatus.Active, ct))
             throw new CrmRuleException("The owner must be an active user in this company.");
     }
+
+    /// <summary>Sets the contact's mailing or billing address (one of each).</summary>
+    public async Task SaveAddressAsync(Guid contactId, string kind, AddressInput input, CancellationToken ct = default)
+    {
+        var contact = await (await scope.ContactsAsync()).FirstOrDefaultAsync(c => c.Id == contactId, ct) ?? throw new RecordNotFoundException("Contact");
+        await scope.EnsureCanEditAsync(contact.OwnerUserId);
+        if (!ContactAddressKinds.All.Contains(kind)) throw new CrmRuleException("Pick mailing or billing.");
+        var a = await db.ContactAddresses.FirstOrDefaultAsync(x => x.ContactId == contactId && x.Kind == kind, ct);
+        if (a is null) { a = new ContactAddress { ContactId = contactId, Kind = kind }; db.ContactAddresses.Add(a); }
+        a.Line1 = Required(input.Line1, "Street address");
+        a.Line2 = Clean(input.Line2);
+        a.City = Required(input.City, "City");
+        a.State = Required(input.State, "State").ToUpperInvariant();
+        a.PostalCode = Required(input.PostalCode, "ZIP code");
+        await items.LogAsync(EntityTypes.Contact, contactId, "contact.address_saved", $"{(kind == ContactAddressKinds.Billing ? "Billing" : "Mailing")} address: {a.SingleLine}", ct);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task RemoveAddressAsync(Guid contactId, string kind, CancellationToken ct = default)
+    {
+        var contact = await (await scope.ContactsAsync()).FirstOrDefaultAsync(c => c.Id == contactId, ct) ?? throw new RecordNotFoundException("Contact");
+        await scope.EnsureCanEditAsync(contact.OwnerUserId);
+        var a = await db.ContactAddresses.FirstOrDefaultAsync(x => x.ContactId == contactId && x.Kind == kind, ct);
+        if (a is null) return;
+        db.ContactAddresses.Remove(a);
+        await items.LogAsync(EntityTypes.Contact, contactId, "contact.address_removed", $"{(kind == ContactAddressKinds.Billing ? "Billing" : "Mailing")} address removed", ct);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Where to send mail: the mailing address, else billing, else their primary current property.</summary>
+    public async Task<string?> MailingLineAsync(Guid contactId, CancellationToken ct = default)
+    {
+        var own = await db.ContactAddresses.Where(a => a.ContactId == contactId).OrderBy(a => a.Kind == ContactAddressKinds.Billing).FirstOrDefaultAsync(ct);
+        if (own is not null) return own.SingleLine;
+        var p = await (from pc in db.PropertyContacts where pc.ContactId == contactId && pc.EndedOn == null
+                       join pr in db.Properties on pc.PropertyId equals pr.Id
+                       orderby pc.IsPrimary descending, pc.CreatedAt descending select pr).FirstOrDefaultAsync(ct);
+        return p?.SingleLine;
+    }
+
+    private static string Required(string? s, string label) =>
+        string.IsNullOrWhiteSpace(s) ? throw new CrmRuleException($"{label} is required.") : s.Trim();
 
     internal static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

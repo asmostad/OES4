@@ -68,7 +68,8 @@ public sealed record VersionContent(
     string Number, string Name, string Method, string? PriceListName, string CustomerName, string? CustomerEmail, string? CustomerPhone,
     string? PropertyAddress, string? ClaimNumber, string? CarrierName, List<VersionSection> Sections,
     decimal Subtotal, decimal OverheadPct, decimal Overhead, decimal ProfitPct, decimal Profit, decimal TaxRate, decimal Tax, decimal Total,
-    bool ShowLinePrices, string? Terms, DateOnly? ExpiresOn, DateTime IssuedAt, int VersionNo);
+    bool ShowLinePrices, string? Terms, DateOnly? ExpiresOn, DateTime IssuedAt, int VersionNo,
+    string? CustomerAddress = null);
 
 public sealed record VersionSection(string Name, string? ScopeOfWork, string? MeasurementSummary, List<VersionLine> Lines, decimal Subtotal);
 
@@ -554,10 +555,13 @@ public sealed class EstimateService(
             s.Lines.Select(l => new VersionLine(l.Kind, l.Code, l.Activity, l.Description, l.Qty, l.Unit, l.UnitPrice, l.Amount, l.DefaultUnitPrice,
                 l.PriceListItemId, l.ProductId, l.Notes)).ToList(),
             s.Subtotal)).ToList();
+        // The customer's own billing (else mailing) address, when it isn't the property itself.
+        var own = await db.ContactAddresses.Where(a => a.ContactId == d.Contact.Id).OrderBy(a => a.Kind != ContactAddressKinds.Billing).FirstOrDefaultAsync(ct);
+        var customerAddress = own is null || own.SingleLine == d.Property?.SingleLine ? null : own.SingleLine;
         return new VersionContent(est.Number, est.Name, est.Method, d.PriceList?.Name, d.Contact.DisplayName, Method(ContactMethodKinds.Email),
             Method(ContactMethodKinds.Mobile), d.Property?.SingleLine, d.Claim?.ClaimNumber, carrier, sections,
             est.Subtotal, est.OverheadPct, est.Overhead, est.ProfitPct, est.Profit, est.TaxRate, est.Tax, est.Total,
-            est.ShowLinePrices, est.Terms, est.ExpiresOn, clock.UtcNow, versionNo);
+            est.ShowLinePrices, est.Terms, est.ExpiresOn, clock.UtcNow, versionNo, customerAddress);
     }
 
     public async Task<(EstimateVersion Version, VersionContent Content, Estimate Estimate)> GetVersionAsync(Guid versionId, CancellationToken ct = default)

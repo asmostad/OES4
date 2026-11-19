@@ -37,6 +37,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     // CRM core
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<ContactMethod> ContactMethods => Set<ContactMethod>();
+    public DbSet<ContactAddress> ContactAddresses => Set<ContactAddress>();
     public DbSet<ContactRelationship> ContactRelationships => Set<ContactRelationship>();
     public DbSet<Property> Properties => Set<Property>();
     public DbSet<PropertyContact> PropertyContacts => Set<PropertyContact>();
@@ -966,6 +967,20 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(m => m.NormalizedValue).HasMaxLength(254);
             e.Property(m => m.Label).HasMaxLength(50);
             e.HasIndex(m => new { m.TenantId, m.NormalizedValue });
+        });
+
+        b.Entity<ContactAddress>(e =>
+        {
+            e.ToTable("contact_addresses");
+            e.Property(a => a.Kind).HasMaxLength(20);
+            e.Property(a => a.Line1).HasMaxLength(200);
+            e.Property(a => a.Line2).HasMaxLength(100);
+            e.Property(a => a.City).HasMaxLength(100);
+            e.Property(a => a.State).HasMaxLength(50);
+            e.Property(a => a.PostalCode).HasMaxLength(20);
+            e.Ignore(a => a.SingleLine);
+            e.HasIndex(a => new { a.TenantId, a.ContactId, a.Kind }).IsUnique();
+            e.HasOne<Contact>().WithMany().HasForeignKey(a => a.ContactId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<ContactRelationship>(e =>

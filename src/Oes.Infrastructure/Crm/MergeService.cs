@@ -57,6 +57,7 @@ public sealed class MergeService(OesDbContext db, RecordScope scope, ICurrentUse
             new("Opportunities", await db.Opportunities.CountAsync(o => o.PrimaryContactId == id, ct)),
             new("Properties", await db.PropertyContacts.CountAsync(p => p.ContactId == id, ct)),
             new("Phone numbers and emails", await db.ContactMethods.CountAsync(m => m.ContactId == id, ct)),
+            new("Mailing and billing addresses", await db.ContactAddresses.CountAsync(a => a.ContactId == id, ct)),
             new("Notes", await db.Notes.CountAsync(n => n.EntityType == EntityTypes.Contact && n.EntityId == id, ct)),
             new("Documents", await db.Documents.CountAsync(d => d.EntityType == EntityTypes.Contact && d.EntityId == id, ct)),
             new("Emails and texts", await db.EmailRecipients.CountAsync(r => r.ContactId == id, ct) + await db.SmsMessages.CountAsync(m => m.ContactId == id, ct)),
@@ -94,6 +95,14 @@ public sealed class MergeService(OesDbContext db, RecordScope scope, ICurrentUse
             if (have.Contains(method.Kind + "|" + method.NormalizedValue)) { db.ContactMethods.Remove(method); continue; }
             method.ContactId = k;
             method.IsPrimary = method.IsPrimary && !await db.ContactMethods.AnyAsync(x => x.ContactId == k && x.Kind == method.Kind && x.IsPrimary, ct);
+        }
+
+        // Mailing and billing addresses: the kept contact's win; the duplicate's fill a missing kind.
+        var haveKinds = await db.ContactAddresses.Where(x => x.ContactId == k).Select(x => x.Kind).ToListAsync(ct);
+        foreach (var address in await db.ContactAddresses.Where(x => x.ContactId == m).ToListAsync(ct))
+        {
+            if (haveKinds.Contains(address.Kind)) db.ContactAddresses.Remove(address);
+            else address.ContactId = k;
         }
 
         // Organization relationships: re-point, dropping self-links and duplicates.

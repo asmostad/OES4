@@ -1536,6 +1536,65 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("contacts", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Crm.ContactAddress", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<byte[]>("ContactId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Line2")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContactId");
+
+                    b.HasIndex("TenantId", "ContactId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("contact_addresses", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Crm.ContactMethod", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -5104,6 +5163,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany("Steps")
                         .HasForeignKey("SequenceId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Crm.ContactAddress", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.Contact", null)
+                        .WithMany()
+                        .HasForeignKey("ContactId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

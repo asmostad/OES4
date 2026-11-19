@@ -15,6 +15,7 @@ public sealed partial class MergeFields(OesDbContext db, ITenantContext tenant, 
     public static readonly (string Key, string Label)[] Available =
     [
         ("contact.first_name", "Contact first name"), ("contact.last_name", "Contact last name"), ("contact.name", "Contact full name"),
+        ("contact.mailing_address", "Contact mailing address (their property if none)"),
         ("property.address", "Property address (one line)"), ("property.street", "Property street"), ("property.city", "Property city"),
         ("opportunity.number", "Opportunity number"), ("opportunity.name", "Opportunity name"),
         ("project.number", "Project number"),
@@ -84,6 +85,8 @@ public sealed partial class MergeFields(OesDbContext db, ITenantContext tenant, 
             {
                 Set("contact.first_name", c.Type == ContactTypes.Organization ? c.DisplayName : c.FirstName);
                 Set("contact.last_name", c.LastName); Set("contact.name", c.DisplayName);
+                var own = await db.ContactAddresses.Where(a => a.ContactId == cid).OrderBy(a => a.Kind == ContactAddressKinds.Billing).FirstOrDefaultAsync(ct);
+                if (own is not null) Set("contact.mailing_address", own.SingleLine);
             }
         }
         // Messaging a contact directly: use their (primary, current) property.
@@ -93,6 +96,7 @@ public sealed partial class MergeFields(OesDbContext db, ITenantContext tenant, 
         if (propertyId is { } prid)
         {
             var p = await db.Properties.FirstOrDefaultAsync(x => x.Id == prid, ct);
+            if (p is not null && !v.ContainsKey("contact.mailing_address") && contactId is not null) Set("contact.mailing_address", p.SingleLine);
             if (p is not null) { Set("property.address", p.SingleLine); Set("property.street", $"{p.Line1} {p.Line2}"); Set("property.city", p.City); }
         }
         if (tenant.TenantId is { } tid)

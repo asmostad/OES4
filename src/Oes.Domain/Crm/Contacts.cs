@@ -89,3 +89,29 @@ public interface IArchivable
 {
     DateTime? ArchivedAt { get; set; }
 }
+
+public static class ContactAddressKinds
+{
+    public const string Mailing = "mailing";
+    public const string Billing = "billing";
+    public static readonly string[] All = [Mailing, Billing];
+}
+
+/// <summary>
+/// A contact's own mailing or billing address, separate from the properties they're tied to
+/// (an owner who lives elsewhere, a property manager's office). One per kind.
+/// </summary>
+public class ContactAddress : TenantEntity
+{
+    public Guid ContactId { get; set; }
+    public string Kind { get; set; } = ContactAddressKinds.Mailing;
+    public string Line1 { get; set; } = "";
+    public string? Line2 { get; set; }
+    public string City { get; set; } = "";
+    public string State { get; set; } = "";
+    public string PostalCode { get; set; } = "";
+
+    public string SingleLine =>
+        string.Join(", ", new[] { Line2 is null ? Line1 : $"{Line1} {Line2}", City, $"{State} {PostalCode}".Trim() }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
+}

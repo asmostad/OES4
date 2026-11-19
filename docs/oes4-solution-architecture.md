@@ -155,9 +155,9 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - Locks: opening a lead locks it to the rep with a conditional update (one lead per rep; it expires after 15 minutes), so two reps never get the same homeowner, and nobody else can set an outcome while it's locked.
        - Opportunity pages log calls with an outcome too. Each outcome is kept in `opportunity_dispositions` and on the timeline.
        - The app API has `/api/v1/prospecting` (dispositions, counts, next, `{id}/disposition`, `{id}/release`).
+     - Contact mailing and billing addresses (done 2026-11-18): one of each per contact, kept apart from the properties they're tied to (an owner who lives elsewhere, a property manager's office). Edited on the contact page and logged on its timeline. The `{{contact.mailing_address}}` merge field uses the mailing address, else billing, else the record's (or the contact's primary) property. Proposals show the billing (else mailing) address under "Prepared for" when it isn't the property. When contacts merge, the kept contact's addresses win and the duplicate's fill a missing kind.
    - Still to do:
      - Saved views, campaigns.
-     - Contact mailing addresses (consents were added in milestone 8).
 3. **Insurance** (done 2026-11-17)
    - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
    - Claims: optional until filed, and visibility follows the opportunity; notes roll up to the opportunity, property and contact.

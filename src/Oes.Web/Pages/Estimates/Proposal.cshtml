@@ -32,6 +32,7 @@
         <div>
             <div class="label">Prepared for</div>
             <div class="fw-semibold">@c.CustomerName</div>
+            @if (c.CustomerAddress is not null) { <div>@c.CustomerAddress</div> }
             @if (c.CustomerEmail is not null) { <div>@c.CustomerEmail</div> }
             @if (c.CustomerPhone is not null) { <div>@c.CustomerPhone</div> }
         </div>

@@ -146,6 +146,7 @@ public sealed class EstimatingTests(MySqlFixture fx)
         var (version, content, _) = await est.GetVersionAsync(v1);
         Assert.Equal(1, version.VersionNo);
         Assert.Equal("Net 30", content.Terms);
+        Assert.Null(content.CustomerAddress); // no billing or mailing address of their own
         Assert.Equal(25.5m, content.Sections.Single().Lines.Single().Qty);
         Assert.Equal(64, version.ContentHash.Length);
 
@@ -155,7 +156,11 @@ public sealed class EstimatingTests(MySqlFixture fx)
         Assert.Equal(25.5m, (await est.GetVersionAsync(v1)).Content.Sections.Single().Lines.Single().Qty);
 
         await Assert.ThrowsAsync<CrmRuleException>(() => est.IssueAsync(id, null));
+        var customer = (await est.GetAsync(id)).Contact.Id;
+        await s.Get<Oes.Infrastructure.Crm.ContactService>().SaveAddressAsync(customer, Oes.Domain.Crm.ContactAddressKinds.Billing,
+            new Oes.Infrastructure.Crm.AddressInput { Line1 = "PO Box 7", City = "Omaha", State = "NE", PostalCode = "68102" });
         var v2 = await est.IssueAsync(id, "Added starter course");
+        Assert.Equal("PO Box 7, Omaha, NE 68102", (await est.GetVersionAsync(v2)).Content.CustomerAddress);
         var versions = (await est.GetAsync(id)).Versions;
         Assert.Equal(VersionStatuses.Superseded, versions.Single(v => v.Id == v1).Status);
         Assert.Equal(VersionStatuses.Issued, versions.Single(v => v.Id == v2).Status);

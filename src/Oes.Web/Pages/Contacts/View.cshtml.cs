@@ -51,6 +51,20 @@ public class ViewModel(ContactService contacts, PropertyService properties, Reco
         return RedirectToPage(new { id = Id });
     });
 
+    public Task<IActionResult> OnPostSaveAddressAsync(string kind, AddressInput address) => Guard(async () =>
+    {
+        await contacts.SaveAddressAsync(Id, kind, address);
+        Flash("Address saved.");
+        return RedirectToPage(new { id = Id });
+    });
+
+    public Task<IActionResult> OnPostRemoveAddressAsync(string kind) => Guard(async () =>
+    {
+        await contacts.RemoveAddressAsync(Id, kind);
+        Flash("Address removed.");
+        return RedirectToPage(new { id = Id });
+    });
+
     public Task<IActionResult> OnPostEndRelationshipAsync(Guid relationshipId) => Guard(async () =>
     {
         await contacts.EndRelationshipAsync(relationshipId);

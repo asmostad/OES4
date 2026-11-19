@@ -63,7 +63,7 @@
 |---|---|---|
 | `contacts` | TenantId, **Type (person/organization)**, FirstName, LastName, OrganizationName, DisplayName (computed), Status (lead/customer/past_customer, derived), OwnerUserId, SourceKey, IsVendor, CautionFlag + note, Industry/SIC (orgs) | Replaces consumers + companies + company_contacts |
 | `contact_methods` | ContactId, Kind (email/phone/mobile/fax/website), Value, NormalizedValue, Label, IsPrimary | Many emails and phones per contact. `NormalizedValue` is indexed for email/SMS/webhook matching. |
-| `contact_addresses` | ContactId, Kind (mailing/billing), address fields | A contact's own mailing address, separate from the properties they're tied to |
+| `contact_addresses` | ContactId, Kind (mailing/billing, one each), Line1, Line2, City, State, PostalCode | A contact's own mailing address, separate from the properties they're tied to. **Built** (2026-11-18) |
 | `contact_relationships` | PersonContactId, OrganizationContactId, Title, IsPrimary, StartedOn, EndedOn | Person ↔ organization. One person can belong to several orgs. |
 | `contact_consents` | ContactId, Channel (email/sms/call), Purpose (marketing/transactional), Status (opted_in/opted_out/unknown), Source, At, Evidence | Required for SMS (STOP/HELP, A2P) and blasts. **Built in M8** (email/sms only, plus RecordedByUserId) |
 | `suppressions` | TenantId, Channel, Address (normalized), Scope (marketing/all), Reason (unsubscribe/bounce/complaint/manual/stop), At, RemovedAt | Checked on every send, including CC/BCC. **Built in M8** |

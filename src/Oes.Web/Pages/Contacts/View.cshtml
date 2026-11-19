@@ -66,6 +66,51 @@
         </div>
 
         <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-mailbox me-2 text-muted"></i>Mailing address</div>
+            <ul class="list-group list-group-flush">
+                @if (Model.Detail.Addresses.Count == 0)
+                {
+                    <li class="list-group-item text-muted small">None on file. Mail goes to their property.</li>
+                }
+                @foreach (var a in Model.Detail.Addresses)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex align-items-start gap-2">
+                            <div class="flex-grow-1">
+                                <div>@a.SingleLine</div>
+                                <div class="small text-muted">@Fmt.Cap(a.Kind)</div>
+                            </div>
+                            @if (Model.Detail.CanEdit)
+                            {
+                                <form method="post" asp-page-handler="RemoveAddress">
+                                    <input type="hidden" name="kind" value="@a.Kind">
+                                    <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="Remove" data-confirm="Remove this address?"><i class="bi bi-x-circle"></i></button>
+                                </form>
+                            }
+                        </div>
+                        @if (Model.Detail.CanEdit)
+                        {
+                            <details class="mt-1">
+                                <summary class="small text-primary">Edit</summary>
+                                <partial name="_AddressForm" model="(a.Kind, (ContactAddress?)a)" />
+                            </details>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (Model.Detail.CanEdit && Model.Detail.Addresses.Count < ContactAddressKinds.All.Length)
+            {
+                var missing = ContactAddressKinds.All.First(k => Model.Detail.Addresses.All(a => a.Kind != k));
+                <div class="card-body border-top">
+                    <details>
+                        <summary class="small text-primary"><i class="bi bi-plus-lg"></i> Add @(missing) address</summary>
+                        <partial name="_AddressForm" model="(missing, (ContactAddress?)null)" />
+                    </details>
+                </div>
+            }
+        </div>
+
+        <div class="card mb-3">
             <div class="card-header d-flex align-items-center"><i class="bi bi-house-door text-level-property me-2"></i>Properties</div>
             <ul class="list-group list-group-flush">
                 @if (Model.Detail.Properties.Count == 0) { <li class="list-group-item text-muted small">Not linked to a property yet.</li> }
