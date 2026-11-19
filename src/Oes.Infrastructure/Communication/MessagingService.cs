@@ -268,7 +268,10 @@ public sealed class MessagingService(
             var who = last?.SentByUserId ?? contacts.Select(c => c.OwnerUserId).FirstOrDefault(o => o is not null);
             var name = contacts.FirstOrDefault(c => c.Id == contactId)?.DisplayName ?? ContactValue.FormatPhone(fromNumber, fromNumber);
             var url = contactId is { } id2 ? RecordUrls.For(inbound.EntityType ?? EntityTypes.Contact, inbound.EntityId ?? id2) : null;
-            notifications.Notify(who, "sms.received", $"Text from {name}", Trim(body, 200), url);
+            if (contactId is null)
+                await notifications.NotifyPermissionAsync(Permissions.SmsViewAll, "sms.unmatched", $"Text from an unknown number, {name}", Trim(body, 200), "/Messages/Unmatched", ct);
+            else
+                notifications.Notify(who, "sms.received", $"Text from {name}", Trim(body, 200), url);
         }
         await db.SaveChangesAsync(ct);
 

@@ -455,6 +455,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(m => m.ProviderSid).HasMaxLength(100);
             e.Property(m => m.Error).HasMaxLength(1000);
             e.Property(m => m.EntityType).HasMaxLength(30);
+            e.HasIndex(m => new { m.TenantId, m.FromNumber, m.ContactId });
             e.HasIndex(m => new { m.TenantId, m.ContactId, m.At });
             e.HasIndex(m => new { m.TenantId, m.FromNumber, m.At });
         });

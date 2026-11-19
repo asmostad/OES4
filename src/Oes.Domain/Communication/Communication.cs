@@ -98,6 +98,8 @@ public class SmsMessage : TenantEntity
     public Guid? TemplateId { get; set; }
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
+    /// <summary>An inbound text from an unknown number that someone dismissed from the unmatched inbox.</summary>
+    public DateTime? ReviewedAt { get; set; }
 }
 
 /// <summary>Consent history: the latest row per (contact, channel, purpose) is the current status.</summary>

@@ -59,6 +59,7 @@ public static class Navigation
         [
             new("Email", "bi-envelope", null),
             new("SMS", "bi-chat-dots", null),
+            new("Unmatched Texts", "bi-chat-square-dots", "/Messages/Unmatched", Permissions.SmsViewAll),
         ]),
         new("Reports",
         [

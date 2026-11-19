@@ -1298,6 +1298,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<byte[]>("SentByUserId")
                         .HasColumnType("binary(16)");
 
@@ -1326,6 +1329,8 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "ContactId", "At");
 
                     b.HasIndex("TenantId", "FromNumber", "At");
+
+                    b.HasIndex("TenantId", "FromNumber", "ContactId");
 
                     b.ToTable("sms_messages", (string)null);
                 });

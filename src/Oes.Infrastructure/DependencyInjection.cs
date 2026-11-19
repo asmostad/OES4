@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<Communication.MergeFields>();
         services.AddScoped<Communication.TemplateService>();
         services.AddScoped<Communication.ConsentService>();
+        services.AddScoped<Communication.UnmatchedTextService>();
         services.AddScoped<Communication.MessagingService>();
         services.AddScoped<Communication.BlastService>();
         services.AddScoped<Communication.BlastSender>();
