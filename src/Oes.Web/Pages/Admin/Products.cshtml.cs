@@ -9,17 +9,19 @@ using Oes.Web.Infrastructure;
 namespace Oes.Web.Pages.Admin;
 
 [HasPermission(Permissions.ProductsManage)]
-public class ProductsModel(CatalogService catalog, MeasurementService measurements) : CrmPageModel
+public class ProductsModel(CatalogService catalog, MeasurementService measurements, TakeoffService takeoff) : CrmPageModel
 {
     [BindProperty(SupportsGet = true)] public string? Q { get; set; }
     [BindProperty(SupportsGet = true)] public bool ShowInactive { get; set; }
     public List<Product> Products { get; private set; } = [];
     public List<TradeType> Trades { get; private set; } = [];
+    public List<string> Slots { get; private set; } = [];
 
     public async Task OnGetAsync()
     {
         Products = await catalog.ProductsAsync(Q, ShowInactive);
         Trades = await measurements.TradesAsync();
+        Slots = await takeoff.SlotsAsync();
     }
 
     public Task<IActionResult> OnPostSaveAsync(Guid? id, ProductInput input) => Guard(async () =>

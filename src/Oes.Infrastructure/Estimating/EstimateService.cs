@@ -357,6 +357,43 @@ public sealed class EstimateService(
         return await SaveNewLineAsync(est, line, ct);
     }
 
+    /// <summary>
+    /// Replaces the section's takeoff-generated lines with a new run. Lines people added by hand stay;
+    /// product prices are copied now, as with any product line. Returns how many lines were added.
+    /// </summary>
+    public async Task<int> ReplaceTakeoffLinesAsync(Guid id, Guid sectionId, IReadOnlyList<TakeoffLine> lines, string choicesJson, CancellationToken ct = default)
+    {
+        var est = await EditableAsync(id, ct);
+        var section = await db.EstimateSections.FirstOrDefaultAsync(s => s.Id == sectionId && s.EstimateId == id, ct)
+                      ?? throw new CrmRuleException("That section isn't on this estimate.");
+        db.EstimateLines.RemoveRange(await db.EstimateLines.Where(l => l.SectionId == sectionId && l.TakeoffRuleId != null).ToListAsync(ct));
+        var sort = await db.EstimateLines.Where(l => l.SectionId == sectionId && l.TakeoffRuleId == null).MaxAsync(l => (int?)l.Sort, ct) ?? 0;
+        var added = 0;
+        foreach (var t in lines.Where(l => l.Problem is null && l.Product is not null))
+        {
+            var p = t.Product!;
+            var line = NewLine(est, sectionId, LineKinds.Product, t.Qty);
+            line.ProductId = p.Id;
+            line.TakeoffRuleId = t.Rule.Id;
+            line.Code = p.Sku;
+            line.Description = t.Description;
+            line.Unit = p.Unit;
+            line.UnitPrice = p.DefaultPrice;
+            line.DefaultUnitPrice = p.DefaultPrice;
+            line.UnitCost = p.DefaultCost;
+            line.IsMaterial = p.IsMaterial;
+            line.Sort = sort += 10;
+            EvaluateApproval(line);
+            db.EstimateLines.Add(line);
+            added++;
+        }
+        section.TakeoffJson = choicesJson;
+        await RecalcAsync(est, ct);
+        await items.LogAsync(EntityTypes.Estimate, id, "estimate.takeoff", $"Takeoff on \"{section.Name}\": {added} line{(added == 1 ? "" : "s")}", ct);
+        await db.SaveChangesAsync(ct);
+        return added;
+    }
+
     /// <summary>A custom line (no catalog item or product). Always needs approval.</summary>
     public async Task<Guid> AddMiscLineAsync(Guid id, Guid sectionId, string description, decimal qty, string unit, decimal unitPrice, bool isMaterial, CancellationToken ct = default)
     {
@@ -495,6 +532,7 @@ public sealed class EstimateService(
         var all = lines.Where(l => tracked.All(t => t.Entity.Id != l.Id || t.State != EntityState.Deleted))
             .Select(l => tracked.FirstOrDefault(t => t.Entity.Id == l.Id)?.Entity ?? l).ToList();
         if (extra is not null && all.All(l => l.Id != extra.Id)) all.Add(extra);
+        all.AddRange(tracked.Where(e => e.State == EntityState.Added && all.All(l => l.Id != e.Entity.Id)).Select(e => e.Entity));
         var t = Totals(all, est.OverheadPct, est.ProfitPct, est.TaxRate, est.TaxBasis);
         (est.Subtotal, est.Overhead, est.Profit, est.Tax, est.Total) = t;
     }

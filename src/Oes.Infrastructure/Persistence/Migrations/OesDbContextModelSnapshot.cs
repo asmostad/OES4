@@ -2844,6 +2844,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<int>("Sort")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("TakeoffRuleId")
+                        .HasColumnType("binary(16)");
+
                     b.Property<byte[]>("TenantId")
                         .IsRequired()
                         .HasColumnType("binary(16)");
@@ -2904,6 +2907,10 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.Property<byte[]>("StructureId")
                         .HasColumnType("binary(16)");
+
+                    b.Property<string>("TakeoffJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
 
                     b.Property<byte[]>("TenantId")
                         .IsRequired()
@@ -3144,6 +3151,14 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<decimal?>("TakeoffMultiplier")
+                        .HasPrecision(14, 6)
+                        .HasColumnType("decimal(14,6)");
+
+                    b.Property<string>("TakeoffSlot")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
                     b.Property<byte[]>("TenantId")
                         .IsRequired()
                         .HasColumnType("binary(16)");
@@ -3232,6 +3247,131 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "EstimateId");
 
                     b.ToTable("scope_imports", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Estimating.TakeoffRule", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Cond1Field")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("Cond1Op")
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
+
+                    b.Property<decimal?>("Cond1Value")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<string>("Cond2Field")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("Cond2Op")
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
+
+                    b.Property<decimal?>("Cond2Value")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Driver")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal?>("MaxQty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<decimal>("MinQty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<decimal>("Multiplier")
+                        .HasPrecision(14, 6)
+                        .HasColumnType("decimal(14,6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<bool>("OptionDefaultOn")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("OptionKey")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("OptionLabel")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<byte[]>("ProductId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("RoundMode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<decimal>("RoundTo")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<string>("Slot")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("TradeTypeId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("UseSuggestedWaste")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("WastePercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("decimal(6,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TradeTypeId");
+
+                    b.HasIndex("TenantId", "TradeTypeId", "Sort");
+
+                    b.ToTable("takeoff_rules", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Insurance.Carrier", b =>
@@ -5591,6 +5731,20 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PriceListId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Estimating.TakeoffRule", b =>
+                {
+                    b.HasOne("Oes.Domain.Estimating.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Oes.Domain.Measurements.TradeType", null)
+                        .WithMany()
+                        .HasForeignKey("TradeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

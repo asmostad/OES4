@@ -81,6 +81,65 @@ public class Product : TenantEntity
     public bool IsMaterial { get; set; } = true;
     public string? Supplier { get; set; }
     public bool IsActive { get; set; } = true;
+    /// <summary>The takeoff slot this product can fill (shingle, ridge_cap…); the rep picks one product per slot.</summary>
+    public string? TakeoffSlot { get; set; }
+    /// <summary>Coverage for this product: units per unit of the rule's driver, replacing the rule's multiplier (e.g. a 4-bundle shingle).</summary>
+    public decimal? TakeoffMultiplier { get; set; }
+}
+
+// ---------------- Takeoff rules ----------------
+
+public static class TakeoffRounding
+{
+    public const string None = "none";
+    public const string Up = "up";
+    public const string Down = "down";
+    public const string Nearest = "nearest";
+    public static readonly string[] All = [Up, Nearest, Down, None];
+}
+
+public static class TakeoffOps
+{
+    public static readonly (string Key, string Label)[] All =
+        [("gte", "≥"), ("gt", ">"), ("eq", "="), ("neq", "≠"), ("lte", "≤"), ("lt", "<")];
+}
+
+/// <summary>
+/// Turns measurements into a quantity of one product, with no stored formulas:
+/// qty = driver × multiplier × (1 + waste%), then rounding, minimum and maximum. Up to two
+/// conditions (ANDed) and an optional on/off option gate it. The product is fixed, or picked per
+/// job for the rule's slot. Ported from OES3's structured rules; supplier-agnostic.
+/// </summary>
+public class TakeoffRule : TenantEntity
+{
+    public Guid TradeTypeId { get; set; }
+    public string Name { get; set; } = "";
+    public Guid? ProductId { get; set; }
+    public string? Slot { get; set; }
+    /// <summary>A measurement field key, a derived driver (e.g. total_area_squares, ridge_hip), or "flat".</summary>
+    public string Driver { get; set; } = "flat";
+    public decimal Multiplier { get; set; } = 1m;
+    public decimal WastePercent { get; set; }
+    /// <summary>Use the measurement's suggested waste when it has one.</summary>
+    public bool UseSuggestedWaste { get; set; }
+    public string RoundMode { get; set; } = TakeoffRounding.Up;
+    public decimal RoundTo { get; set; } = 1m;
+    public decimal MinQty { get; set; }
+    public decimal? MaxQty { get; set; }
+    public string? Cond1Field { get; set; }
+    public string? Cond1Op { get; set; }
+    public decimal? Cond1Value { get; set; }
+    public string? Cond2Field { get; set; }
+    public string? Cond2Op { get; set; }
+    public decimal? Cond2Value { get; set; }
+    public string? OptionKey { get; set; }
+    public string? OptionLabel { get; set; }
+    public bool OptionDefaultOn { get; set; } = true;
+    /// <summary>Line description instead of the product name.</summary>
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int Sort { get; set; }
 }
 
 // ---------------- Estimates ----------------
@@ -149,6 +208,8 @@ public class EstimateSection : TenantEntity
     public Guid? TradeTypeId { get; set; }
     public Guid? MeasurementSetId { get; set; }
     public string? ScopeOfWork { get; set; }
+    /// <summary>The last takeoff run on this section (slot picks and options), to pre-fill the next one.</summary>
+    public string? TakeoffJson { get; set; }
     public int Sort { get; set; }
 }
 
@@ -179,6 +240,8 @@ public class EstimateLine : TenantEntity
     public Guid? CatalogItemId { get; set; }
     public Guid? PriceListItemId { get; set; }
     public Guid? ProductId { get; set; }
+    /// <summary>Set when the takeoff generated this line; a re-run replaces only these.</summary>
+    public Guid? TakeoffRuleId { get; set; }
     public string Activity { get; set; } = "";
     public string? Code { get; set; }
     public string Description { get; set; } = "";

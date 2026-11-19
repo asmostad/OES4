@@ -86,7 +86,7 @@ public static class Navigation
                 new("Products", "bi-box-seam", "/Admin/Products", Permissions.ProductsManage),
                 new("Price Lists", "bi-tags", "/PriceLists", Permissions.PriceListsManage),
                 new("Trades & Measurements", "bi-hammer", "/Admin/Trades", Permissions.ProductsManage),
-                new("Takeoff Rules", "bi-rulers", null, Permissions.ProductsManage),
+                new("Takeoff Rules", "bi-rulers", "/Admin/Takeoff", Permissions.ProductsManage, Match: ["/Admin/Takeoff", "/Admin/TakeoffRule"]),
             ]),
             new("people", "People & Partners", "bi-people",
             [

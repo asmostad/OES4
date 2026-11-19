@@ -116,7 +116,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `price_list_imports` | TenantId, PriceListId, DocumentId, Format (csv/xlsx), MappingJson, Status, RowCounts, ErrorsJson | |
 | `products` | TenantId, Sku, Name, Unit, LineType, DefaultCost, DefaultPrice, Supplier, SupplierRef, OptionsJson (colors/sizes), ImageDocumentId, Active | Line-item method and order sheets |
 | `catalog_item_products` | CatalogItemId, ProductId | Allowed products per price book item |
-| Takeoff engine | `takeoff_rules`, `takeoff_slots`, `takeoff_options`, `takeoff_scope_templates`, `takeoff_coverage_overrides` | Port OES3's structured-rule design (no eval). Keyed by trade type code. Supplier-agnostic. |
+| Takeoff engine | `takeoff_rules` (TradeTypeId, Name, ProductId or Slot, Driver, Multiplier, WastePercent, UseSuggestedWaste, RoundMode, RoundTo, MinQty, MaxQty, two conditions, OptionKey/Label/DefaultOn, Description, Notes, IsActive, Sort); `products.TakeoffSlot` and `products.TakeoffMultiplier` (coverage); `estimate_sections.TakeoffJson` (last picks); `estimate_lines.TakeoffRuleId` | **Built** (2026-11-19). OES3's structured-rule design (no eval). Keyed by trade type. Supplier-agnostic. Scope templates and order sheets later. |
 
 ## 8. Estimates
 

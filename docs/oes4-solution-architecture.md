@@ -187,9 +187,15 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Frozen versions on issue (JSON snapshot plus hash, a revision reason after v1), sign/decline, and signing wins the opportunity.
      - A printable proposal rendered from the frozen version.
      - Company estimate defaults (done 2026-11-18, Administration › Settings): terms and conditions, separate optional terms for insurance work, days an estimate stays valid, sales tax %, and insurance overhead and profit %. They're copied onto each new estimate, which can still change them; existing estimates keep theirs. Existing companies start at 30 days and 10% / 10%, as before.
+     - Takeoff rules engine (done 2026-11-19), ported from OES3's structured rules with no stored formulas:
+       - A rule (Administration › Takeoff Rules, `products.manage`, per trade) turns one measurement into a quantity of one product: driver × multiplier × (1 + waste%), rounded up, down or to the nearest multiple, then held between a minimum and maximum. Up to two conditions (e.g. layers ≥ 2) and an on/off option (e.g. ice & water shield, valley metal) decide when it applies.
+       - Drivers are the trade's measurement fields (wall sides summed), "squares" for every sq ft field, ridges + hips and eaves + rakes for roofs, and a fixed quantity.
+       - The product is fixed, or comes from a slot (shingle, ridge_cap…) the rep fills per job from products tagged with it. A product's own coverage replaces the rule's multiplier (e.g. a 33 LF ridge cap bundle). Rules can use the measurement's suggested waste.
+       - New companies get starter rules for roofing (17, from OES3's set) and gutters (6), all slot-based, with notes on what each coverage assumes.
+       - On an estimate section with measurements, "Takeoff" shows the drivers, slot pickers (pre-filled from the last run, or the only product in a slot), options and a priced preview, then puts the lines on the estimate. A re-run replaces only the lines the takeoff made (`EstimateLines.TakeoffRuleId`); hand-added lines stay.
    - Still to do:
      - Server-side PDF (Playwright).
-     - The takeoff rules engine and order sheet.
+     - The order sheet (production), built on the takeoff engine.
 6. **Production** (core done 2026-11-17)
    - Done:
      - Projects from signed estimates (one trade per estimate trade, contract = signed total).

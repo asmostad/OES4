@@ -95,6 +95,7 @@ else if (e.Status == EstimateStatuses.Draft && e.LatestVersionNo > 0)
                     <span class="fw-semibold">@s.Name</span>
                     @if (sv.StructureName is not null || sv.TradeName is not null) { <span class="small text-muted">@sv.StructureName @(sv.TradeName is null ? "" : "· " + sv.TradeName)</span> }
                     <span class="ms-auto fw-semibold">@M(sv.Subtotal)</span>
+                    @if (edit && s.TradeTypeId is not null && sv.Measurements.Count > 0) { <a class="btn btn-sm btn-outline-primary py-0" href="/Estimates/Takeoff/@d.Estimate.Id?section=@s.Id" title="Work out materials from the measurements"><i class="bi bi-calculator me-1"></i>Takeoff</a> }
                     @if (edit) { <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#se-@sid" title="Edit section"><i class="bi bi-pencil"></i></button> }
                 </div>
                 @if (edit)
@@ -129,7 +130,7 @@ else if (e.Status == EstimateStatuses.Draft && e.LatestVersionNo > 0)
                             {
                                 var fid = "l-" + l.Id.ToString("N");
                                 <tr class="line-@l.ApprovalStatus">
-                                    <td><code>@(l.Code ?? (l.Kind == LineKinds.Misc ? "CUSTOM" : ""))</code></td>
+                                    <td><code>@(l.Code ?? (l.Kind == LineKinds.Misc ? "CUSTOM" : ""))</code>@if (l.TakeoffRuleId is not null) { <i class="bi bi-calculator text-muted ms-1" title="From the takeoff; a new takeoff replaces it"></i> }</td>
                                     <td>
                                         @if (l.Activity.Length > 0) { <span class="activity-tag">@Activities.Label(l.Activity)</span> }
                                         @if (edit && l.Kind == LineKinds.Misc) { <input form="@fid" name="description" value="@l.Description" class="form-control form-control-sm d-inline-block" style="max-width:340px" maxlength="500" aria-label="Description"> }

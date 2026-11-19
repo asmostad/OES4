@@ -35,6 +35,8 @@ public sealed class ProductInput
     public bool IsMaterial { get; set; } = true;
     public string? Supplier { get; set; }
     public bool IsActive { get; set; } = true;
+    public string? TakeoffSlot { get; set; }
+    public decimal? TakeoffMultiplier { get; set; }
 }
 
 /// <summary>
@@ -286,6 +288,9 @@ public sealed class CatalogService(OesDbContext db, RecordScope scope, IAuditLog
         product.IsMaterial = input.IsMaterial;
         product.Supplier = ContactService.Clean(input.Supplier);
         product.IsActive = input.IsActive;
+        if (input.TakeoffMultiplier is <= 0) throw new CrmRuleException("Coverage must be more than zero (or blank to use the rule's).");
+        product.TakeoffSlot = TakeoffService.Key(input.TakeoffSlot);
+        product.TakeoffMultiplier = input.TakeoffMultiplier;
         await db.SaveChangesAsync(ct);
         return product.Id;
     }

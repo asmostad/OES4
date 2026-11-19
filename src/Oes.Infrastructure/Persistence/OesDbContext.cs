@@ -75,6 +75,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<PriceList> PriceLists => Set<PriceList>();
     public DbSet<PriceListItem> PriceListItems => Set<PriceListItem>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<TakeoffRule> TakeoffRules => Set<TakeoffRule>();
     public DbSet<Estimate> Estimates => Set<Estimate>();
     public DbSet<EstimateSection> EstimateSections => Set<EstimateSection>();
     public DbSet<EstimateLine> EstimateLines => Set<EstimateLine>();
@@ -759,7 +760,36 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(p => p.DefaultCost).HasPrecision(12, 4);
             e.Property(p => p.DefaultPrice).HasPrecision(12, 4);
             e.Property(p => p.Supplier).HasMaxLength(100);
+            e.Property(p => p.TakeoffSlot).HasMaxLength(50);
+            e.Property(p => p.TakeoffMultiplier).HasPrecision(14, 6);
             e.HasIndex(p => new { p.TenantId, p.Sku }).IsUnique();
+        });
+
+        b.Entity<TakeoffRule>(e =>
+        {
+            e.ToTable("takeoff_rules");
+            e.Property(r => r.Name).HasMaxLength(150);
+            e.Property(r => r.Slot).HasMaxLength(50);
+            e.Property(r => r.Driver).HasMaxLength(60);
+            e.Property(r => r.Multiplier).HasPrecision(14, 6);
+            e.Property(r => r.WastePercent).HasPrecision(6, 3);
+            e.Property(r => r.RoundMode).HasMaxLength(10);
+            e.Property(r => r.RoundTo).HasPrecision(10, 4);
+            e.Property(r => r.MinQty).HasPrecision(12, 3);
+            e.Property(r => r.MaxQty).HasPrecision(12, 3);
+            e.Property(r => r.Cond1Field).HasMaxLength(60);
+            e.Property(r => r.Cond1Op).HasMaxLength(5);
+            e.Property(r => r.Cond1Value).HasPrecision(12, 3);
+            e.Property(r => r.Cond2Field).HasMaxLength(60);
+            e.Property(r => r.Cond2Op).HasMaxLength(5);
+            e.Property(r => r.Cond2Value).HasPrecision(12, 3);
+            e.Property(r => r.OptionKey).HasMaxLength(50);
+            e.Property(r => r.OptionLabel).HasMaxLength(150);
+            e.Property(r => r.Description).HasMaxLength(500);
+            e.Property(r => r.Notes).HasMaxLength(500);
+            e.HasIndex(r => new { r.TenantId, r.TradeTypeId, r.Sort });
+            e.HasOne<Domain.Measurements.TradeType>().WithMany().HasForeignKey(r => r.TradeTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Product>().WithMany().HasForeignKey(r => r.ProductId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Estimate>(e =>
@@ -790,6 +820,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.ToTable("estimate_sections");
             e.Property(s => s.Name).HasMaxLength(150);
             e.Property(s => s.ScopeOfWork).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(s => s.TakeoffJson).HasMaxLength(2000);
             e.HasIndex(s => new { s.TenantId, s.EstimateId });
             e.HasOne<Estimate>().WithMany().HasForeignKey(s => s.EstimateId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<MeasurementSet>().WithMany().HasForeignKey(s => s.MeasurementSetId).OnDelete(DeleteBehavior.Restrict);

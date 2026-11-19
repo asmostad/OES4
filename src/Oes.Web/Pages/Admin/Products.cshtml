@@ -20,7 +20,9 @@
 <div class="card">
     <div class="table-responsive">
         <table class="table mb-0 align-middle small">
-            <thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th>Trade</th><th>Cost</th><th>Price</th><th>Material</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th>Trade</th><th>Cost</th><th>Price</th>
+                <th title="The takeoff slot this product can fill, e.g. shingle or ridge_cap">Takeoff slot</th><th title="Units per unit of the rule's driver; blank = the rule's own multiplier">Coverage</th>
+                <th>Material</th><th>Active</th><th></th></tr></thead>
             <tbody>
                 @foreach (var p in Model.Products)
                 {
@@ -34,6 +36,8 @@
                             @foreach (var t in Model.Trades) { <option value="@t.Id" selected="@(p.TradeTypeId == t.Id)">@t.Name</option> }</select></td>
                         <td><input form="@fid" type="number" step="0.01" min="0" name="input.DefaultCost" value="@p.DefaultCost?.ToString("0.00")" class="form-control form-control-sm" style="max-width:100px" aria-label="Cost"></td>
                         <td><input form="@fid" type="number" step="0.01" min="0" name="input.DefaultPrice" value="@p.DefaultPrice.ToString("0.00")" class="form-control form-control-sm" style="max-width:100px" required aria-label="Price"></td>
+                        <td><input form="@fid" name="input.TakeoffSlot" value="@p.TakeoffSlot" list="takeoff-slots" class="form-control form-control-sm" style="max-width:130px" maxlength="50" aria-label="Takeoff slot"></td>
+                        <td><input form="@fid" type="number" step="0.000001" min="0" name="input.TakeoffMultiplier" value="@p.TakeoffMultiplier?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" style="max-width:100px" aria-label="Coverage"></td>
                         <td><input form="@fid" class="form-check-input" type="checkbox" name="input.IsMaterial" value="true" checked="@p.IsMaterial" aria-label="Material (taxable)"></td>
                         <td><input form="@fid" class="form-check-input" type="checkbox" name="input.IsActive" value="true" checked="@p.IsActive" aria-label="Active"></td>
                         <td><button form="@fid" class="btn btn-sm btn-outline-primary" type="submit">Save</button></td>
@@ -54,6 +58,11 @@
             <div class="col-md-1"><label class="form-label small" for="np">Price</label><input id="np" type="number" step="0.01" min="0" name="input.DefaultPrice" class="form-control form-control-sm" required></div>
             <div class="col-md-1"><div class="form-check"><input class="form-check-input" type="checkbox" name="input.IsMaterial" value="true" id="nm" checked><label class="form-check-label small" for="nm">Material</label></div></div>
             <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit">Add</button></div>
+            <div class="col-md-2"><label class="form-label small" for="nsl">Takeoff slot</label><input id="nsl" name="input.TakeoffSlot" list="takeoff-slots" class="form-control form-control-sm" maxlength="50" placeholder="e.g. shingle"></div>
+            <div class="col-md-2"><label class="form-label small" for="ncv">Coverage</label><input id="ncv" type="number" step="0.000001" min="0" name="input.TakeoffMultiplier" class="form-control form-control-sm" placeholder="blank = rule's"></div>
         </form>
     </div>
 </div>
+<datalist id="takeoff-slots">@foreach (var s in Model.Slots) { <option value="@s"></option> }</datalist>
+<p class="small text-muted mt-2">A <strong>takeoff slot</strong> lets a <a href="/Admin/Takeoff">takeoff rule</a> use whichever product the rep picks on the job (e.g. every shingle line is in the "shingle" slot).
+    <strong>Coverage</strong> replaces the rule's multiplier for this product, e.g. 0.04 bundles per LF for a 25 LF ridge cap bundle.</p>

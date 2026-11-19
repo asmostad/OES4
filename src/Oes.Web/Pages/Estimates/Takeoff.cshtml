@@ -1,0 +1,101 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Estimates.TakeoffModel
+@using Oes.Infrastructure.Estimating
+@{
+    var r = Model.Run;
+    ViewData["Title"] = "Takeoff · " + r.Section.Name;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string Q(decimal x) => x.ToString("#,0.###", us);
+    string M(decimal x) => x.ToString("C2", us);
+    var shown = r.Drivers.Where(d => d.Key != TakeoffEngine.Flat && r.Values.GetValueOrDefault(d.Key) != 0).ToList();
+    var ready = r.Lines.Where(l => l.Problem is null).ToList();
+}
+<div class="page-header">
+    <div>
+        <h1>Takeoff · @r.Section.Name</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Estimates/View/@Model.Id">@Model.EstimateLabel</a></li>
+            <li class="breadcrumb-item active">Takeoff</li>
+        </ol></nav>
+    </div>
+</div>
+
+@if (!r.HasMeasurements)
+{
+    <div class="alert alert-warning">This section has no measurements. Add them on the property's measurements page first.</div>
+}
+
+<form method="post" class="row g-3">
+    <div asp-validation-summary="ModelOnly" class="text-danger col-12"></div>
+    <input type="hidden" name="section" value="@r.Section.Id">
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header">Products</div>
+            <div class="card-body">
+                @if (r.SlotProducts.Count == 0) { <div class="small text-muted">This trade's rules use fixed products.</div> }
+                @foreach (var (slot, products) in r.SlotProducts.OrderBy(kv => kv.Key))
+                {
+                    var current = r.Choices.Slots.GetValueOrDefault(slot);
+                    <label class="form-label small mb-1" for="slot-@slot">@TakeoffEngine.Label(slot)</label>
+                    <select id="slot-@slot" name="Choices.Slots[@slot]" class="form-select form-select-sm mb-2">
+                        <option value="">@(products.Count == 0 ? "No products tagged with this slot" : "— skip —")</option>
+                        @foreach (var p in products) { <option value="@p.Id" selected="@(current == p.Id)">@p.Name · @M(p.DefaultPrice)/@p.Unit</option> }
+                    </select>
+                }
+                <a class="small" href="/Admin/Products">Tag products with a slot</a>
+            </div>
+        </div>
+        @if (r.Options.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="card-header">Options</div>
+                <div class="card-body">
+                    @foreach (var o in r.Options)
+                    {
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="Choices.Options" value="@o.Key" id="opt-@o.Key" checked="@r.Choices.Options.Contains(o.Key)">
+                            <label class="form-check-label" for="opt-@o.Key">@o.Label</label></div>
+                    }
+                </div>
+            </div>
+        }
+        <div class="card mb-3">
+            <div class="card-header">Measurements</div>
+            <ul class="list-group list-group-flush small">
+                @if (shown.Count == 0) { <li class="list-group-item text-muted">None.</li> }
+                @foreach (var d in shown) { <li class="list-group-item d-flex justify-content-between"><span>@d.Label</span><span>@Q(r.Values[d.Key]) @d.Unit</span></li> }
+            </ul>
+        </div>
+    </div>
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="card-header d-flex align-items-center">Materials from the rules
+                <button type="submit" asp-page-handler="Preview" class="btn btn-sm btn-outline-secondary ms-auto">Update preview</button></div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>Rule</th><th>Product</th><th class="text-end">Qty</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                        @if (r.Lines.Count == 0) { <tr><td colspan="4" class="small text-muted">No rule applies to these measurements.</td></tr> }
+                        @foreach (var l in r.Lines)
+                        {
+                            <tr class="@(l.Problem is null ? "" : "text-muted")">
+                                <td>@l.Rule.Name<div class="small text-muted">@Q(l.Driver) × @l.Rule.Multiplier.ToString("0.######", us)@(l.Product?.TakeoffMultiplier is not null ? " (product coverage)" : "") → @Q(l.RawQty)</div></td>
+                                <td>@if (l.Problem is not null) { <span class="text-warning small"><i class="bi bi-exclamation-triangle me-1"></i>@l.Problem</span> } else { @l.Description }</td>
+                                <td class="text-end text-nowrap">@Q(l.Qty) @(l.Product?.Unit)</td>
+                                <td class="text-end">@(l.Product is null ? "" : M(Math.Round(l.Qty * l.Product.DefaultPrice, 2, MidpointRounding.AwayFromZero)))</td>
+                            </tr>
+                        }
+                    </tbody>
+                    @if (ready.Count > 0)
+                    {
+                        <tfoot><tr><td colspan="3" class="text-end">@ready.Count line@(ready.Count == 1 ? "" : "s")</td>
+                            <td class="text-end fw-semibold">@M(ready.Sum(l => Math.Round(l.Qty * l.Product!.DefaultPrice, 2, MidpointRounding.AwayFromZero)))</td></tr></tfoot>
+                    }
+                </table>
+            </div>
+            <div class="card-body border-top d-flex align-items-center gap-2">
+                <button type="submit" asp-page-handler="Apply" class="btn btn-primary" disabled="@(!r.HasMeasurements)"><i class="bi bi-check2 me-1"></i>Put these on the estimate</button>
+                <span class="small text-muted">Replaces this section's earlier takeoff lines; lines added by hand stay. Rules still needing a product are skipped.</span>
+            </div>
+        </div>
+    </div>
+</form>
