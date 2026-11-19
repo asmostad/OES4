@@ -45,7 +45,10 @@
                 @foreach (var (m, l) in new[] { (30, "30m"), (60, "1h"), (90, "1.5h"), (120, "2h"), (240, "4h"), (480, "8h") }) { <option value="@m" selected="@(m == 60)">@l</option> }</select></div>
             <div class="col-7"><select name="appointment.AssignedToUserId" class="form-select form-select-sm" aria-label="With">
                 @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
-            <div class="col-5"><button class="btn btn-sm btn-primary w-100" type="submit">Schedule</button></div>
+            <div class="col-5 d-flex align-items-center"><div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="appointment.AllDay" value="true" id="allday-@key"><label class="form-check-label small" for="allday-@key">All day</label></div></div>
+            <div class="col-12"><select name="appointment.AttendeeUserIds" class="form-select form-select-sm" multiple size="2" aria-label="Also invite">
+                @foreach (var u in Model.Users) { <option value="@u.Value">@u.Label</option> }</select><div class="form-text mt-0">Also invite (Ctrl-click for several)</div></div>
+            <div class="col-12"><button class="btn btn-sm btn-primary w-100" type="submit">Schedule</button></div>
             <div class="col-12 form-text mt-0">Location defaults to the property address.</div>
         </form>
     </div></div>
@@ -54,8 +57,8 @@
         @foreach (var a in Model.Appointments)
         {
             <li class="list-group-item @(a.EndLocal < Model.NowLocal || a.Status == "completed" ? "text-muted" : "")">
-                <div class="fw-medium">@a.StartLocal.ToString("ddd MMM d, h:mm tt") · @a.Title</div>
-                <div class="text-muted">@a.AssigneeName@(a.Location is null ? "" : " · " + a.Location)</div>
+                <div class="fw-medium">@(a.IsAllDay ? (a.FirstDay == a.LastDay ? a.FirstDay.ToString("ddd MMM d") + ", all day" : $"{a.FirstDay:ddd MMM d}–{a.LastDay:MMM d}, all day") : a.StartLocal.ToString("ddd MMM d, h:mm tt")) · @a.Title</div>
+                <div class="text-muted">@a.AssigneeName@(a.AttendeeNames is { Count: > 0 } names ? " + " + string.Join(", ", names) : "")@(a.Location is null ? "" : " · " + a.Location)</div>
                 @if (a.CanEdit && a.Status == "scheduled")
                 {
                     <button class="btn btn-link btn-sm p-0 small" type="button" data-bs-toggle="collapse" data-bs-target="#edit-appt-@a.Id.ToString("N")">Edit</button>

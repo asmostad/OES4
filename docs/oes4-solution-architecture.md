@@ -172,7 +172,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Supplements with status, amounts and dates.
    - Storm events with ZIP codes, a canvass list and storm suggestions; storm filters on the pipeline and claims.
    - Admin screens for pipeline stages and pick lists.
-4. **Measurements** (done 2026-11-17, except AI extraction)
+4. **Measurements** (done 2026-11-17; AI reading of reports 2026-11-18)
    - Default trades and measurement fields per tenant, editable under Administration › Trades & Measurements.
    - Per-property measurements page by structure × trade.
    - Versions that are never overwritten, with a "vs previous" delta, revert by making an older version current, and the report file kept on the property.
@@ -232,10 +232,10 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Company texting number (unique across companies) routes inbound texts to the right tenant. Replies continue on the record the last text came from and notify its sender.
      - Providers sit behind `IMailProvider` / `ISmsProvider`. Development writes to a pickup folder and has a secret-protected `/api/webhooks/sms/dev` endpoint; with no provider configured, sends fail with a clear message and nothing leaves the server.
      - Unmatched texts inbox (done 2026-11-19, `sms.view_all`; Communication › Unmatched Texts): texts from numbers on no contact are grouped by number with the conversation (including automatic replies), and everyone with `sms.view_all` is notified when one arrives. "File here" adds the number to a contact (as a mobile) and files the texts there, so the next text matches by itself; "New contact" creates the contact (lead source Phone In) and optionally a lead, with the texts on it; "Dismiss" hides spam or wrong numbers until they text again. Numbers on an archived contact are pointed out.
+     - Appointments (done 2026-11-19): all-day events, one day or several (local midnight to midnight; the calendar shows them on every day they cover), and teammates invited besides the assignee. Invited people see it on their calendar even without `calendar.view_all`, are notified when invited, moved or cancelled, and count as busy for online booking (so do all-day events). Editing tasks and appointments in place, due/overdue, stale and expiry alerts, and automation rules were done earlier.
    - Still to do (needs external credentials or later work):
      - Real providers: Microsoft Graph mail (per-user OAuth, inbound sync and threading) and calendar sync, Twilio texting (request-signature validation, A2P registration, delivery status callbacks). SignalR live updates, email/push delivery of notifications and preferences.
      - MMS; email CC/BCC and attachments; replying from the unmatched inbox before filing.
-     - Appointment attendees, all-day events. (Done since: editing tasks and appointments in place, with the assignee told when moved or handed over, and a booked appointment moving its booking; due/overdue, stale and expiry alerts; automation rules.)
 9. **Marketing** (done 2026-11-17: email blasts, unsubscribe, suppressions, online booking, nurture workflows; provider-dependent parts listed below)
    - Done:
      - Email blasts: draft with a template or plain text and merge fields; audience by contact status, storm, lead source and organizations; a live count of who gets it (opted-out, unsubscribed, duplicate addresses and no-email contacts left out); "send me a test"; send now or later; cancel.

@@ -5197,6 +5197,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<bool>("IsAllDay")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Location")
                         .HasMaxLength(300)
                         .HasColumnType("varchar(300)");
@@ -5238,6 +5241,42 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "EntityType", "EntityId");
 
                     b.ToTable("appointments", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Work.AppointmentAttendee", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("AppointmentId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UserId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.HasIndex("TenantId", "AppointmentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("appointment_attendees", (string)null);
                 });
 
             modelBuilder.Entity("Oes.Domain.Work.AutomationRule", b =>
@@ -6123,6 +6162,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Work.AppointmentAttendee", b =>
+                {
+                    b.HasOne("Oes.Domain.Work.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

@@ -42,6 +42,8 @@ public class Appointment : TenantEntity
     public string TypeKey { get; set; } = "other";
     public DateTime StartsAt { get; set; }
     public DateTime EndsAt { get; set; }
+    /// <summary>Whole days (local midnight to midnight, possibly several days); no times shown.</summary>
+    public bool IsAllDay { get; set; }
     public string? Location { get; set; }
     public string? Notes { get; set; }
     public Guid AssignedToUserId { get; set; }
@@ -50,6 +52,13 @@ public class Appointment : TenantEntity
 
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
+}
+
+/// <summary>Team members invited to an appointment besides the person it's assigned to. It shows on their calendar too.</summary>
+public class AppointmentAttendee : TenantEntity
+{
+    public Guid AppointmentId { get; set; }
+    public Guid UserId { get; set; }
 }
 
 public static class AppointmentTypes

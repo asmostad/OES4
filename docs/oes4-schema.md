@@ -178,7 +178,7 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 | Table | Key columns | Notes |
 |---|---|---|
 | `tasks` | TenantId, Title, Notes, DueAt (UTC), HasDueTime, Priority (normal/high), AssignedToUserId, CreatedByUserId, CompletedAt/By, EntityType/EntityId (home record) | Linked via `record_links` for rollups. **Built in M8**; low/urgent priorities and a status column were dropped (open = no CompletedAt) |
-| `appointments` | TenantId, Title, TypeKey, StartAt, EndAt (UTC), IsAllDay, TimeZone, Location, AssignedTo, Status, RemoteEventId, RemoteChangeKey, SyncStatus | **Built in M8** without IsAllDay, TimeZone (the tenant zone is used) and the sync columns, which come with M365 sync |
+| `appointments` | TenantId, Title, TypeKey, StartAt, EndAt (UTC), IsAllDay, TimeZone, Location, AssignedTo, Status, RemoteEventId, RemoteChangeKey, SyncStatus; `appointment_attendees` (AppointmentId, UserId) | **Built** (M8; IsAllDay and attendees 2026-11-19) without TimeZone (the tenant zone is used) and the sync columns, which come with M365 sync |
 | `appointment_attendees` | AppointmentId, UserId / ContactId / Email, Response | No more JSON text and LIKE matching |
 | `calendar_connections` | MembershipId, Provider (ms365), DeltaToken, LastSyncAt, Status, LastError | |
 | `busy_calendars` + `busy_blocks` | MembershipId, Label, IcsUrl (encrypted), ShowOnCalendar / StartAt, EndAt | Fetched through an SSRF-safe client |

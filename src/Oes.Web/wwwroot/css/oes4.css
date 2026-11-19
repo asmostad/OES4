@@ -382,3 +382,4 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .assistant-time { font-size: .7rem; color: var(--bs-secondary-color); margin-top: .15rem; }
 .assistant-tools { margin-bottom: .25rem; }
 .ai-filled { background: #fffbeb; border-color: #f59e0b; }
+.cal-item.cal-allday { background: var(--bs-primary-bg-subtle); }

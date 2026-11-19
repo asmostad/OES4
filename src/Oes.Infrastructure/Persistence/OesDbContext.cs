@@ -101,6 +101,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     // Tasks, calendar, notifications
     public DbSet<Domain.Work.TaskItem> Tasks => Set<Domain.Work.TaskItem>();
     public DbSet<Domain.Work.Appointment> Appointments => Set<Domain.Work.Appointment>();
+    public DbSet<Domain.Work.AppointmentAttendee> AppointmentAttendees => Set<Domain.Work.AppointmentAttendee>();
     public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
     public DbSet<Domain.Work.AutomationRule> AutomationRules => Set<Domain.Work.AutomationRule>();
     public DbSet<Domain.Work.AutomationRun> AutomationRuns => Set<Domain.Work.AutomationRun>();
@@ -262,6 +263,14 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Ignore(t => t.IsOpen);
             e.HasIndex(t => new { t.TenantId, t.AssignedToUserId, t.CompletedAt, t.DueAt });
             e.HasIndex(t => new { t.TenantId, t.EntityType, t.EntityId });
+        });
+
+        b.Entity<Domain.Work.AppointmentAttendee>(e =>
+        {
+            e.ToTable("appointment_attendees");
+            e.HasIndex(a => new { a.TenantId, a.AppointmentId, a.UserId }).IsUnique();
+            e.HasIndex(a => new { a.TenantId, a.UserId });
+            e.HasOne<Domain.Work.Appointment>().WithMany().HasForeignKey(a => a.AppointmentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Domain.Work.Appointment>(e =>

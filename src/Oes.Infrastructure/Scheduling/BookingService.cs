@@ -206,6 +206,11 @@ public sealed class BookingService(
                                                     && a.Status != AppointmentStatuses.Cancelled
                                                     && a.EndsAt > rangeStart - pad && a.StartsAt < rangeEnd + pad)
             .Select(a => new { Host = a.AssignedToUserId, a.StartsAt, a.EndsAt }).ToListAsync(ct);
+        // Invited teammates are busy too.
+        busy.AddRange(await (from x in db.AppointmentAttendees where activeHosts.Contains(x.UserId)
+                             join a in db.Appointments on x.AppointmentId equals a.Id
+                             where a.Id != ignoreAppointmentId && a.Status != AppointmentStatuses.Cancelled && a.EndsAt > rangeStart - pad && a.StartsAt < rangeEnd + pad
+                             select new { Host = x.UserId, a.StartsAt, a.EndsAt }).ToListAsync(ct));
         var booked = await db.Bookings.Where(b => b.BookingTypeId == t.Id && b.AppointmentId != ignoreAppointmentId && b.Status == BookingStatuses.Booked && b.StartsAt >= rangeStart && b.StartsAt < rangeEnd)
             .Select(b => new { b.HostUserId, b.StartsAt }).ToListAsync(ct);
         var earliest = clock.UtcNow.AddMinutes(t.MinNoticeMinutes);

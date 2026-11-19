@@ -82,7 +82,7 @@
                 @foreach (var a in Model.Day.Appointments)
                 {
                     <li class="list-group-item @(a.Status != "scheduled" ? "text-muted" : "")">
-                        <span class="fw-medium">@a.StartLocal.ToString("h:mm tt")</span> ·
+                        <span class="fw-medium">@(a.IsAllDay ? "All day" : a.StartLocal.ToString("h:mm tt"))</span> ·
                         @if (a.RecordUrl is not null) { <a href="@a.RecordUrl">@a.Title</a> } else { @a.Title }
                         @if (a.Location is not null) { <div class="text-muted">@a.Location</div> }
                     </li>

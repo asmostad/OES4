@@ -89,6 +89,21 @@ public sealed partial class BookingTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task Invitations_and_all_day_events_block_booking_times()
+    {
+        var w = await WorldAsync();
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+        {
+            var work = s.Get<WorkService>();
+            // The admin is off all day and the rep is invited to the admin's 9 o'clock ride-along: only the rep's 10 and 11 are left.
+            await work.CreateAppointmentAsync(new AppointmentInput { Title = "Day off", AllDay = true, Date = w.Day });
+            await work.CreateAppointmentAsync(new AppointmentInput { Title = "Ride-along", Date = w.Day, StartTime = Nine, DurationMinutes = 60, AttendeeUserIds = [w.Rep.Id] });
+        }
+        await using var p = await PublicAsync(w);
+        Assert.Equal([Ten, Eleven], (await p.Get<BookingService>().SlotsAsync("roof-inspection"))[w.Day]);
+    }
+
+    [Fact]
     public async Task A_booking_lands_on_the_calendar_but_stays_out_of_the_crm_until_staff_accept_it()
     {
         var w = await WorldAsync();

@@ -33,13 +33,30 @@ public sealed class AppointmentInput
     public Guid? AssignedToUserId { get; set; }
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
+    /// <summary>Whole days from <see cref="Date"/> through <see cref="EndDate"/> (or just that day); the times are ignored.</summary>
+    public bool AllDay { get; set; }
+    public DateOnly? EndDate { get; set; }
+    /// <summary>Teammates invited besides the assignee. Null leaves them unchanged on an edit.</summary>
+    public List<Guid>? AttendeeUserIds { get; set; }
+    /// <summary>The form sent the attendee list (so an empty list means "no one", not "unchanged").</summary>
+    public bool AttendeesSent { get; set; }
 }
 
 public sealed record TaskRow(Guid Id, string Title, string? Notes, DateTime? DueLocal, bool HasDueTime, string Priority, Guid AssignedToUserId,
     string AssigneeName, DateTime? CompletedAt, string? EntityType, Guid? EntityId, string? RecordUrl, bool IsOverdue, bool IsDueToday, bool CanEdit);
 
 public sealed record AppointmentRow(Guid Id, string Title, string TypeKey, DateTime StartLocal, DateTime EndLocal, string? Location, string? Notes,
-    Guid AssignedToUserId, string AssigneeName, string Status, string? EntityType, Guid? EntityId, string? RecordUrl, bool CanEdit);
+    Guid AssignedToUserId, string AssigneeName, string Status, string? EntityType, Guid? EntityId, string? RecordUrl, bool CanEdit,
+    bool IsAllDay = false, List<Guid>? AttendeeIds = null, List<string>? AttendeeNames = null)
+{
+    /// <summary>The local days it covers (all-day events end at the next midnight).</summary>
+    public DateOnly FirstDay => DateOnly.FromDateTime(StartLocal);
+    public DateOnly LastDay => IsAllDay ? DateOnly.FromDateTime(EndLocal).AddDays(-1) : DateOnly.FromDateTime(StartLocal);
+    public bool Covers(DateOnly day) => day >= FirstDay && day <= LastDay;
+    public string When => IsAllDay
+        ? (FirstDay == LastDay ? "All day" : $"All day, {FirstDay:MMM d}–{LastDay:MMM d}")
+        : $"{StartLocal:h:mm tt}–{EndLocal:h:mm tt}";
+}
 
 /// <summary>Tasks and appointments: on records (rolled up via record_links) or standalone.</summary>
 public sealed class WorkService(
@@ -185,29 +202,59 @@ public sealed class WorkService(
     {
         await scope.EnsurePermissionAsync(Permissions.TasksCreate);
         if (string.IsNullOrWhiteSpace(input.Title)) throw new CrmRuleException("Give the appointment a title.");
-        if (input.DurationMinutes is < 5 or > 24 * 60) throw new CrmRuleException("Duration must be between 5 minutes and 24 hours.");
+        var (starts, ends) = await TimesAsync(input);
         var (type, id) = await RecordAsync(input.EntityType, input.EntityId);
         var assignee = await AssigneeAsync(input.AssignedToUserId, ct);
         if (assignee != scope.Me && !await user.HasPermissionAsync(Permissions.CalendarManage, ct))
             throw new RecordForbiddenException("You can only put appointments on your own calendar.");
+        var attendees = await AttendeesAsync(input.AttendeeUserIds, assignee, ct);
 
-        var starts = await time.ToUtcAsync(input.Date, input.StartTime);
         var appt = new Appointment
         {
             Title = input.Title.Trim(), TypeKey = string.IsNullOrWhiteSpace(input.TypeKey) ? "other" : input.TypeKey, StartsAt = starts,
-            EndsAt = starts.AddMinutes(input.DurationMinutes), Location = ContactService.Clean(input.Location) ?? await DefaultLocationAsync(type, id, ct),
+            EndsAt = ends, IsAllDay = input.AllDay, Location = ContactService.Clean(input.Location) ?? await DefaultLocationAsync(type, id, ct),
             Notes = ContactService.Clean(input.Notes), AssignedToUserId = assignee, CreatedByUserId = scope.Me, EntityType = type, EntityId = id,
         };
         db.Appointments.Add(appt);
+        foreach (var a in attendees) db.AppointmentAttendees.Add(new AppointmentAttendee { AppointmentId = appt.Id, UserId = a });
+        var when = When(input);
         if (type is not null)
         {
             await items.LinkItemAsync(ItemTypes.Appointment, appt.Id, type, id!.Value, ct);
-            await items.LogAsync(type, id.Value, "appointment.scheduled", $"Appointment: {appt.Title} on {input.Date:ddd MMM d} at {input.StartTime:h:mm tt}", ct);
+            await items.LogAsync(type, id.Value, "appointment.scheduled", $"Appointment: {appt.Title} on {when}", ct);
         }
-        notifications.Notify(assignee, "appointment.assigned", $"New appointment: {appt.Title}", $"{input.Date:ddd MMM d} at {input.StartTime:h:mm tt}",
-            RecordUrls.For(type, id) ?? $"/Calendar?date={input.Date:yyyy-MM-dd}");
+        var url = RecordUrls.For(type, id) ?? $"/Calendar?date={input.Date:yyyy-MM-dd}";
+        notifications.Notify(assignee, "appointment.assigned", $"New appointment: {appt.Title}", when, url);
+        foreach (var a in attendees) notifications.Notify(a, "appointment.invited", $"Invited: {appt.Title}", when, url);
         await db.SaveChangesAsync(ct);
         return appt.Id;
+    }
+
+    private async Task<(DateTime Starts, DateTime Ends)> TimesAsync(AppointmentInput input)
+    {
+        if (input.AllDay)
+        {
+            var last = input.EndDate ?? input.Date;
+            if (last < input.Date) throw new CrmRuleException("The end date is before the start date.");
+            if (last.DayNumber - input.Date.DayNumber > 30) throw new CrmRuleException("An all-day event can run up to 31 days.");
+            return (await time.ToUtcAsync(input.Date, TimeOnly.MinValue), await time.ToUtcAsync(last.AddDays(1), TimeOnly.MinValue));
+        }
+        if (input.DurationMinutes is < 5 or > 24 * 60) throw new CrmRuleException("Duration must be between 5 minutes and 24 hours.");
+        var starts = await time.ToUtcAsync(input.Date, input.StartTime);
+        return (starts, starts.AddMinutes(input.DurationMinutes));
+    }
+
+    private static string When(AppointmentInput input) => !input.AllDay ? $"{input.Date:ddd MMM d} at {input.StartTime:h:mm tt}"
+        : input.EndDate is { } end && end > input.Date ? $"{input.Date:ddd MMM d}–{end:ddd MMM d} (all day)" : $"{input.Date:ddd MMM d} (all day)";
+
+    /// <summary>Invited teammates: active users in this company, not the assignee, at most 20.</summary>
+    private async Task<List<Guid>> AttendeesAsync(List<Guid>? ids, Guid assignee, CancellationToken ct)
+    {
+        var list = (ids ?? []).Where(i => i != Guid.Empty && i != assignee).Distinct().ToList();
+        if (list.Count > 20) throw new CrmRuleException("Invite at most 20 people.");
+        var active = await db.Memberships.Where(m => list.Contains(m.UserId) && m.Status == MembershipStatus.Active).Select(m => m.UserId).Distinct().CountAsync(ct);
+        if (active != list.Count) throw new CrmRuleException("Invite active users in this company.");
+        return list;
     }
 
     /// <summary>Appointments on a property-backed record default to that address.</summary>
@@ -234,7 +281,9 @@ public sealed class WorkService(
         if (a.AssignedToUserId != scope.Me && a.CreatedByUserId != scope.Me && !await user.HasPermissionAsync(Permissions.CalendarManage, ct))
             throw new RecordNotFoundException("Appointment");
         a.Status = status;
-        if (status == AppointmentStatuses.Cancelled) notifications.Notify(a.AssignedToUserId, "appointment.cancelled", $"Cancelled: {a.Title}", null, "/Calendar");
+        if (status == AppointmentStatuses.Cancelled)
+            foreach (var who in (await AttendeeIdsAsync(a.Id, ct)).Prepend(a.AssignedToUserId))
+                notifications.Notify(who, "appointment.cancelled", $"Cancelled: {a.Title}", null, "/Calendar");
         await db.SaveChangesAsync(ct);
     }
 
@@ -249,21 +298,29 @@ public sealed class WorkService(
         if (a.AssignedToUserId != scope.Me && a.CreatedByUserId != scope.Me && !manage) throw new RecordNotFoundException("Appointment");
         if (a.Status == AppointmentStatuses.Cancelled) throw new CrmRuleException("This appointment was cancelled.");
         if (string.IsNullOrWhiteSpace(input.Title)) throw new CrmRuleException("Give the appointment a title.");
-        if (input.DurationMinutes is < 5 or > 24 * 60) throw new CrmRuleException("Duration must be between 5 minutes and 24 hours.");
+        var (starts, ends) = await TimesAsync(input);
         var assignee = await AssigneeAsync(input.AssignedToUserId ?? a.AssignedToUserId, ct);
         if (assignee != a.AssignedToUserId && assignee != scope.Me && !manage)
             throw new RecordForbiddenException("You can only put appointments on your own calendar.");
 
-        var starts = await time.ToUtcAsync(input.Date, input.StartTime);
-        var moved = starts != a.StartsAt || starts.AddMinutes(input.DurationMinutes) != a.EndsAt;
+        var moved = starts != a.StartsAt || ends != a.EndsAt;
         var reassigned = assignee != a.AssignedToUserId;
         a.Title = input.Title.Trim();
         a.TypeKey = string.IsNullOrWhiteSpace(input.TypeKey) ? a.TypeKey : input.TypeKey;
         a.StartsAt = starts;
-        a.EndsAt = starts.AddMinutes(input.DurationMinutes);
+        a.EndsAt = ends;
+        a.IsAllDay = input.AllDay;
         a.Location = ContactService.Clean(input.Location);
         a.Notes = ContactService.Clean(input.Notes);
         a.AssignedToUserId = assignee;
+
+        // Invitations: new people are told; people already invited hear about a move like the assignee.
+        var existing = await db.AppointmentAttendees.Where(x => x.AppointmentId == a.Id).ToListAsync(ct);
+        var keep = input.AttendeeUserIds is null && !input.AttendeesSent ? existing.Select(x => x.UserId).Where(u => u != assignee).ToList()
+            : await AttendeesAsync(input.AttendeeUserIds, assignee, ct);
+        db.AppointmentAttendees.RemoveRange(existing.Where(x => !keep.Contains(x.UserId)));
+        var added = keep.Where(u => existing.All(x => x.UserId != u)).ToList();
+        foreach (var u in added) db.AppointmentAttendees.Add(new AppointmentAttendee { AppointmentId = a.Id, UserId = u });
 
         var booking = await db.Bookings.FirstOrDefaultAsync(b => b.AppointmentId == a.Id && b.Status == Domain.Booking.BookingStatuses.Booked, ct);
         if (booking is not null && (moved || reassigned))
@@ -272,10 +329,12 @@ public sealed class WorkService(
             booking.SlotKey = Scheduling.BookingService.SlotKey(assignee, a.StartsAt);
             booking.ReminderSentAt = null;
         }
-        var when = $"{input.Date:ddd MMM d} at {input.StartTime:h:mm tt}";
+        var when = When(input);
         var url = RecordUrls.For(a.EntityType, a.EntityId) ?? $"/Calendar?date={input.Date:yyyy-MM-dd}";
         if (reassigned) notifications.Notify(assignee, "appointment.assigned", $"New appointment: {a.Title}", when, url);
         else if (moved) notifications.Notify(assignee, "appointment.moved", $"Moved: {a.Title}", $"Now {when}", url);
+        foreach (var u in added) notifications.Notify(u, "appointment.invited", $"Invited: {a.Title}", when, url);
+        if (moved) foreach (var u in keep.Except(added)) notifications.Notify(u, "appointment.moved", $"Moved: {a.Title}", $"Now {when}", url);
         if (moved && a.EntityType is not null) await items.LogAsync(a.EntityType, a.EntityId!.Value, "appointment.moved", $"Appointment moved: {a.Title}, now {when}", ct);
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException) when (booking is not null)
@@ -284,7 +343,10 @@ public sealed class WorkService(
         }
     }
 
-    /// <summary>Appointments between two local dates. Without calendar.view_all only your own (assigned or created).</summary>
+    private async Task<List<Guid>> AttendeeIdsAsync(Guid appointmentId, CancellationToken ct) =>
+        await db.AppointmentAttendees.Where(x => x.AppointmentId == appointmentId).Select(x => x.UserId).ToListAsync(ct);
+
+    /// <summary>Appointments between two local dates. Without calendar.view_all only your own (assigned, created or invited to).</summary>
     public async Task<List<AppointmentRow>> AppointmentsAsync(DateOnly from, DateOnly to, Guid? userId, string? entityType = null, Guid? entityId = null,
         bool includeCancelled = false, CancellationToken ct = default)
     {
@@ -300,18 +362,26 @@ public sealed class WorkService(
         {
             var (start, end) = await time.DayRangeUtcAsync(from, to);
             q = q.Where(a => a.StartsAt < end && a.EndsAt > start);
-            if (!await user.HasPermissionAsync(Permissions.CalendarViewAll, ct)) q = q.Where(a => a.AssignedToUserId == me || a.CreatedByUserId == me);
-            else if (userId is { } u) q = q.Where(a => a.AssignedToUserId == u);
+            if (!await user.HasPermissionAsync(Permissions.CalendarViewAll, ct))
+                q = q.Where(a => a.AssignedToUserId == me || a.CreatedByUserId == me || db.AppointmentAttendees.Any(x => x.AppointmentId == a.Id && x.UserId == me));
+            else if (userId is { } u)
+                q = q.Where(a => a.AssignedToUserId == u || db.AppointmentAttendees.Any(x => x.AppointmentId == a.Id && x.UserId == u));
         }
         if (!includeCancelled) q = q.Where(a => a.Status != AppointmentStatuses.Cancelled);
         var list = await q.OrderBy(a => a.StartsAt).Take(500).ToListAsync(ct);
-        var names = await NamesAsync(list.Select(a => a.AssignedToUserId), ct);
+        var listIds = list.Select(a => a.Id).ToList();
+        var attendees = await db.AppointmentAttendees.Where(x => listIds.Contains(x.AppointmentId)).Select(x => new { x.AppointmentId, x.UserId }).ToListAsync(ct);
+        var names = await NamesAsync(list.Select(a => a.AssignedToUserId).Concat(attendees.Select(x => x.UserId)), ct);
         var manage = await user.HasPermissionAsync(Permissions.CalendarManage, ct);
         var rows = new List<AppointmentRow>();
         foreach (var a in list)
+        {
+            var invited = attendees.Where(x => x.AppointmentId == a.Id).Select(x => x.UserId).ToList();
             rows.Add(new AppointmentRow(a.Id, a.Title, a.TypeKey, await time.ToLocalAsync(a.StartsAt), await time.ToLocalAsync(a.EndsAt), a.Location, a.Notes,
                 a.AssignedToUserId, names.GetValueOrDefault(a.AssignedToUserId, "?"), a.Status, a.EntityType, a.EntityId, RecordUrls.For(a.EntityType, a.EntityId),
-                manage || a.AssignedToUserId == me || a.CreatedByUserId == me));
+                manage || a.AssignedToUserId == me || a.CreatedByUserId == me,
+                a.IsAllDay, invited, invited.Select(i => names.GetValueOrDefault(i, "?")).ToList()));
+        }
         return rows;
     }
 
@@ -321,7 +391,7 @@ public sealed class WorkService(
     {
         var tasks = await TasksAsync(onlyMine: true, includeDone: false, ct: ct);
         var today = await time.TodayAsync();
-        var appts = (await AppointmentsAsync(today, today, scope.Me, ct: ct)).Where(a => a.AssignedToUserId == scope.Me).ToList();
+        var appts = (await AppointmentsAsync(today, today, scope.Me, ct: ct)).Where(a => a.AssignedToUserId == scope.Me || (a.AttendeeIds?.Contains(scope.Me ?? Guid.Empty) ?? false)).ToList();
         return new MyDay(tasks.Count(t => t.IsOverdue), tasks.Count(t => t.IsDueToday && !t.IsOverdue), appts);
     }
 }

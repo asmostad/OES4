@@ -31,16 +31,16 @@
             @for (var i = 0; i < 7; i++)
             {
                 var day = Model.WeekStart.AddDays(i);
-                var appts = Model.Appointments.Where(a => DateOnly.FromDateTime(a.StartLocal) == day).ToList();
+                var appts = Model.Appointments.Where(a => a.Covers(day)).OrderByDescending(a => a.IsAllDay).ThenBy(a => a.StartLocal).ToList();
                 var tasks = Model.DueTasks.Where(t => DateOnly.FromDateTime(t.DueLocal!.Value) == day).ToList();
                 <div class="week-day @(day == Model.Today ? "today" : "")">
                     <div class="week-day-head"><span>@day.ToString("ddd")</span><strong>@day.Day</strong></div>
                     @foreach (var a in appts)
                     {
-                        <div class="cal-item cal-@a.TypeKey @(a.Status == "completed" ? "done" : "")">
-                            <div class="cal-time">@a.StartLocal.ToString("h:mm tt")–@a.EndLocal.ToString("h:mm")</div>
+                        <div class="cal-item cal-@a.TypeKey @(a.Status == "completed" ? "done" : "") @(a.IsAllDay ? "cal-allday" : "")">
+                            <div class="cal-time">@(a.IsAllDay ? (a.FirstDay == a.LastDay ? "All day" : $"All day · {a.FirstDay:MMM d}–{a.LastDay:MMM d}") : $"{a.StartLocal:h:mm tt}–{a.EndLocal:h:mm}")</div>
                             <div class="cal-title">@if (a.RecordUrl is not null) { <a href="@a.RecordUrl">@a.Title</a> } else { @a.Title }</div>
-                            <div class="cal-meta">@a.AssigneeName@(a.Location is null ? "" : " · " + a.Location)</div>
+                            <div class="cal-meta">@a.AssigneeName@(a.AttendeeNames is { Count: > 0 } names ? " + " + string.Join(", ", names) : "")@(a.Location is null ? "" : " · " + a.Location)</div>
                             @if (a.CanEdit && a.Status == "scheduled")
                             {
                                 <form method="post" asp-antiforgery="true" action="/Work/Items?handler=AppointmentStatus" class="cal-actions">
@@ -71,12 +71,18 @@
                     <div class="col-12"><select name="appointment.TypeKey" class="form-select form-select-sm" aria-label="Type">
                         @foreach (var t in Model.Types) { <option value="@t.Value">@t.Label</option> }</select></div>
                     <div class="col-12"><input type="date" name="appointment.Date" value="@Model.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required aria-label="Date"></div>
+                    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="appointment.AllDay" value="true" id="new-allday">
+                        <label class="form-check-label small" for="new-allday">All day, through</label></div>
+                        <input type="date" name="appointment.EndDate" class="form-control form-control-sm" aria-label="Last day (all day)"></div>
                     <div class="col-6"><input type="time" name="appointment.StartTime" value="09:00" class="form-control form-control-sm" required aria-label="Start"></div>
                     <div class="col-6"><select name="appointment.DurationMinutes" class="form-select form-select-sm" aria-label="Duration">
                         @foreach (var (m, l) in new[] { (30, "30m"), (60, "1h"), (90, "1.5h"), (120, "2h"), (240, "4h"), (480, "8h") }) { <option value="@m" selected="@(m == 60)">@l</option> }</select></div>
                     <div class="col-12"><input name="appointment.Location" class="form-control form-control-sm" placeholder="Location" maxlength="300" aria-label="Location"></div>
                     <div class="col-12"><select name="appointment.AssignedToUserId" class="form-select form-select-sm" aria-label="With">
                         @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
+                    <div class="col-12"><label class="form-label small mb-0" for="new-att">Also invite</label>
+                        <select id="new-att" name="appointment.AttendeeUserIds" class="form-select form-select-sm" multiple size="3">
+                            @foreach (var u in Model.Users) { <option value="@u.Value">@u.Label</option> }</select></div>
                     <div class="col-12"><button class="btn btn-sm btn-primary w-100" type="submit">Schedule</button></div>
                 </form>
                 <div class="form-text">To tie an appointment to a job, schedule it from that record's page.</div>

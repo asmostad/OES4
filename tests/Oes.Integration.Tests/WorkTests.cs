@@ -173,4 +173,80 @@ public sealed class WorkTests(MySqlFixture fx)
             Assert.Empty(await s.Get<NotificationService>().LatestAsync());
         }
     }
+
+    [Fact]
+    public async Task All_day_events_span_whole_days_and_invited_teammates_see_and_hear_about_them()
+    {
+        var w = await WorldAsync();
+        var crew = await fx.AddMemberAsync(w.Tenant, "Sales Rep"); // no calendar.view_all: sees it only by being invited
+        Guid appt;
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+        {
+            var work = s.Get<WorkService>();
+            await Assert.ThrowsAsync<CrmRuleException>(() => work.CreateAppointmentAsync(new AppointmentInput
+                { Title = "Backwards", AllDay = true, Date = new DateOnly(2026, 8, 5), EndDate = new DateOnly(2026, 8, 4) }));
+            await Assert.ThrowsAsync<CrmRuleException>(() => work.CreateAppointmentAsync(new AppointmentInput
+                { Title = "Stranger", Date = new DateOnly(2026, 8, 5), AttendeeUserIds = [Guid.NewGuid()] }));
+
+            // Two-day install, all day, for the rep with the production manager invited.
+            appt = await work.CreateAppointmentAsync(new AppointmentInput
+            {
+                Title = "Install", TypeKey = "install", AllDay = true, Date = new DateOnly(2026, 8, 4), EndDate = new DateOnly(2026, 8, 5),
+                StartTime = new TimeOnly(13, 0), DurationMinutes = 30, AssignedToUserId = w.Rep.Id, AttendeeUserIds = [crew.Id, w.Rep.Id],
+                EntityType = EntityTypes.Opportunity, EntityId = w.Opportunity,
+            });
+            var db = s.Get<OesDbContext>();
+            var stored = await db.Appointments.SingleAsync(a => a.Id == appt);
+            Assert.Equal((new DateTime(2026, 8, 4, 5, 0, 0), new DateTime(2026, 8, 6, 5, 0, 0), true), (stored.StartsAt, stored.EndsAt, stored.IsAllDay)); // CDT midnights
+            Assert.Equal([crew.Id], await db.AppointmentAttendees.Where(a => a.AppointmentId == appt).Select(a => a.UserId).ToListAsync()); // not the assignee twice
+            Assert.True(await db.Notifications.AnyAsync(n => n.UserId == crew.Id && n.Kind == "appointment.invited" && n.Body!.Contains("(all day)")));
+
+            var row = (await work.AppointmentsAsync(new DateOnly(2026, 8, 5), new DateOnly(2026, 8, 5), null)).Single();
+            Assert.Equal((new DateOnly(2026, 8, 4), new DateOnly(2026, 8, 5), "All day, Aug 4–Aug 5"), (row.FirstDay, row.LastDay, row.When));
+            Assert.True(row.Covers(new DateOnly(2026, 8, 5)) && !row.Covers(new DateOnly(2026, 8, 6)));
+            Assert.Equal((crew.Id, 1), (row.AttendeeIds!.Single(), row.AttendeeNames!.Count));
+        }
+
+        // The invited teammate sees it on their calendar (without calendar.view_all) and on their day.
+        await using (var c = fx.ScopeAs(w.Tenant, crew))
+        {
+            var mine = await c.Get<WorkService>().AppointmentsAsync(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), crew.Id);
+            Assert.Contains(mine, a => a.Id == appt && !a.CanEdit);
+        }
+
+        // Moving it tells the invited; un-inviting removes it; clearing everyone works from the form.
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+        {
+            var work = s.Get<WorkService>();
+            var db = s.Get<OesDbContext>();
+            await work.UpdateAppointmentAsync(appt, new AppointmentInput
+            {
+                Title = "Install", TypeKey = "install", AllDay = true, Date = new DateOnly(2026, 8, 6), EndDate = new DateOnly(2026, 8, 7), AssignedToUserId = w.Rep.Id,
+            });
+            Assert.True(await db.Notifications.AnyAsync(n => n.UserId == crew.Id && n.Kind == "appointment.moved"));
+            Assert.Single(await db.AppointmentAttendees.Where(a => a.AppointmentId == appt).ToListAsync()); // null list: unchanged
+            await work.UpdateAppointmentAsync(appt, new AppointmentInput
+            {
+                Title = "Install", TypeKey = "install", Date = new DateOnly(2026, 8, 6), StartTime = new TimeOnly(8, 0), DurationMinutes = 480,
+                AssignedToUserId = w.Rep.Id, AttendeesSent = true,
+            });
+            Assert.Empty(await db.AppointmentAttendees.Where(a => a.AppointmentId == appt).ToListAsync());
+            Assert.False((await db.Appointments.SingleAsync(a => a.Id == appt)).IsAllDay);
+        }
+
+        // The calendar page shows all-day events and invitations.
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+            await s.Get<WorkService>().CreateAppointmentAsync(new AppointmentInput { Title = "Company picnic", AllDay = true, Date = new DateOnly(2026, 8, 12), AttendeeUserIds = [crew.Id] });
+        var web = fx.App.Browser();
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = crew.Email!, ["Password"] = MySqlFixture.Password,
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(await web.GetStringAsync("/Account/Login"),
+                "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync("/Calendar?date=2026-08-12");
+        Assert.Contains("Company picnic", page);
+        Assert.Contains("cal-allday", page);
+    }
 }
