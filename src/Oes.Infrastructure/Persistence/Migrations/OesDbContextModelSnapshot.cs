@@ -2406,6 +2406,50 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("record_links", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Crm.SavedView", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CriteriaJson")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UserId")
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ListKey", "UserId");
+
+                    b.ToTable("saved_views", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Estimating.CatalogCategory", b =>
                 {
                     b.Property<byte[]>("Id")

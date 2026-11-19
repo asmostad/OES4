@@ -9,7 +9,10 @@
         <h1>Properties</h1>
         <p class="page-subtitle">Every address you've worked or quoted. The property is the root of each record.</p>
     </div>
-    <a class="btn btn-primary btn-sm" href="/Properties/New"><i class="bi bi-house-add me-1"></i> Property</a>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "properties" })
+        <a class="btn btn-primary btn-sm" href="/Properties/New"><i class="bi bi-house-add me-1"></i> Property</a>
+    </div>
 </div>
 
 <form method="get" class="card mb-3">

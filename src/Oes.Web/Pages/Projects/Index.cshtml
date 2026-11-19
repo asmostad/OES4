@@ -10,6 +10,9 @@
         <h1>Projects</h1>
         <p class="page-subtitle">Sold work. A project is created from a signed estimate; each trade moves through production on the <a href="/Workflow">Workflow Board</a>.</p>
     </div>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "projects" })
+    </div>
 </div>
 
 <form method="get" class="card mb-3">

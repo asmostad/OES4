@@ -97,7 +97,8 @@ builder.Services.AddRazorPages(o => o.Conventions
     .AllowAnonymousToPage("/Portal/Unsubscribe")
     .AllowAnonymousToPage("/Portal/Booking")
     .AllowAnonymousToFolder("/Book")
-    .AllowAnonymousToPage("/Error"));
+    .AllowAnonymousToPage("/Error"))
+    .AddMvcOptions(o => o.Filters.Add<Oes.Web.Infrastructure.SavedViewDefaultFilter>());
 builder.Services.AddControllers(o =>
 {
     o.Filters.Add<CookieOnlyAntiforgeryFilter>();

@@ -118,3 +118,17 @@ public class OpportunityDisposition : TenantEntity
     public Guid? ByUserId { get; set; }
     public string? Note { get; set; }
 }
+
+/// <summary>
+/// A named set of filters on a list page. Personal (UserId set) or shared with the whole
+/// company (UserId null). A personal view can be the user's default for that list.
+/// </summary>
+public class SavedView : TenantEntity
+{
+    public Guid? UserId { get; set; }
+    public string ListKey { get; set; } = "";
+    public string Name { get; set; } = "";
+    /// <summary>The list's filters as a JSON object of query-string values (only known keys).</summary>
+    public string CriteriaJson { get; set; } = "{}";
+    public bool IsDefault { get; set; }
+}

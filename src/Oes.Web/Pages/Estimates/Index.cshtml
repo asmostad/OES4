@@ -9,6 +9,9 @@
         <h1>Estimates</h1>
         <p class="page-subtitle">Start an estimate from an opportunity. Price-book estimates use one of your price lists; line-item estimates use products.</p>
     </div>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "estimates" })
+    </div>
 </div>
 
 <form method="get" class="card mb-3">

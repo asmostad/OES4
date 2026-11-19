@@ -156,8 +156,12 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - Opportunity pages log calls with an outcome too. Each outcome is kept in `opportunity_dispositions` and on the timeline.
        - The app API has `/api/v1/prospecting` (dispositions, counts, next, `{id}/disposition`, `{id}/release`).
      - Contact mailing and billing addresses (done 2026-11-18): one of each per contact, kept apart from the properties they're tied to (an owner who lives elsewhere, a property manager's office). Edited on the contact page and logged on its timeline. The `{{contact.mailing_address}}` merge field uses the mailing address, else billing, else the record's (or the contact's primary) property. Proposals show the billing (else mailing) address under "Prepared for" when it isn't the property. When contacts merge, the kept contact's addresses win and the duplicate's fill a missing kind.
+     - Saved views (done 2026-11-18) on Opportunities, Contacts, Properties, Projects, Estimates, Claims and Tasks:
+       - A "Views" menu saves what's on screen under a name and switches between views. A view keeps only that list's known filters (never paging), so it always shows what the viewer may see, and "mine" means the viewer. Saving with an existing name replaces it; up to 30 personal views per person.
+       - Managers (`records.view_all`) can share a view with everyone and remove shared views; shared changes are audited.
+       - A personal view can be your default: opening the list with no filters goes to it, and "No filters" (`?reset=1`) shows everything.
    - Still to do:
-     - Saved views, campaigns.
+     - Lead campaigns.
 3. **Insurance** (done 2026-11-17)
    - Carriers: a platform default list (names only), with tenant overrides kept private and falling back to the defaults; tenants can add their own carriers and hide unused ones.
    - Claims: optional until filed, and visibility follows the opportunity; notes roll up to the opportunity, property and contact.

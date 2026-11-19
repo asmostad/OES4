@@ -10,6 +10,9 @@
         <h1>Insurance Claims</h1>
         <p class="page-subtitle">Every claim, filed or not, with its carrier, storm and supplements. Start a claim from an opportunity.</p>
     </div>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "claims" })
+    </div>
 </div>
 
 <form method="get" class="card mb-3">

@@ -9,7 +9,8 @@
         <h1>Contacts</h1>
         <p class="page-subtitle">People and organizations. Properties, opportunities and jobs hang off them.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "contacts" })
         <a class="btn btn-outline-primary btn-sm" href="/Contacts/New?type=organization"><i class="bi bi-building-add me-1"></i> Organization</a>
         <a class="btn btn-primary btn-sm" href="/Contacts/New"><i class="bi bi-person-plus me-1"></i> Contact</a>
     </div>

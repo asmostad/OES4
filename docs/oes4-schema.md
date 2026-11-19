@@ -89,7 +89,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `opportunities` | TenantId, Number, Name, **PrimaryContactId** (required), **PropertyId (nullable)**, OwnerUserId, SourceKey, StageId, Outcome (open/won/lost/recycled), LostReasonKey, ExpectedValue, IsInsurance, PerilKey, DateOfLoss, StormEventId (nullable), ContactAttempts, LastContactAt, LastDispositionId, RecycleAt, LockedByUserId, LockedAt (call-list lock, 15 minutes), WonAt, ClosedAt | **A lead is an opportunity.** It can exist without a property; it attaches to one (existing or new) when the address is collected. |
 | `opportunity_contacts` | OpportunityId, ContactId, RoleKey | Spouse, property manager, public adjuster… |
 | `opportunity_stage_history` | OpportunityId, FromStageId, ToStageId, DispositionId, ByUserId, At, Note | Stale detection and conversion reports |
-| `saved_views` | TenantId, UserId (null = shared), ListKey, Name, CriteriaJson, SortJson, IsDefault | Saved filters on every list |
+| `saved_views` | TenantId, UserId (null = shared), ListKey, Name, CriteriaJson (the list's known query-string filters), IsDefault (personal views only) | Saved filters on every list. **Built** (2026-11-18) |
 | `campaigns` | TenantId, Name, EntityKind, CriteriaJson, Mode (dynamic/static) + `campaign_members` | Lead banks. Static lists track progress (OES3 campaigns were filters only). |
 
 **Converting:** a won opportunity creates/links an estimate and later a project at its property. A contact can have many opportunities over time.

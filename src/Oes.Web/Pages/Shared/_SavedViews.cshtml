@@ -1,0 +1,98 @@
+@model Oes.Web.ViewComponents.SavedViewsModel
+@{
+    var active = Model.Active;
+    var mine = Model.Views.Where(v => !v.Shared).ToList();
+    var shared = Model.Views.Where(v => v.Shared).ToList();
+    var modalId = "savedViews-" + Model.ListKey;
+}
+<div class="btn-group saved-views">
+    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-bookmark me-1"></i>@(active?.Name ?? "Views")
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item @(Model.Current.Count == 0 ? "active" : "")" href="@Model.ResetUrl">No filters</a></li>
+        @if (mine.Count > 0)
+        {
+            <li><hr class="dropdown-divider"></li>
+            <li class="dropdown-header">My views</li>
+            @foreach (var v in mine)
+            {
+                <li><a class="dropdown-item @(active?.Id == v.Id ? "active" : "")" href="@v.Url">@v.Name@if (v.IsDefault) { <i class="bi bi-star-fill ms-1 small" title="Your default"></i> }</a></li>
+            }
+        }
+        @if (shared.Count > 0)
+        {
+            <li><hr class="dropdown-divider"></li>
+            <li class="dropdown-header">Shared with everyone</li>
+            @foreach (var v in shared)
+            {
+                <li><a class="dropdown-item @(active?.Id == v.Id ? "active" : "")" href="@v.Url">@v.Name</a></li>
+            }
+        }
+        <li><hr class="dropdown-divider"></li>
+        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#@modalId"><i class="bi bi-bookmark-plus me-1"></i>Save or manage views…</button></li>
+    </ul>
+</div>
+
+<div class="modal fade" id="@modalId" tabindex="-1" aria-labelledby="@modalId-title" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="@modalId-title">Saved views</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="/SavedViews?handler=Save" asp-antiforgery="true">
+                    <input type="hidden" name="listKey" value="@Model.ListKey">
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl">
+                    @foreach (var (k, v) in Model.Current) { <input type="hidden" name="criteria[@k]" value="@v"> }
+                    <label class="form-label" for="@modalId-name">Save what's on screen as</label>
+                    <input id="@modalId-name" name="name" class="form-control mb-2" maxlength="80" required value="@(active is { Shared: false } ? active.Name : "")" placeholder="e.g. My hail leads">
+                    <div class="small text-muted mb-2">
+                        @if (Model.Current.Count == 0) { <text>No filters are applied right now.</text> }
+                        else { <text>Filters: @string.Join(", ", Model.Current.Select(kv => kv.Key + " = " + kv.Value))</text> }
+                    </div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="isDefault" value="true" id="@modalId-default">
+                        <label class="form-check-label" for="@modalId-default">Open this list with this view</label></div>
+                    @if (Model.CanShare)
+                    {
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="shared" value="true" id="@modalId-shared">
+                            <label class="form-check-label" for="@modalId-shared">Share with everyone in the company</label></div>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm mt-2">Save view</button>
+                    <div class="small text-muted mt-1">Saving with an existing name replaces that view.</div>
+                </form>
+
+                @if (Model.Views.Count > 0)
+                {
+                    <hr>
+                    <ul class="list-group">
+                        @foreach (var v in Model.Views)
+                        {
+                            <li class="list-group-item d-flex align-items-center gap-2">
+                                <a href="@v.Url" class="flex-grow-1">@v.Name</a>
+                                @if (v.Shared) { <span class="badge bg-secondary-subtle text-secondary">Shared</span> }
+                                @if (!v.Shared)
+                                {
+                                    <form method="post" action="/SavedViews?handler=Default" asp-antiforgery="true">
+                                        <input type="hidden" name="id" value="@v.Id"><input type="hidden" name="isDefault" value="@(v.IsDefault ? "false" : "true")">
+                                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl">
+                                        <button type="submit" class="btn btn-link btn-sm p-0" title="@(v.IsDefault ? "Stop opening the list with this view" : "Open the list with this view")">
+                                            <i class="bi @(v.IsDefault ? "bi-star-fill" : "bi-star")"></i></button>
+                                    </form>
+                                }
+                                @if (v.CanDelete)
+                                {
+                                    <form method="post" action="/SavedViews?handler=Delete" asp-antiforgery="true">
+                                        <input type="hidden" name="id" value="@v.Id"><input type="hidden" name="returnUrl" value="@Model.ReturnUrl">
+                                        <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Delete" data-confirm="Delete the view &quot;@v.Name&quot;?"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

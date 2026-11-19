@@ -18,6 +18,9 @@
         <h1>Tasks</h1>
         <p class="page-subtitle">@(Model.All ? "Everyone's tasks you can see." : "Assigned to you.") Tasks added on a record also show on the records above it.</p>
     </div>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "tasks" })
+    </div>
 </div>
 
 <div class="row g-3">

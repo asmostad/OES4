@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<Crm.CrmLookups>();
         services.AddScoped<Crm.ListSettingsService>();
         services.AddScoped<Crm.ProspectingService>();
+        services.AddScoped<Crm.SavedViewService>();
 
         services.AddScoped<Insurance.CarrierService>();
         services.AddScoped<Insurance.StormService>();

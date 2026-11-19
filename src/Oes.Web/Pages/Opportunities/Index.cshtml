@@ -11,7 +11,10 @@
         <h1>Opportunities</h1>
         <p class="page-subtitle">Every lead is an opportunity. Drag cards between stages on the board.</p>
     </div>
-    <a class="btn btn-primary btn-sm" href="/Opportunities/New"><i class="bi bi-plus-lg me-1"></i> New lead</a>
+    <div class="d-flex gap-2 align-items-center">
+        @await Component.InvokeAsync("SavedViews", new { listKey = "opportunities" })
+        <a class="btn btn-primary btn-sm" href="/Opportunities/New"><i class="bi bi-plus-lg me-1"></i> New lead</a>
+    </div>
 </div>
 
 <form method="get" class="card mb-3">

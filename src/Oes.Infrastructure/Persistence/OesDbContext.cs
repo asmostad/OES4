@@ -47,6 +47,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<OpportunityStageChange> OpportunityStageChanges => Set<OpportunityStageChange>();
     public DbSet<Disposition> Dispositions => Set<Disposition>();
     public DbSet<OpportunityDisposition> OpportunityDispositions => Set<OpportunityDisposition>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
     public DbSet<Note> Notes => Set<Note>();
     public DbSet<Document> Documents => Set<Document>();
@@ -1072,6 +1073,15 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(d => d.LostReasonKey).HasMaxLength(60);
             e.HasIndex(d => new { d.TenantId, d.Sort });
             e.HasOne<PipelineStage>().WithMany().HasForeignKey(d => d.MovesToStageId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<SavedView>(e =>
+        {
+            e.ToTable("saved_views");
+            e.Property(v => v.ListKey).HasMaxLength(40);
+            e.Property(v => v.Name).HasMaxLength(80);
+            e.Property(v => v.CriteriaJson).HasMaxLength(2000);
+            e.HasIndex(v => new { v.TenantId, v.ListKey, v.UserId });
         });
 
         b.Entity<OpportunityDisposition>(e =>
