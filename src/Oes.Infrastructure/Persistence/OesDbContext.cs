@@ -172,6 +172,11 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(t => t.Slug).IsUnique();
             e.Property(t => t.TimeZone).HasMaxLength(64);
             e.Property(t => t.PostalAddress).HasMaxLength(500);
+            e.Property(t => t.EstimateTerms).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(t => t.InsuranceEstimateTerms).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(t => t.DefaultTaxRate).HasPrecision(6, 3);
+            e.Property(t => t.InsuranceOverheadPct).HasPrecision(5, 2);
+            e.Property(t => t.InsuranceProfitPct).HasPrecision(5, 2);
         });
 
         b.Entity<TenantMembership>(e =>

@@ -216,15 +216,21 @@ public sealed class EstimateService(
         }
 
         var claim = await db.Claims.Where(c => c.OpportunityId == opp.Id && c.ArchivedAt == null).OrderBy(c => c.CreatedAt).FirstOrDefaultAsync(ct);
+        var tenantId = db.CurrentTenantId;
+        var defaults = await db.Tenants.Where(t => t.Id == tenantId)
+            .Select(t => new { t.EstimateTerms, t.InsuranceEstimateTerms, t.EstimateValidDays, t.DefaultTaxRate, t.InsuranceOverheadPct, t.InsuranceProfitPct })
+            .FirstAsync(ct);
         var est = new Estimate
         {
             Number = await numbers.NextAsync(NumberedKinds.Estimate, ct),
             Name = ContactService.Clean(input.Name) ?? opp.Name,
             OpportunityId = opp.Id, PropertyId = opp.PropertyId, ClaimId = claim?.Id, OwnerUserId = scope.Me ?? opp.OwnerUserId,
             Method = input.Method, PriceListId = list?.Id,
-            ExpiresOn = DateOnly.FromDateTime(clock.UtcNow.AddDays(30)),
-            // Insurance work usually carries 10% overhead and 10% profit; retail usually doesn't show O&P.
-            OverheadPct = opp.IsInsurance ? 10m : 0m, ProfitPct = opp.IsInsurance ? 10m : 0m,
+            // Company defaults (Administration › Settings). Insurance work usually carries overhead and profit; retail doesn't show O&P.
+            ExpiresOn = DateOnly.FromDateTime(clock.UtcNow.AddDays(defaults.EstimateValidDays > 0 ? defaults.EstimateValidDays : 30)),
+            OverheadPct = opp.IsInsurance ? defaults.InsuranceOverheadPct : 0m, ProfitPct = opp.IsInsurance ? defaults.InsuranceProfitPct : 0m,
+            TaxRate = defaults.DefaultTaxRate,
+            Terms = opp.IsInsurance ? defaults.InsuranceEstimateTerms ?? defaults.EstimateTerms : defaults.EstimateTerms,
         };
         db.Estimates.Add(est);
 

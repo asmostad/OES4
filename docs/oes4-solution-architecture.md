@@ -186,10 +186,10 @@ Today the worker runs plain timed hosted services, each job working per tenant i
      - Approvals by exception (custom lines, below list, no price) with no self-approval.
      - Frozen versions on issue (JSON snapshot plus hash, a revision reason after v1), sign/decline, and signing wins the opportunity.
      - A printable proposal rendered from the frozen version.
+     - Company estimate defaults (done 2026-11-18, Administration › Settings): terms and conditions, separate optional terms for insurance work, days an estimate stays valid, sales tax %, and insurance overhead and profit %. They're copied onto each new estimate, which can still change them; existing estimates keep theirs. Existing companies start at 30 days and 10% / 10%, as before.
    - Still to do:
      - Server-side PDF (Playwright).
      - The takeoff rules engine and order sheet.
-     - Tenant default terms.
 6. **Production** (core done 2026-11-17)
    - Done:
      - Projects from signed estimates (one trade per estimate trade, contract = signed total).

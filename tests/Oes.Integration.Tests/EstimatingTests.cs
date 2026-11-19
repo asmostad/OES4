@@ -67,6 +67,36 @@ public sealed class EstimatingTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task New_estimates_take_the_company_defaults()
+    {
+        var w = await WorldAsync();
+        await using var s = fx.ScopeAs(w.Tenant, w.Admin);
+        var settings = s.Get<Oes.Infrastructure.Admin.SettingsService>();
+        await Assert.ThrowsAsync<CrmRuleException>(() => settings.SaveEstimateDefaultsAsync(new() { ValidDays = 0 }));
+        await Assert.ThrowsAsync<CrmRuleException>(() => settings.SaveEstimateDefaultsAsync(new() { TaxRate = 31 }));
+        await settings.SaveEstimateDefaultsAsync(new()
+        {
+            Terms = " 50% down, balance on completion. ", InsuranceTerms = "Deductible due at signing.", ValidDays = 45, TaxRate = 7.5m,
+            InsuranceOverheadPct = 12, InsuranceProfitPct = 8,
+        });
+        Assert.Equal("50% down, balance on completion.", (await settings.EstimateDefaultsAsync()).Terms);
+
+        var est = s.Get<EstimateService>();
+        var insurance = (await est.GetAsync(await est.CreateAsync(new NewEstimateInput { OpportunityId = w.Opportunity, PriceListId = w.PriceList }))).Estimate;
+        Assert.Equal(("Deductible due at signing.", 12m, 8m, 7.5m), (insurance.Terms, insurance.OverheadPct, insurance.ProfitPct, insurance.TaxRate));
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(45)), insurance.ExpiresOn);
+
+        var contact = (await s.Get<OpportunityService>().GetAsync(w.Opportunity)).Contact.Id;
+        var retailOpp = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = contact, Name = "Gutters" });
+        var retail = (await est.GetAsync(await est.CreateAsync(new NewEstimateInput { OpportunityId = retailOpp, PriceListId = w.PriceList }))).Estimate;
+        Assert.Equal(("50% down, balance on completion.", 0m, 0m, 7.5m), (retail.Terms, retail.OverheadPct, retail.ProfitPct, retail.TaxRate));
+
+        var rep = await fx.AddMemberAsync(w.Tenant, "Sales Rep");
+        await using var r = fx.ScopeAs(w.Tenant, rep);
+        await Assert.ThrowsAsync<RecordForbiddenException>(() => r.Get<Oes.Infrastructure.Admin.SettingsService>().SaveEstimateDefaultsAsync(new()));
+    }
+
+    [Fact]
     public async Task Sections_come_from_measurements_and_prices_are_copied_onto_lines()
     {
         var w = await WorldAsync();

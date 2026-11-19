@@ -4769,6 +4769,27 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<decimal>("DefaultTaxRate")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("decimal(6,3)");
+
+                    b.Property<string>("EstimateTerms")
+                        .HasColumnType("text");
+
+                    b.Property<int>("EstimateValidDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InsuranceEstimateTerms")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("InsuranceOverheadPct")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("InsuranceProfitPct")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
                     b.Property<string>("LogoFileKey")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");

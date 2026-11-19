@@ -30,7 +30,7 @@
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `tenants` | Name, LegalName, Slug, Status (trial/active/suspended), TimeZone (IANA), Country, PlanCode, CreatedAt | Status = trial/active/suspended. One row per contractor company. |
+| `tenants` | Name, LegalName, Slug, Status (trial/active/suspended), TimeZone (IANA), Country, PlanCode, CreatedAt | Status = trial/active/suspended. One row per contractor company. **Built** also: PostalAddress, LogoFileKey, and estimate defaults (EstimateTerms, InsuranceEstimateTerms, EstimateValidDays, DefaultTaxRate, InsuranceOverheadPct, InsuranceProfitPct). |
 | `tenant_profiles` | TenantId, address, phone, email, website, license numbers, logo DocumentId, brand colors, proposal terms (rich text), letter signer | Used for branding, PDFs, CAN-SPAM footer, merge fields |
 | `tenant_settings` | TenantId, Key, Value, IsSecret | Typed settings. Secrets are encrypted. |
 | `tenant_sequences` | TenantId, SequenceKey, NextValue, Format | Estimate, project and WO numbers |

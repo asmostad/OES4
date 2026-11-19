@@ -22,6 +22,16 @@ public class Tenant : Entity
 
     /// <summary>File-store key of the logo shown in the sidebar, or null for the default mark.</summary>
     public string? LogoFileKey { get; set; }
+
+    // Estimate defaults (Administration › Settings); copied onto each new estimate, which can change them.
+    public string? EstimateTerms { get; set; }
+    /// <summary>Terms for insurance work; falls back to <see cref="EstimateTerms"/>.</summary>
+    public string? InsuranceEstimateTerms { get; set; }
+    public int EstimateValidDays { get; set; } = 30;
+    /// <summary>Sales tax percent for new estimates.</summary>
+    public decimal DefaultTaxRate { get; set; }
+    public decimal InsuranceOverheadPct { get; set; } = 10m;
+    public decimal InsuranceProfitPct { get; set; } = 10m;
 }
 
 public enum MembershipStatus { Invited = 1, Active = 2, Disabled = 3 }
