@@ -8,7 +8,7 @@ using Oes.Web.Infrastructure;
 namespace Oes.Web.Pages.Availability;
 
 /// <summary>Weekly hours for online booking. Everyone can set their own; booking.manage can set anyone's.</summary>
-public class IndexModel(BookingService booking, CrmLookups lookups, ICurrentUser user) : CrmPageModel
+public class IndexModel(BookingService booking, BusyCalendarService calendars, CrmLookups lookups, ICurrentUser user) : CrmPageModel
 {
     public static readonly DayOfWeek[] Days = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
 
@@ -20,11 +20,13 @@ public class IndexModel(BookingService booking, CrmLookups lookups, ICurrentUser
     public bool CanManage { get; private set; }
     public List<Option> Users { get; private set; } = [];
     public Guid Target => UserId ?? user.UserId ?? Guid.Empty;
+    public List<BusyCalendarRow> Calendars { get; private set; } = [];
 
     private async Task LoadAsync()
     {
         CanManage = await user.HasPermissionAsync(Permissions.BookingManage);
         if (CanManage) Users = await lookups.UsersAsync();
+        Calendars = await calendars.ForUserAsync(Target);
     }
 
     public Task<IActionResult> OnGetAsync() => Guard(async () =>
@@ -58,4 +60,35 @@ public class IndexModel(BookingService booking, CrmLookups lookups, ICurrentUser
             return RedirectToPage(new { user = UserId });
         }, Page);
     }
+
+    public Task<IActionResult> OnPostAddCalendarAsync(string? label, string url) => Busy(async () =>
+    {
+        await calendars.AddAsync(Target, label, url);
+        Flash("Calendar added. Its busy times now block online booking.");
+    });
+
+    public Task<IActionResult> OnPostRefreshCalendarAsync(Guid id) => Busy(async () =>
+    {
+        await calendars.RefreshNowAsync(id);
+        Flash("Calendar refreshed.");
+    });
+
+    public Task<IActionResult> OnPostShowCalendarAsync(Guid id, bool show) => Busy(() => calendars.SetShowOnCalendarAsync(id, show));
+
+    public Task<IActionResult> OnPostDeleteCalendarAsync(Guid id) => Busy(async () =>
+    {
+        await calendars.DeleteAsync(id);
+        Flash("Calendar removed.");
+    });
+
+    private Task<IActionResult> Busy(Func<Task> action) => Guard(async () =>
+    {
+        await action();
+        return RedirectToPage(new { user = UserId });
+    }, () =>
+    {
+        var errors = ModelState[""]?.Errors.Select(e => e.ErrorMessage).ToList();
+        if (errors is { Count: > 0 }) Flash(string.Join(" ", errors), "danger");
+        return RedirectToPage(new { user = UserId });
+    });
 }

@@ -206,6 +206,9 @@ public sealed class BookingService(
                                                     && a.Status != AppointmentStatuses.Cancelled
                                                     && a.EndsAt > rangeStart - pad && a.StartsAt < rangeEnd + pad)
             .Select(a => new { Host = a.AssignedToUserId, a.StartsAt, a.EndsAt }).ToListAsync(ct);
+        // Busy times from outside calendars (.ics feeds).
+        busy.AddRange(await db.BusyBlocks.Where(x => activeHosts.Contains(x.UserId) && x.EndsAt > rangeStart - pad && x.StartsAt < rangeEnd + pad)
+            .Select(x => new { Host = x.UserId, x.StartsAt, x.EndsAt }).ToListAsync(ct));
         // Invited teammates are busy too.
         busy.AddRange(await (from x in db.AppointmentAttendees where activeHosts.Contains(x.UserId)
                              join a in db.Appointments on x.AppointmentId equals a.Id

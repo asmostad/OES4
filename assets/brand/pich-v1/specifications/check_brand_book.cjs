@@ -1,0 +1,22 @@
+const {chromium}=require('C:/Users/AdamJohnson/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const path=require('path');
+const fs=require('fs');
+(async()=>{
+ const root=path.resolve(__dirname,'..');
+ const browser=await chromium.launch({headless:true,channel:'msedge'});
+ const page=await browser.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:1});
+ const errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('file:///'+path.join(root,'brand-book.html').replaceAll('\\','/'),{waitUntil:'networkidle'});
+ await page.screenshot({path:path.join(root,'previews/brand-book-check.png')});
+ await page.locator('.grid').screenshot({path:path.join(root,'previews/logo-files-check.png')});
+ const images=await page.locator('img').evaluateAll(imgs=>imgs.map(i=>({src:i.getAttribute('src'),loaded:i.complete&&i.naturalWidth>0})));
+ await page.goto('file:///'+path.join(root,'applications.html').replaceAll('\\','/'),{waitUntil:'networkidle'});
+ await page.screenshot({path:path.join(root,'previews/stationery-check.png'),fullPage:true});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
+ const fontStatus=await page.evaluate(()=>({inter:document.fonts.check('16px Inter'),oxanium:document.fonts.check('16px Oxanium')}));
+ const report={images,errors,stationeryHorizontalOverflow:overflow,fontStatus};
+ fs.writeFileSync(path.join(root,'specifications/browser-check.json'),JSON.stringify(report,null,2));
+ console.log(JSON.stringify(report));
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -1,5 +1,6 @@
 using Amazon;
 using Amazon.SimpleEmailV2;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,15 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddSingleton<IClock, SystemClock>();
+
+        // One key ring for the web app and the worker (both decrypt stored secrets such as calendar feed links).
+        var dp = services.AddDataProtection().SetApplicationName("OES4");
+        if (config["DataProtection:KeysPath"] is { Length: > 0 } keysPath)
+        {
+            dp.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+            if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi(protectToLocalMachine: true);
+        }
+        services.AddSingleton<Http.ISafeFetcher, Http.SafeHttpFetcher>();
 
         services.AddScoped<TenantContext>();
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
@@ -99,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<Communication.NurtureRunner>();
         services.AddScoped<Admin.SettingsService>();
         services.AddScoped<Scheduling.BookingService>();
+        services.AddScoped<Scheduling.BusyCalendarService>();
         services.AddScoped<Reports.ReportService>();
         services.AddScoped<Reports.SavedReportService>();
 

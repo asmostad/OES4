@@ -129,6 +129,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Booking.BookingType> BookingTypes => Set<Domain.Booking.BookingType>();
     public DbSet<Domain.Booking.BookingTypeHost> BookingTypeHosts => Set<Domain.Booking.BookingTypeHost>();
     public DbSet<Domain.Booking.AvailabilityRule> AvailabilityRules => Set<Domain.Booking.AvailabilityRule>();
+    public DbSet<Domain.Booking.BusyCalendar> BusyCalendars => Set<Domain.Booking.BusyCalendar>();
+    public DbSet<Domain.Booking.BusyBlock> BusyBlocks => Set<Domain.Booking.BusyBlock>();
     public DbSet<Domain.Booking.Booking> Bookings => Set<Domain.Booking.Booking>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder b)
@@ -387,6 +389,24 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
         {
             e.ToTable("booking_type_hosts");
             e.HasIndex(x => new { x.BookingTypeId, x.UserId }).IsUnique();
+        });
+
+        b.Entity<Domain.Booking.BusyCalendar>(e =>
+        {
+            e.ToTable("busy_calendars");
+            e.Property(c => c.Label).HasMaxLength(100);
+            e.Property(c => c.UrlProtected).HasMaxLength(4000);
+            e.Property(c => c.Host).HasMaxLength(255);
+            e.Property(c => c.LastError).HasMaxLength(300);
+            e.HasIndex(c => new { c.TenantId, c.UserId });
+        });
+
+        b.Entity<Domain.Booking.BusyBlock>(e =>
+        {
+            e.ToTable("busy_blocks");
+            e.HasIndex(x => new { x.TenantId, x.UserId, x.StartsAt });
+            e.HasIndex(x => new { x.TenantId, x.BusyCalendarId });
+            e.HasOne<Domain.Booking.BusyCalendar>().WithMany().HasForeignKey(x => x.BusyCalendarId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Domain.Booking.AvailabilityRule>(e =>

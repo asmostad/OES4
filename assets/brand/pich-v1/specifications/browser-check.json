@@ -1,0 +1,66 @@
+{
+  "images": [
+    {
+      "src": "logos/lockup-color.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/mark-color.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/mark-navy.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/mark-white.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/circle-orange-white.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/circle-navy-white.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/circle-navy-orange.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/wordmark-color.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/wordmark-navy.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/wordmark-white.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/lockup-color.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/lockup-navy.png",
+      "loaded": true
+    },
+    {
+      "src": "logos/lockup-white.png",
+      "loaded": true
+    },
+    {
+      "src": "previews/applications.png",
+      "loaded": true
+    }
+  ],
+  "errors": [],
+  "stationeryHorizontalOverflow": false,
+  "fontStatus": {
+    "inter": true,
+    "oxanium": true
+  }
+}

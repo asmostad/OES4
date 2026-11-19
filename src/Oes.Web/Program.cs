@@ -127,13 +127,7 @@ builder.Services.AddRateLimiter(o =>
 
 builder.Services.AddHealthChecks().AddDbContextCheck<OesDbContext>("database");
 
-var keysPath = builder.Configuration["DataProtection:KeysPath"];
-var dp = builder.Services.AddDataProtection().SetApplicationName("OES4");
-if (!string.IsNullOrWhiteSpace(keysPath))
-{
-    dp.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
-    if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi();
-}
+// Data protection (shared key ring with the worker) is set up in AddOesInfrastructure.
 
 var app = builder.Build();
 

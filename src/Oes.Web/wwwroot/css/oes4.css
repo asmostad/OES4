@@ -383,3 +383,4 @@ a.record-chip:hover { border-color: var(--oes-primary); color: var(--oes-primary
 .assistant-tools { margin-bottom: .25rem; }
 .ai-filled { background: #fffbeb; border-color: #f59e0b; }
 .cal-item.cal-allday { background: var(--bs-primary-bg-subtle); }
+.cal-busy { font-size: .75rem; color: var(--bs-secondary-color); background: repeating-linear-gradient(45deg, var(--bs-tertiary-bg), var(--bs-tertiary-bg) 4px, transparent 4px, transparent 8px); border-radius: .35rem; padding: .2rem .45rem; margin-top: .2rem; }

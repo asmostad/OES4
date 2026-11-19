@@ -53,6 +53,11 @@
                             }
                         </div>
                     }
+                    @foreach (var b in Model.Busy.Where(b => DateOnly.FromDateTime(b.StartLocal) <= day && DateOnly.FromDateTime(b.EndLocal.AddTicks(-1)) >= day))
+                    {
+                        var whole = b.StartLocal.TimeOfDay == TimeSpan.Zero && b.EndLocal.TimeOfDay == TimeSpan.Zero;
+                        <div class="cal-busy"><i class="bi bi-slash-circle me-1"></i>@(whole ? "All day" : $"{b.StartLocal:h:mm tt}–{b.EndLocal:h:mm tt}") · Busy (@b.Label)@(Model.UserFilter is null && b.UserId != Model.Me ? " · " + (Model.Users.FirstOrDefault(u => u.Value == b.UserId.ToString())?.Label ?? "") : "")</div>
+                    }
                     @foreach (var t in tasks)
                     {
                         <div class="cal-task @(t.IsOverdue ? "overdue" : "")"><i class="bi bi-check2-square"></i> @t.Title</div>

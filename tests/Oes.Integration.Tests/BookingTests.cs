@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Oes.Domain.Booking;
 using Oes.Domain.Communication;
@@ -101,6 +102,73 @@ public sealed partial class BookingTests(MySqlFixture fx)
         }
         await using var p = await PublicAsync(w);
         Assert.Equal([Ten, Eleven], (await p.Get<BookingService>().SlotsAsync("roof-inspection"))[w.Day]);
+    }
+
+    [Fact]
+    public async Task Outside_calendar_feeds_block_booking_times_and_keep_only_when()
+    {
+        var w = await WorldAsync();
+        var url = $"https://calendar.example.com/private/{Guid.NewGuid():N}/basic.ics";
+        DateTime StartUtc(TimeOnly t) => TimeZoneInfo.ConvertTimeToUtc(w.Day.ToDateTime(t), TimeZoneInfo.FindSystemTimeZoneById("America/Chicago"));
+        string Event(TimeOnly t, string summary) => $"BEGIN:VEVENT\r\nDTSTART:{StartUtc(t):yyyyMMdd'T'HHmmss}Z\r\nDURATION:PT1H\r\nSUMMARY:{summary}\r\nEND:VEVENT\r\n";
+        fx.Feeds.Set(url, "BEGIN:VCALENDAR\r\n" + Event(Nine, "Kids pickup") + "END:VCALENDAR\r\n");
+
+        Guid cal;
+        await using (var s = fx.ScopeAs(w.Tenant, w.Rep))
+        {
+            var calendars = s.Get<BusyCalendarService>();
+            await Assert.ThrowsAsync<CrmRuleException>(() => calendars.AddAsync(w.Rep.Id, null, "http://calendar.example.com/a.ics"));
+            await Assert.ThrowsAsync<CrmRuleException>(() => calendars.AddAsync(w.Rep.Id, null, "https://169.254.169.254/latest/meta-data"));
+            await Assert.ThrowsAsync<CrmRuleException>(() => calendars.AddAsync(w.Rep.Id, null, "https://calendar.example.com/unknown.ics")); // unreachable: not saved
+            await Assert.ThrowsAsync<RecordForbiddenException>(() => calendars.AddAsync(w.Admin.Id, null, url)); // someone else's
+            cal = await calendars.AddAsync(w.Rep.Id, "Personal", url.Replace("https:", "webcal:"));
+            var row = Assert.Single(await calendars.ForUserAsync(w.Rep.Id));
+            Assert.Equal(("Personal", "calendar.example.com", 1, (string?)null), (row.Calendar.Label, row.Calendar.Host, row.Calendar.BlockCount, row.Calendar.LastError));
+            var db = s.Get<OesDbContext>();
+            Assert.DoesNotContain(url, (await db.BusyCalendars.SingleAsync(c => c.Id == cal)).UrlProtected); // encrypted at rest
+            Assert.Equal(StartUtc(Nine), (await db.BusyBlocks.SingleAsync(b => b.BusyCalendarId == cal)).StartsAt);
+        }
+
+        // Admin is busy all morning; the rep's feed blocks 9, so nobody can take 9 but 10 and 11 are open.
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+            await s.Get<WorkService>().CreateAppointmentAsync(new AppointmentInput { Title = "Morning", Date = w.Day, StartTime = Nine, DurationMinutes = 180 });
+        await using (var p = await PublicAsync(w))
+            Assert.Equal([Ten, Eleven], (await p.Get<BookingService>().SlotsAsync("roof-inspection"))[w.Day]);
+
+        // The feed changes; the worker picks it up. A failed read keeps the last busy times.
+        fx.Feeds.Set(url, "BEGIN:VCALENDAR\r\n" + Event(new TimeOnly(7, 0), "Gym") + Event(Eleven, "Lunch") + "END:VCALENDAR\r\n"); // a 10 o'clock would also block 9 (30-minute buffer)
+        await using (var s = fx.ScopeFor(w.Tenant))
+            await s.Get<OesDbContext>().BusyCalendars.Where(c => c.Id == cal).ExecuteUpdateAsync(x => x.SetProperty(c => c.LastFetchedAt, DateTime.UtcNow.AddHours(-1)));
+        Assert.True(await BusyCalendarRunner.RefreshAllAsync(fx.App.Services.GetRequiredService<IServiceScopeFactory>()) >= 1);
+        await using (var p = await PublicAsync(w))
+            Assert.Equal([Nine], (await p.Get<BookingService>().SlotsAsync("roof-inspection"))[w.Day]);
+
+        fx.Feeds.Set(url, "<html>Not a calendar</html>");
+        await using (var s = fx.ScopeAs(w.Tenant, w.Rep))
+        {
+            await s.Get<BusyCalendarService>().RefreshNowAsync(cal);
+            var row = Assert.Single(await s.Get<BusyCalendarService>().ForUserAsync(w.Rep.Id));
+            Assert.Equal((2, "That link isn't an .ics calendar feed."), (row.Calendar.BlockCount, row.Calendar.LastError));
+            Assert.Equal(2, await s.Get<OesDbContext>().BusyBlocks.CountAsync(b => b.BusyCalendarId == cal));
+
+            // The rep sees their busy times on the OES calendar (no event details), until they hide them.
+            Assert.Equal(2, (await s.Get<BusyCalendarService>().BlocksAsync(w.Day, w.Day, null)).Count);
+            var web = fx.App.Browser();
+            await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Email"] = w.Rep.Email!, ["Password"] = MySqlFixture.Password,
+                ["__RequestVerificationToken"] = Regex.Match(await web.GetStringAsync("/Account/Login"), "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+            }));
+            await web.GetAsync("/Account/SelectTenant");
+            Assert.Contains("calendar.example.com", await web.GetStringAsync("/Availability"));
+            var week = await web.GetStringAsync($"/Calendar?date={w.Day:yyyy-MM-dd}");
+            Assert.Contains("Busy (Personal)", week);
+            Assert.DoesNotContain("Lunch", week); // never the event itself
+            await s.Get<BusyCalendarService>().SetShowOnCalendarAsync(cal, false);
+            Assert.Empty(await s.Get<BusyCalendarService>().BlocksAsync(w.Day, w.Day, null));
+            await s.Get<BusyCalendarService>().DeleteAsync(cal);
+            Assert.False(await s.Get<OesDbContext>().BusyBlocks.AnyAsync(b => b.BusyCalendarId == cal));
+        }
     }
 
     [Fact]

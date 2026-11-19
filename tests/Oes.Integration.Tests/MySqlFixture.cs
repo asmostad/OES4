@@ -39,6 +39,9 @@ public sealed class MySqlFixture : IAsyncLifetime
     /// <summary>The model behind the assistant: scripted per test, never the real API.</summary>
     public ScriptedAiClient Ai { get; } = new();
 
+    /// <summary>Calendar feeds by URL: tests never reach the internet.</summary>
+    public FakeFetcher Feeds { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _mysql.StartAsync();
@@ -153,6 +156,7 @@ public sealed class TestApp(MySqlFixture fx) : WebApplicationFactory<Program>
         {
             s.RemoveAll<IClock>(); s.AddSingleton<IClock>(fx.Clock);
             s.RemoveAll<IAiClient>(); s.AddSingleton<IAiClient>(fx.Ai);
+            s.RemoveAll<Oes.Infrastructure.Http.ISafeFetcher>(); s.AddSingleton<Oes.Infrastructure.Http.ISafeFetcher>(fx.Feeds);
         });
     }
 
@@ -175,4 +179,18 @@ public sealed class TestClock : IClock
 {
     public DateTime? Pinned { get; set; }
     public DateTime UtcNow => Pinned is { } p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : DateTime.UtcNow;
+}
+
+/// <summary>Serves registered URLs (after the real URL checks); anything else fails like an unreachable site.</summary>
+public sealed class FakeFetcher : Oes.Infrastructure.Http.ISafeFetcher
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _content = new();
+
+    public void Set(string url, string content) => _content[Oes.Infrastructure.Http.SafeHttpFetcher.Normalize(url).ToString()] = content;
+
+    public Task<string> GetStringAsync(string url, int maxBytes, CancellationToken ct = default)
+    {
+        var key = Oes.Infrastructure.Http.SafeHttpFetcher.Normalize(url).ToString();
+        return _content.TryGetValue(key, out var c) ? Task.FromResult(c) : throw new Oes.Infrastructure.Http.SafeFetchException("Couldn't reach the calendar site.");
+    }
 }

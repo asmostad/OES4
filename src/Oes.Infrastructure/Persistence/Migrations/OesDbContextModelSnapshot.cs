@@ -553,6 +553,102 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("booking_type_hosts", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Booking.BusyBlock", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("BusyCalendarId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EndsAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UserId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusyCalendarId");
+
+                    b.HasIndex("TenantId", "BusyCalendarId");
+
+                    b.HasIndex("TenantId", "UserId", "StartsAt");
+
+                    b.ToTable("busy_blocks", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Booking.BusyCalendar", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("BlockCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<DateTime?>("LastFetchedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("ShowOnCalendar")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UrlProtected")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("varchar(4000)");
+
+                    b.Property<byte[]>("UserId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.ToTable("busy_calendars", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Common.AuditEntry", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -5709,6 +5805,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasOne("Oes.Domain.Booking.BookingType", null)
                         .WithMany("Hosts")
                         .HasForeignKey("BookingTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Booking.BusyBlock", b =>
+                {
+                    b.HasOne("Oes.Domain.Booking.BusyCalendar", null)
+                        .WithMany()
+                        .HasForeignKey("BusyCalendarId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

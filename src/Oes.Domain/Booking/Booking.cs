@@ -96,3 +96,29 @@ public class Booking : TenantEntity
     /// <summary>"{host}|{start ticks}" while booked, null once cancelled. Unique: one booking per host per start.</summary>
     public string? SlotKey { get; set; }
 }
+
+/// <summary>
+/// Someone's outside calendar (Google, Outlook, iCloud…) as an .ics feed link. Its busy times block
+/// online booking; only when, never what. The link is a secret, so it's stored encrypted.
+/// </summary>
+public class BusyCalendar : TenantEntity
+{
+    public Guid UserId { get; set; }
+    public string Label { get; set; } = "";
+    public string UrlProtected { get; set; } = "";
+    /// <summary>The site part of the link, for display (the rest is a secret).</summary>
+    public string Host { get; set; } = "";
+    public bool ShowOnCalendar { get; set; } = true;
+    public DateTime? LastFetchedAt { get; set; }
+    public string? LastError { get; set; }
+    public int BlockCount { get; set; }
+}
+
+/// <summary>One busy time read from a feed (UTC). Replaced on every refresh.</summary>
+public class BusyBlock : TenantEntity
+{
+    public Guid BusyCalendarId { get; set; }
+    public Guid UserId { get; set; }
+    public DateTime StartsAt { get; set; }
+    public DateTime EndsAt { get; set; }
+}
