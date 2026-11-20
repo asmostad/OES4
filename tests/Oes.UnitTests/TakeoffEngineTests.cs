@@ -87,4 +87,31 @@ public class TakeoffEngineTests
         Assert.Contains("Ice water", two[1].Problem);           // option on, but no product picked for the slot
         Assert.Equal(1m, two[1].Qty);
     }
+
+    [Fact]
+    public void Scope_wording_fills_in_fields_and_measurements_and_skips_lines_that_wont_be_added()
+    {
+        var rules = new[]
+        {
+            new TakeoffRule { Name = "Shingles", Slot = "shingle", Driver = "total_area_squares", WastePercent = 10, RoundTo = 0.33m, Sort = 1,
+                ScopeText = "Install {product} on {total_area_squares} squares ({qty} {unit}, {measure} measured)." },
+            new TakeoffRule { Name = "Ridge cap", Slot = "ridge_cap", Driver = "ridge_hip", Multiplier = 0.05m, Sort = 2, ScopeText = "Cap {ridge_hip} LF of ridges and hips." },
+            new TakeoffRule { Name = "Hip cap", Slot = "ridge_cap", Driver = "hips", Multiplier = 0.05m, Sort = 3, ScopeText = "Cap {ridge_hip} LF of ridges and hips." }, // same words: listed once
+            new TakeoffRule { Name = "Starter", Slot = "starter", Driver = "eave_rake", Multiplier = 0.01m, Sort = 4, ScopeText = "Install starter strip." }, // no product picked
+            new TakeoffRule { Name = "Nails", Slot = "shingle", Driver = "total_area_squares", Multiplier = 0.25m, Sort = 5 }, // no wording
+        };
+        var d = Drivers();
+        var lines = TakeoffEngine.Run(rules, d, new Dictionary<Guid, Product>(), Pick(("shingle", Shingle), ("ridge_cap", Ridge)));
+        Assert.Equal("Install Arch shingle on 28.05 squares (31.02 SQ, 28.05 measured).", TakeoffEngine.ScopeText(lines[0], d));
+        Assert.Null(TakeoffEngine.ScopeText(lines.Single(l => l.Rule.Name == "Nails"), d));
+        Assert.Equal("- Install Arch shingle on 28.05 squares (31.02 SQ, 28.05 measured).\n- Cap 100 LF of ridges and hips.", TakeoffEngine.Scope(lines, d));
+        Assert.Null(TakeoffEngine.Scope(lines.Where(l => l.Rule.Name == "Nails"), d));
+    }
+
+    [Fact]
+    public void Unknown_placeholders_are_reported()
+    {
+        Assert.Equal(["nope"], TakeoffEngine.UnknownPlaceholders("Install {product} over {ridges} and {nope} {nope}", ["ridges"]));
+        Assert.Empty(TakeoffEngine.UnknownPlaceholders("No fill-ins, {Not a placeholder}", []));
+    }
 }

@@ -10,6 +10,8 @@ public class TakeoffModel(TakeoffService takeoff, EstimateService estimates) : C
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }
     [BindProperty(SupportsGet = true)] public Guid Section { get; set; }
     [BindProperty] public TakeoffChoicesInput Choices { get; set; } = new();
+    /// <summary>Replace the section's scope of work with the rules' wording. Off by default when the scope was edited by hand.</summary>
+    [BindProperty] public bool WriteScope { get; set; }
 
     public SectionTakeoff Run { get; private set; } = null!;
     public string EstimateLabel { get; private set; } = "";
@@ -18,6 +20,7 @@ public class TakeoffModel(TakeoffService takeoff, EstimateService estimates) : C
     public Task<IActionResult> OnGetAsync() => Guard(async () =>
     {
         await LoadAsync(null);
+        WriteScope = !Run.ScopeEditedByHand;
         return Page();
     });
 
@@ -31,8 +34,9 @@ public class TakeoffModel(TakeoffService takeoff, EstimateService estimates) : C
     public Task<IActionResult> OnPostApplyAsync() => Guard(async () =>
     {
         await LoadAsync(Choices); // for redisplay if it's refused
-        var n = await takeoff.ApplyAsync(Id, Section, Choices);
-        Flash($"Takeoff added {n} line{(n == 1 ? "" : "s")}. Lines you added by hand were left alone.");
+        var scope = WriteScope && Run.Scope is not null;
+        var n = await takeoff.ApplyAsync(Id, Section, Choices, WriteScope);
+        Flash($"Takeoff added {n} line{(n == 1 ? "" : "s")}{(scope ? " and wrote the scope of work" : "")}. Lines you added by hand were left alone.");
         return Redirect($"/Estimates/View/{Id}#s-{Section:N}");
     }, Page);
 

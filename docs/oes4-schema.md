@@ -117,7 +117,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `price_list_imports` | TenantId, PriceListId, DocumentId, Format (csv/xlsx), MappingJson, Status, RowCounts, ErrorsJson | |
 | `products` | TenantId, Sku, Name, Unit, LineType, DefaultCost, DefaultPrice, Supplier, SupplierRef, OptionsJson (colors/sizes), ImageDocumentId, Active | Line-item method and order sheets |
 | `catalog_item_products` | CatalogItemId, ProductId | Allowed products per price book item |
-| Takeoff engine | `takeoff_rules` (TradeTypeId, Name, ProductId or Slot, Driver, Multiplier, WastePercent, UseSuggestedWaste, RoundMode, RoundTo, MinQty, MaxQty, two conditions, OptionKey/Label/DefaultOn, Description, Notes, IsActive, Sort); `products.TakeoffSlot` and `products.TakeoffMultiplier` (coverage); `estimate_sections.TakeoffJson` (last picks); `estimate_lines.TakeoffRuleId` | **Built** (2026-11-19). OES3's structured-rule design (no eval). Keyed by trade type. Supplier-agnostic. Scope templates and order sheets later. |
+| Takeoff engine | `takeoff_rules` (TradeTypeId, Name, ProductId or Slot, Driver, Multiplier, WastePercent, UseSuggestedWaste, RoundMode, RoundTo, MinQty, MaxQty, two conditions, OptionKey/Label/DefaultOn, Description, ScopeText (wording with {fill-ins}), Notes, IsActive, Sort); `products.TakeoffSlot` and `products.TakeoffMultiplier` (coverage); `estimate_sections.TakeoffJson` (last picks) and `TakeoffScope` (the scope of work it last wrote); `estimate_lines.TakeoffRuleId` | **Built** (2026-11-19). OES3's structured-rule design (no eval). Keyed by trade type. Supplier-agnostic. Scope-of-work wording and order sheets built. |
 
 ## 8. Estimates
 

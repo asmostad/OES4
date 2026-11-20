@@ -88,6 +88,53 @@ public static class TakeoffEngine
         return result;
     }
 
+    /// <summary>Placeholders every rule's wording can use, besides the trade's measurements by key.</summary>
+    public static readonly (string Key, string Label)[] ScopeFields =
+    [
+        ("qty", "the quantity"), ("unit", "the product's unit"), ("product", "the product's name"),
+        ("line", "the line description"), ("measure", "the measurement the rule is based on"),
+    ];
+
+    private static readonly System.Text.RegularExpressions.Regex Placeholder = new(@"\{([a-z0-9_]+)\}", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Placeholders in a wording template that aren't fields or measurement keys.</summary>
+    public static List<string> UnknownPlaceholders(string template, IEnumerable<string> driverKeys)
+    {
+        var known = driverKeys.Concat(ScopeFields.Select(f => f.Key)).ToHashSet();
+        return Placeholder.Matches(template).Select(m => m.Groups[1].Value).Where(k => !known.Contains(k)).Distinct().ToList();
+    }
+
+    /// <summary>
+    /// A line's scope-of-work wording: the rule's template with {qty}, {unit}, {product}, {line},
+    /// {measure} and any measurement key (e.g. {total_area_squares}) filled in. Null without wording.
+    /// </summary>
+    public static string? ScopeText(TakeoffLine line, IReadOnlyDictionary<string, decimal> drivers)
+    {
+        if (string.IsNullOrWhiteSpace(line.Rule.ScopeText)) return null;
+        return Placeholder.Replace(line.Rule.ScopeText.Trim(), m => m.Groups[1].Value switch
+        {
+            "qty" => Num(line.Qty),
+            "unit" => line.Product?.Unit ?? "",
+            "product" => line.Product?.Name ?? line.Rule.Name,
+            "line" => line.Description,
+            "measure" => Num(line.Driver),
+            var k => drivers.TryGetValue(k, out var v) ? Num(v) : m.Value,
+        });
+    }
+
+    /// <summary>
+    /// The section's scope of work from the lines that will be added (in rule order), one "- " item
+    /// per rule with wording; identical wording is listed once. Null when no rule has wording.
+    /// </summary>
+    public static string? Scope(IEnumerable<TakeoffLine> lines, IReadOnlyDictionary<string, decimal> drivers)
+    {
+        var items = lines.Where(l => l.Problem is null && l.Product is not null)
+            .Select(l => ScopeText(l, drivers)).OfType<string>().Distinct().ToList();
+        return items.Count == 0 ? null : string.Join("\n", items.Select(i => "- " + i));
+    }
+
+    private static string Num(decimal d) => d.ToString("#,0.##", System.Globalization.CultureInfo.InvariantCulture);
+
     public static decimal Round(decimal qty, string mode, decimal to)
     {
         if (to <= 0) to = 1;

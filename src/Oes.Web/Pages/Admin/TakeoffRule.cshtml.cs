@@ -30,7 +30,7 @@ public class TakeoffRuleModel(TakeoffService takeoff, MeasurementService measure
                 Id = r.Id, TradeTypeId = r.TradeTypeId, Name = r.Name, ProductId = r.ProductId, Slot = r.Slot, Driver = r.Driver, Multiplier = r.Multiplier,
                 WastePercent = r.WastePercent, UseSuggestedWaste = r.UseSuggestedWaste, RoundMode = r.RoundMode, RoundTo = r.RoundTo, MinQty = r.MinQty, MaxQty = r.MaxQty,
                 Cond1Field = r.Cond1Field, Cond1Op = r.Cond1Op, Cond1Value = r.Cond1Value, Cond2Field = r.Cond2Field, Cond2Op = r.Cond2Op, Cond2Value = r.Cond2Value,
-                OptionKey = r.OptionKey, OptionLabel = r.OptionLabel, OptionDefaultOn = r.OptionDefaultOn, Description = r.Description, Notes = r.Notes, IsActive = r.IsActive,
+                OptionKey = r.OptionKey, OptionLabel = r.OptionLabel, OptionDefaultOn = r.OptionDefaultOn, Description = r.Description, ScopeText = r.ScopeText, Notes = r.Notes, IsActive = r.IsActive,
             };
         }
         else

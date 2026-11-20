@@ -92,6 +92,16 @@
                     }
                 </table>
             </div>
+            @if (r.Scope is { } scope)
+            {
+                <div class="card-body border-top">
+                    <div class="small fw-semibold mb-1">Scope of work from the rules' wording</div>
+                    <div class="small pre-wrap bg-light rounded p-2 mb-2" data-scope-preview>@scope</div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="WriteScope" value="true" id="write-scope" checked="@Model.WriteScope">
+                        <label class="form-check-label small" for="write-scope">Use it as this section's scope of work@(r.ScopeEditedByHand ? " (replaces the wording you typed)" : "")</label></div>
+                    <input type="hidden" name="WriteScope" value="false">
+                </div>
+            }
             <div class="card-body border-top d-flex align-items-center gap-2">
                 <button type="submit" asp-page-handler="Apply" class="btn btn-primary" disabled="@(!r.HasMeasurements)"><i class="bi bi-check2 me-1"></i>Put these on the estimate</button>
                 <span class="small text-muted">Replaces this section's earlier takeoff lines; lines added by hand stay. Rules still needing a product are skipped.</span>

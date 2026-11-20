@@ -37,7 +37,7 @@ public static class TenantDefaults
     ];
 
     public sealed record SeedRule(string Trade, string Name, string Slot, string Driver, decimal Multiplier, decimal Waste, string Round, decimal RoundTo,
-        decimal Min, string Notes, bool SuggestedWaste = false, (string Field, string Op, decimal Value)? Cond = null, (string Key, string Label, bool On)? Option = null);
+        decimal Min, string Notes, bool SuggestedWaste = false, (string Field, string Op, decimal Value)? Cond = null, (string Key, string Label, bool On)? Option = null, string? Scope = null);
 
     /// <summary>
     /// Starter takeoff rules (from OES3's roofing set, plus gutters). Each uses a slot, so nothing is
@@ -46,29 +46,29 @@ public static class TenantDefaults
     /// </summary>
     public static readonly SeedRule[] TakeoffRules =
     [
-        new("roofing", "Tear-off", "tear_off", "total_area_squares", 1m, 0, "nearest", 0.01m, 0, "Remove existing roofing, per square.", Cond: ("layers", "gte", 1)),
-        new("roofing", "Shingles", "shingle", "total_area_squares", 1m, 10, "up", 0.33m, 0, "1 square per roof square, rounded up to the bundle (1/3 square). Uses the measurement's suggested waste when it has one.", SuggestedWaste: true),
-        new("roofing", "Starter course", "starter", "eave_rake", 0.01m, 5, "up", 1, 1, "1 bundle per 100 LF of eaves and rakes."),
-        new("roofing", "Ridge cap", "ridge_cap", "ridge_hip", 0.05m, 5, "up", 1, 1, "20 LF per bundle."),
-        new("roofing", "Synthetic underlayment", "underlayment", "total_area_squares", 0.1m, 5, "up", 1, 1, "10 squares per roll."),
-        new("roofing", "Ice & water shield – eaves", "ice_water", "eaves", 0.005m, 5, "up", 1, 1, "200 LF per roll at one 3 ft course; double it for two courses.", Option: ("ice_water", "Ice & water shield", true)),
-        new("roofing", "Ice & water shield – valleys", "ice_water", "valleys", 0.005m, 10, "up", 1, 0, "Same roll coverage as the eaves.", Option: ("ice_water", "Ice & water shield", true)),
-        new("roofing", "Drip edge", "drip_edge", "eave_rake", 0.1m, 5, "up", 1, 1, "10 ft sticks."),
-        new("roofing", "Valley metal", "valley_metal", "valleys", 0.1m, 10, "up", 1, 0, "10 ft sticks, for open valleys.", Option: ("valley_metal", "Open valley metal", false)),
-        new("roofing", "Step flashing", "step_flashing", "step_flashing", 0.125m, 10, "up", 1, 0, "One bundle per 8 LF."),
-        new("roofing", "Wall flashing", "wall_flashing", "wall_flashing", 0.1m, 10, "up", 1, 0, "10 ft sticks."),
-        new("roofing", "Pipe boots", "pipe_boot", "pipe_jacks", 1m, 0, "up", 1, 0, "One per pipe jack."),
-        new("roofing", "Box vents", "box_vent", "vents", 1m, 0, "up", 1, 0, "One per vent."),
-        new("roofing", "Ridge vent", "ridge_vent", "ridges", 0.25m, 5, "up", 1, 0, "4 ft sections.", Option: ("ridge_vent", "Ridge vent", false)),
-        new("roofing", "Skylight flashing kits", "skylight_kit", "skylights", 1m, 0, "up", 1, 0, "One per skylight."),
-        new("roofing", "Chimney flashing", "chimney_flashing", "chimneys", 1m, 0, "up", 1, 0, "One kit per chimney."),
+        new("roofing", "Tear-off", "tear_off", "total_area_squares", 1m, 0, "nearest", 0.01m, 0, "Remove existing roofing, per square.", Cond: ("layers", "gte", 1), Scope: "Tear off the existing roofing down to the deck and haul it away."),
+        new("roofing", "Shingles", "shingle", "total_area_squares", 1m, 10, "up", 0.33m, 0, "1 square per roof square, rounded up to the bundle (1/3 square). Uses the measurement's suggested waste when it has one.", SuggestedWaste: true, Scope: "Install {product} on {total_area_squares} squares of roof."),
+        new("roofing", "Starter course", "starter", "eave_rake", 0.01m, 5, "up", 1, 1, "1 bundle per 100 LF of eaves and rakes.", Scope: "Install starter strip along the eaves and rakes."),
+        new("roofing", "Ridge cap", "ridge_cap", "ridge_hip", 0.05m, 5, "up", 1, 1, "20 LF per bundle.", Scope: "Cap {ridge_hip} LF of ridges and hips with {product}."),
+        new("roofing", "Synthetic underlayment", "underlayment", "total_area_squares", 0.1m, 5, "up", 1, 1, "10 squares per roll.", Scope: "Install {product} over the whole roof deck."),
+        new("roofing", "Ice & water shield – eaves", "ice_water", "eaves", 0.005m, 5, "up", 1, 1, "200 LF per roll at one 3 ft course; double it for two courses.", Option: ("ice_water", "Ice & water shield", true), Scope: "Install {product} along {eaves} LF of eaves."),
+        new("roofing", "Ice & water shield – valleys", "ice_water", "valleys", 0.005m, 10, "up", 1, 0, "Same roll coverage as the eaves.", Option: ("ice_water", "Ice & water shield", true), Scope: "Install {product} in {valleys} LF of valleys."),
+        new("roofing", "Drip edge", "drip_edge", "eave_rake", 0.1m, 5, "up", 1, 1, "10 ft sticks.", Scope: "Install new drip edge along {eave_rake} LF of eaves and rakes."),
+        new("roofing", "Valley metal", "valley_metal", "valleys", 0.1m, 10, "up", 1, 0, "10 ft sticks, for open valleys.", Option: ("valley_metal", "Open valley metal", false), Scope: "Install open valley metal in {valleys} LF of valleys."),
+        new("roofing", "Step flashing", "step_flashing", "step_flashing", 0.125m, 10, "up", 1, 0, "One bundle per 8 LF.", Scope: "Replace step flashing along {step_flashing} LF of walls."),
+        new("roofing", "Wall flashing", "wall_flashing", "wall_flashing", 0.1m, 10, "up", 1, 0, "10 ft sticks.", Scope: "Replace wall flashing along {wall_flashing} LF."),
+        new("roofing", "Pipe boots", "pipe_boot", "pipe_jacks", 1m, 0, "up", 1, 0, "One per pipe jack.", Scope: "Replace pipe boots ({qty})."),
+        new("roofing", "Box vents", "box_vent", "vents", 1m, 0, "up", 1, 0, "One per vent.", Scope: "Install box vents ({qty})."),
+        new("roofing", "Ridge vent", "ridge_vent", "ridges", 0.25m, 5, "up", 1, 0, "4 ft sections.", Option: ("ridge_vent", "Ridge vent", false), Scope: "Install ridge vent along {ridges} LF of ridges."),
+        new("roofing", "Skylight flashing kits", "skylight_kit", "skylights", 1m, 0, "up", 1, 0, "One per skylight.", Scope: "Reflash skylights ({qty})."),
+        new("roofing", "Chimney flashing", "chimney_flashing", "chimneys", 1m, 0, "up", 1, 0, "One kit per chimney.", Scope: "Reflash chimneys ({qty})."),
         new("roofing", "Roofing nails", "nails", "total_area_squares", 0.25m, 0, "up", 1, 1, "One box per 4 squares."),
-        new("gutters", "Gutter", "gutter", "gutter_length", 1m, 5, "up", 1, 0, "Per LF."),
-        new("gutters", "Downspout", "downspout", "downspout_length", 1m, 5, "up", 1, 0, "Per LF."),
+        new("gutters", "Gutter", "gutter", "gutter_length", 1m, 5, "up", 1, 0, "Per LF.", Scope: "Install {gutter_length} LF of {product}."),
+        new("gutters", "Downspout", "downspout", "downspout_length", 1m, 5, "up", 1, 0, "Per LF.", Scope: "Install {downspout_length} LF of downspout."),
         new("gutters", "Inside miters", "inside_miter", "inside_miters", 1m, 0, "up", 1, 0, "One each."),
         new("gutters", "Outside miters", "outside_miter", "outside_miters", 1m, 0, "up", 1, 0, "One each."),
         new("gutters", "End caps", "end_cap", "end_caps", 1m, 0, "up", 1, 0, "One each."),
-        new("gutters", "Gutter guard", "gutter_guard", "gutter_length", 1m, 0, "up", 1, 0, "Per LF of gutter.", Option: ("gutter_guard", "Gutter guard", false)),
+        new("gutters", "Gutter guard", "gutter_guard", "gutter_length", 1m, 0, "up", 1, 0, "Per LF of gutter.", Option: ("gutter_guard", "Gutter guard", false), Scope: "Install {product} on {gutter_length} LF of gutter."),
     ];
 
     public static readonly Dictionary<string, (string Key, string Label)[]> Lookups = new()
@@ -168,7 +168,7 @@ public static class TenantDefaults
                     WastePercent = r.Waste, UseSuggestedWaste = r.SuggestedWaste, RoundMode = r.Round, RoundTo = r.RoundTo, MinQty = r.Min,
                     Cond1Field = r.Cond?.Field, Cond1Op = r.Cond?.Op, Cond1Value = r.Cond?.Value,
                     OptionKey = r.Option?.Key, OptionLabel = r.Option?.Label, OptionDefaultOn = r.Option?.On ?? true,
-                    Notes = r.Notes, Sort = sort += 10,
+                    ScopeText = r.Scope, Notes = r.Notes, Sort = sort += 10,
                 });
             }
         }

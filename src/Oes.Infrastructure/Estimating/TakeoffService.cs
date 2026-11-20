@@ -34,6 +34,7 @@ public sealed class TakeoffRuleInput
     public string? OptionLabel { get; set; }
     public bool OptionDefaultOn { get; set; } = true;
     public string? Description { get; set; }
+    public string? ScopeText { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -45,7 +46,14 @@ public sealed record TakeoffOption(string Key, string Label, bool DefaultOn);
 /// <summary>Everything the takeoff page needs for one estimate section.</summary>
 public sealed record SectionTakeoff(
     EstimateSection Section, TradeType Trade, List<TakeoffDriver> Drivers, Dictionary<string, decimal> Values, bool HasMeasurements,
-    Dictionary<string, List<Product>> SlotProducts, List<TakeoffOption> Options, TakeoffChoicesInput Choices, List<TakeoffLine> Lines);
+    Dictionary<string, List<Product>> SlotProducts, List<TakeoffOption> Options, TakeoffChoicesInput Choices, List<TakeoffLine> Lines)
+{
+    /// <summary>The scope of work the rules' wording gives for these lines (null if no rule has wording).</summary>
+    public string? Scope => TakeoffEngine.Scope(Lines, Values);
+
+    /// <summary>The section's scope was typed or changed by hand (not empty and not what the last takeoff wrote).</summary>
+    public bool ScopeEditedByHand => !string.IsNullOrWhiteSpace(Section.ScopeOfWork) && Section.ScopeOfWork != Section.TakeoffScope;
+}
 
 /// <summary>A takeoff over one trade's measurements (an estimate section, or a project trade's order sheet).</summary>
 public sealed record TakeoffRun(
@@ -103,6 +111,10 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         var (c1f, c1o, c1v) = Condition(i.Cond1Field, i.Cond1Op, i.Cond1Value, drivers);
         var (c2f, c2o, c2v) = Condition(i.Cond2Field, i.Cond2Op, i.Cond2Value, drivers);
         var option = Key(i.OptionKey);
+        var wording = ContactService.Clean(i.ScopeText);
+        if (wording is { Length: > 1000 }) throw new CrmRuleException("Keep the scope wording under 1,000 characters.");
+        if (wording is not null && TakeoffEngine.UnknownPlaceholders(wording, drivers) is [var bad, ..])
+            throw new CrmRuleException($"The wording uses {{{bad}}}, which isn't a field or a measurement of this trade.");
 
         TakeoffRule r;
         if (i.Id is { } id) r = await GetRuleAsync(id, ct);
@@ -128,6 +140,7 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         r.OptionLabel = option is null ? null : ContactService.Clean(i.OptionLabel) ?? TakeoffEngine.Label(option);
         r.OptionDefaultOn = i.OptionDefaultOn;
         r.Description = ContactService.Clean(i.Description);
+        r.ScopeText = wording;
         r.Notes = ContactService.Clean(i.Notes);
         r.IsActive = i.IsActive;
         audit.Record(i.Id is null ? "takeoff_rule.created" : "takeoff_rule.updated", "TakeoffRule", r.Id, $"Takeoff rule {name}");
@@ -197,12 +210,16 @@ public sealed class TakeoffService(OesDbContext db, RecordScope scope, EstimateS
         return new TakeoffRun(trade, TakeoffEngine.Drivers(trade, fields), values, measured.Count > 0, slotProducts, options, choices, lines);
     }
 
-    /// <summary>Runs the takeoff and replaces the section's generated lines. Returns how many lines were added.</summary>
-    public async Task<int> ApplyAsync(Guid estimateId, Guid sectionId, TakeoffChoicesInput choices, CancellationToken ct = default)
+    /// <summary>
+    /// Runs the takeoff and replaces the section's generated lines; with <paramref name="writeScope"/>,
+    /// also replaces its scope of work with the rules' wording (when any rule has wording). Returns how many lines were added.
+    /// </summary>
+    public async Task<int> ApplyAsync(Guid estimateId, Guid sectionId, TakeoffChoicesInput choices, bool writeScope = false, CancellationToken ct = default)
     {
         var run = await ForSectionAsync(estimateId, sectionId, choices, ct);
         if (!run.HasMeasurements) throw new CrmRuleException("This section has no measurements to take off from.");
-        return await estimates.ReplaceTakeoffLinesAsync(estimateId, sectionId, run.Lines, JsonSerializer.Serialize(choices, Json), ct);
+        return await estimates.ReplaceTakeoffLinesAsync(estimateId, sectionId, run.Lines, JsonSerializer.Serialize(choices, Json),
+            writeScope ? run.Scope : null, ct);
     }
 
     public static string Write(TakeoffChoicesInput choices) => JsonSerializer.Serialize(choices, Json);

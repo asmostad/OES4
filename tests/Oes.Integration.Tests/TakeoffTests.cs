@@ -60,10 +60,14 @@ public sealed class TakeoffTests(MySqlFixture fx)
         Assert.Equal((31.02m, 130m, true), (shingles.Qty, shingles.UnitPrice, shingles.TakeoffRuleId != null)); // 28.05 SQ + 10%, to the bundle
         Assert.Equal(21m, lines.Single(l => l.Code == "DRIP").Qty);           // 200 LF × 0.1 × 1.05
         Assert.Contains(lines, l => l.Id == handLine);
+        Assert.Null((await est.GetAsync(id)).Sections.Single().Section.ScopeOfWork); // not asked to write the scope
 
-        // Re-running replaces only the takeoff's own lines, and remembers the picks.
+        // Re-running replaces only the takeoff's own lines, and remembers the picks; the starter rules' wording becomes the scope.
         choices.Slots["shingle"] = arch2;
-        await takeoff.ApplyAsync(id, section, choices);
+        await takeoff.ApplyAsync(id, section, choices, writeScope: true);
+        Assert.Equal("- Install Designer shingle on 28.05 squares of roof.\n- Cap 100 LF of ridges and hips with Ridge cap.\n- Install new drip edge along 200 LF of eaves and rakes.",
+            (await est.GetAsync(id)).Sections.Single().Section.ScopeOfWork); // tear-off and starter have no product yet, so no wording
+        Assert.False((await takeoff.ForSectionAsync(id, section)).ScopeEditedByHand);
         var after = (await est.GetAsync(id)).Sections.Single().Lines;
         Assert.Equal(4, after.Count);
         Assert.DoesNotContain(after, l => l.ProductId == arch);
@@ -81,9 +85,17 @@ public sealed class TakeoffTests(MySqlFixture fx)
         Assert.Contains("slot: shingle", await web.GetStringAsync("/Admin/Takeoff?trade=roofing"));
         var ruleHtml = await web.GetStringAsync("/Admin/TakeoffRule?trade=roofing");
         Assert.Contains("value=\"ridge_hip\"", ruleHtml);
+        Assert.Contains("{total_area_squares}", ruleHtml); // the wording's fill-ins
         var page = await web.GetStringAsync($"/Estimates/Takeoff/{id}?section={section}");
         Assert.Contains("Designer shingle", page);
         Assert.Contains("Put these on the estimate", page);
+        Assert.Matches("name=\"WriteScope\" value=\"true\" id=\"write-scope\" checked", page); // the scope is still the takeoff's own
+
+        // Once the scope is typed by hand, the takeoff leaves it alone unless asked.
+        await est.UpdateSectionAsync(section, "Roof", "Full replacement per the insurance scope.");
+        page = await web.GetStringAsync($"/Estimates/Takeoff/{id}?section={section}");
+        Assert.Contains("replaces the wording you typed", page);
+        Assert.DoesNotMatch("id=\"write-scope\" checked", page);
         var apply = await web.PostAsync($"/Estimates/Takeoff/{id}?handler=Apply", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["section"] = section.ToString(), ["Choices.Slots[shingle]"] = arch.ToString(), ["Choices.Slots[drip_edge]"] = "", ["__RequestVerificationToken"] = Token(page),
@@ -91,6 +103,7 @@ public sealed class TakeoffTests(MySqlFixture fx)
         Assert.Equal(HttpStatusCode.Redirect, apply.StatusCode);
         var posted = (await s.Get<EstimateService>().GetAsync(id)).Sections.Single().Lines;
         Assert.Equal(["Architectural shingle", "Haul-away"], posted.Select(l => l.Description).Order()); // drip edge skipped; ridge slot not sent
+        Assert.Equal("Full replacement per the insurance scope.", (await s.Get<EstimateService>().GetAsync(id)).Sections.Single().Section.ScopeOfWork);
         Assert.Contains($"/Estimates/Takeoff/{id}?section={section}", await web.GetStringAsync($"/Estimates/View/{id}"));
 
         var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
@@ -114,10 +127,21 @@ public sealed class TakeoffTests(MySqlFixture fx)
         await Assert.ThrowsAsync<CrmRuleException>(() => takeoff.SaveRuleAsync(bad));
         bad = Valid(); bad.MinQty = 5; bad.MaxQty = 2;
         await Assert.ThrowsAsync<CrmRuleException>(() => takeoff.SaveRuleAsync(bad));
+        bad = Valid(); bad.ScopeText = "Install hangers every {spacing} along {gutter_length} LF.";
+        Assert.Contains("{spacing}", (await Assert.ThrowsAsync<CrmRuleException>(() => takeoff.SaveRuleAsync(bad))).Message);
 
-        var id = await takeoff.SaveRuleAsync(Valid());
+        // Every starter rule's wording only uses fill-ins its trade has.
+        foreach (var trade in await s.Get<MeasurementService>().TradesAsync())
+        {
+            var keys = (await takeoff.DriversAsync(trade.Id)).Select(d => d.Key).ToList();
+            foreach (var r in await takeoff.RulesAsync(trade.Id))
+                Assert.Empty(TakeoffEngine.UnknownPlaceholders(r.Rule.ScopeText ?? "", keys));
+        }
+
+        var ok = Valid(); ok.ScopeText = "  Install {qty} hangers along {gutter_length} LF.  ";
+        var id = await takeoff.SaveRuleAsync(ok);
         var rule = await takeoff.GetRuleAsync(id);
-        Assert.Equal(("hanger", (Guid?)null), (rule.Slot, rule.ProductId));
+        Assert.Equal(("hanger", (Guid?)null, "Install {qty} hangers along {gutter_length} LF."), (rule.Slot, rule.ProductId, rule.ScopeText));
         var last = (await takeoff.RulesAsync(gutters.Id)).Last();
         Assert.Equal(id, last.Rule.Id);
         await takeoff.MoveRuleAsync(id, -1);

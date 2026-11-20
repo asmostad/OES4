@@ -137,6 +137,8 @@ public class TakeoffRule : TenantEntity
     public bool OptionDefaultOn { get; set; } = true;
     /// <summary>Line description instead of the product name.</summary>
     public string? Description { get; set; }
+    /// <summary>Wording for the section's scope of work, with {placeholders} (see TakeoffEngine.ScopeText).</summary>
+    public string? ScopeText { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
     public int Sort { get; set; }
@@ -210,6 +212,8 @@ public class EstimateSection : TenantEntity
     public string? ScopeOfWork { get; set; }
     /// <summary>The last takeoff run on this section (slot picks and options), to pre-fill the next one.</summary>
     public string? TakeoffJson { get; set; }
+    /// <summary>The scope of work the last takeoff wrote, to tell whether it was edited by hand since.</summary>
+    public string? TakeoffScope { get; set; }
     public int Sort { get; set; }
 }
 

@@ -81,6 +81,12 @@
     <div class="col-md-3 d-flex align-items-end"><div class="form-check mb-1">
         <input class="form-check-input" type="checkbox" name="Input.OptionDefaultOn" value="true" id="r-on" checked="@i.OptionDefaultOn"><label class="form-check-label small" for="r-on">On by default</label></div></div>
 
+    <div class="col-12"><h2 class="h6 mb-0">Scope of work</h2></div>
+    <div class="col-12"><label class="form-label small" for="r-scope">Wording <span class="text-muted">(optional; one item in the section's scope of work when this rule adds a line)</span></label>
+        <textarea id="r-scope" name="Input.ScopeText" class="form-control form-control-sm" rows="2" maxlength="1000" placeholder="e.g. Install {product} over {total_area_squares} squares of roof.">@i.ScopeText</textarea>
+        <div class="form-text">Fill-ins: @(string.Join(", ", Oes.Infrastructure.Estimating.TakeoffEngine.ScopeFields.Select(f => $"{{{f.Key}}} {f.Label}"))),
+            or any measurement: @(string.Join(", ", Model.Drivers.Where(d => d.Key != "flat").Select(d => $"{{{d.Key}}}"))).</div></div>
+
     <div class="col-12"><label class="form-label small" for="r-notes">Notes <span class="text-muted">(where the numbers come from)</span></label>
         <input id="r-notes" name="Input.Notes" value="@i.Notes" class="form-control form-control-sm" maxlength="500"></div>
     <div class="col-12 d-flex gap-2">

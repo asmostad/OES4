@@ -199,9 +199,13 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - The product is fixed, or comes from a slot (shingle, ridge_cap…) the rep fills per job from products tagged with it. A product's own coverage replaces the rule's multiplier (e.g. a 33 LF ridge cap bundle). Rules can use the measurement's suggested waste.
        - New companies get starter rules for roofing (17, from OES3's set) and gutters (6), all slot-based, with notes on what each coverage assumes.
        - On an estimate section with measurements, "Takeoff" shows the drivers, slot pickers (pre-filled from the last run, or the only product in a slot), options and a priced preview, then puts the lines on the estimate. A re-run replaces only the lines the takeoff made (`EstimateLines.TakeoffRuleId`); hand-added lines stay.
+     - Scope-of-work wording per takeoff rule (done 2026-11-19):
+       - A rule can carry one sentence of wording with fill-ins: {qty}, {unit}, {product}, {line}, {measure} (the rule's own measurement), or any of the trade's measurements by key (e.g. {total_area_squares}, {ridge_hip}). Unknown fill-ins are refused when the rule is saved.
+       - The takeoff page previews the section's scope of work: one "- " item per rule that adds a line, in rule order, with identical wording listed once. Rules still needing a product add no wording.
+       - "Use it as this section's scope of work" replaces the section's scope when the lines go on. It's ticked unless the scope was typed or changed by hand since the last takeoff wrote it (`estimate_sections.TakeoffScope`), so hand wording isn't overwritten by accident.
+       - New companies' starter rules come with customer-facing wording (nails, miters and end caps have none). Companies set up before this have no wording on their rules until an admin adds it.
    - Still to do:
      - Server-side PDF (Playwright).
-     - Scope-of-work wording templates per rule (OES3 had them).
 6. **Production** (done 2026-11-19)
    - Done:
      - Projects from signed estimates (one trade per estimate trade, contract = signed total).

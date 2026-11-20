@@ -835,6 +835,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(r => r.OptionKey).HasMaxLength(50);
             e.Property(r => r.OptionLabel).HasMaxLength(150);
             e.Property(r => r.Description).HasMaxLength(500);
+            e.Property(r => r.ScopeText).HasMaxLength(1000);
             e.Property(r => r.Notes).HasMaxLength(500);
             e.HasIndex(r => new { r.TenantId, r.TradeTypeId, r.Sort });
             e.HasOne<Domain.Measurements.TradeType>().WithMany().HasForeignKey(r => r.TradeTypeId).OnDelete(DeleteBehavior.Restrict);
@@ -870,6 +871,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(s => s.Name).HasMaxLength(150);
             e.Property(s => s.ScopeOfWork).HasColumnType("text").Metadata.SetMaxLength(null);
             e.Property(s => s.TakeoffJson).HasMaxLength(2000);
+            e.Property(s => s.TakeoffScope).HasColumnType("text").Metadata.SetMaxLength(null);
             e.HasIndex(s => new { s.TenantId, s.EstimateId });
             e.HasOne<Estimate>().WithMany().HasForeignKey(s => s.EstimateId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<MeasurementSet>().WithMany().HasForeignKey(s => s.MeasurementSetId).OnDelete(DeleteBehavior.Restrict);

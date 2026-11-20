@@ -3013,6 +3013,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
 
+                    b.Property<string>("TakeoffScope")
+                        .HasColumnType("text");
+
                     b.Property<byte[]>("TenantId")
                         .IsRequired()
                         .HasColumnType("binary(16)");
@@ -3438,6 +3441,10 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("RoundTo")
                         .HasPrecision(10, 4)
                         .HasColumnType("decimal(10,4)");
+
+                    b.Property<string>("ScopeText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
                     b.Property<string>("Slot")
                         .HasMaxLength(50)

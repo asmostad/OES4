@@ -361,7 +361,9 @@ public sealed class EstimateService(
     /// Replaces the section's takeoff-generated lines with a new run. Lines people added by hand stay;
     /// product prices are copied now, as with any product line. Returns how many lines were added.
     /// </summary>
-    public async Task<int> ReplaceTakeoffLinesAsync(Guid id, Guid sectionId, IReadOnlyList<TakeoffLine> lines, string choicesJson, CancellationToken ct = default)
+    /// <summary>Replaces a section's takeoff lines; a non-null <paramref name="scope"/> also replaces its scope of work.</summary>
+    public async Task<int> ReplaceTakeoffLinesAsync(Guid id, Guid sectionId, IReadOnlyList<TakeoffLine> lines, string choicesJson, string? scope = null,
+        CancellationToken ct = default)
     {
         var est = await EditableAsync(id, ct);
         var section = await db.EstimateSections.FirstOrDefaultAsync(s => s.Id == sectionId && s.EstimateId == id, ct)
@@ -388,6 +390,7 @@ public sealed class EstimateService(
             added++;
         }
         section.TakeoffJson = choicesJson;
+        if (scope is not null) section.ScopeOfWork = section.TakeoffScope = scope;
         await RecalcAsync(est, ct);
         await items.LogAsync(EntityTypes.Estimate, id, "estimate.takeoff", $"Takeoff on \"{section.Name}\": {added} line{(added == 1 ? "" : "s")}", ct);
         await db.SaveChangesAsync(ct);
