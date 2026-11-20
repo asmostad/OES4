@@ -32,11 +32,16 @@
                     <div class="d-flex @(inbound ? "" : "justify-content-end") mb-1">
                         <div class="px-3 py-2 rounded-3 small @(inbound ? "bg-light" : "bg-primary-subtle")" style="max-width:75%">
                             <div class="pre-wrap">@m.Body</div>
-                            <div class="text-muted" style="font-size:.75rem">@Fmt.Ago(m.At)@(inbound ? "" : " · automatic reply")</div>
+                            <div class="text-muted" style="font-size:.75rem">@Fmt.Ago(m.At)@(inbound ? "" : m.SentByUserId is null ? " · automatic reply" : " · sent")</div>
                         </div>
                     </div>
                 }
             </div>
+            <form method="post" asp-page-handler="Reply" class="d-flex gap-2 mb-3">
+                <input type="hidden" name="number" value="@key">
+                <input name="body" class="form-control form-control-sm" maxlength="1500" placeholder="Reply by text…" required aria-label="Reply">
+                <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-send me-1"></i>Reply</button>
+            </form>
             @if (t.Possible.Count > 0)
             {
                 <div class="alert alert-info small py-2">This number is on an archived contact:

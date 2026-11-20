@@ -202,6 +202,42 @@ public sealed class MessagingService(
     }
 
     /// <summary>
+    /// Replies to a number that texted in but isn't on any contact yet (from the unmatched inbox).
+    /// Only numbers that texted first can be answered; STOP is honored; the first text carries the
+    /// opt-out line. No merge fields (there's no contact to fill them from).
+    /// </summary>
+    public async Task<SendResult> ReplyToUnknownAsync(string number, string body, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.SmsSend);
+        await scope.EnsurePermissionAsync(Permissions.SmsViewAll);
+        var me = user.UserId ?? throw new RecordForbiddenException("Sign in to send texts.");
+        var from = await PhoneNumberAsync(ct) ?? throw new CrmRuleException("Texting isn't set up yet. An administrator needs to add the company's texting number.");
+        var to = ContactValue.Phone(number);
+        if (!await db.SmsMessages.AnyAsync(m => m.FromNumber == to && m.Direction == Directions.Inbound && m.ContactId == null, ct))
+            throw new CrmRuleException("You can only reply to a number that texted you.");
+        if (await db.ContactMethods.AnyAsync(m => m.NormalizedValue == to && db.Contacts.Any(c => c.Id == m.ContactId && c.ArchivedAt == null), ct))
+            throw new CrmRuleException("That number is on a contact now. Reply from their page.");
+        if (await db.Suppressions.AnyAsync(s => s.Channel == Channels.Sms && s.Address == to && s.RemovedAt == null, ct))
+            throw new CrmRuleException("Not sent: they texted STOP.");
+        var text = (body ?? "").Trim();
+        if (text.Length == 0) throw new CrmRuleException("Write a message.");
+        if (!await db.SmsMessages.AnyAsync(m => m.ToNumber == to && m.Direction == Directions.Outbound && m.Status == MessageStatuses.Sent && m.SentByUserId != null, ct)
+            && !text.Contains("STOP", StringComparison.OrdinalIgnoreCase))
+            text = $"{text}\n{OptOutFooter}";
+        if (text.Length > TemplateService.SmsMaxLength) throw new CrmRuleException($"Texts can be up to {TemplateService.SmsMaxLength} characters.");
+
+        var result = await SafeAsync(() => sms.SendAsync(from, to, text, ct));
+        var msg = new SmsMessage
+        {
+            Direction = Directions.Outbound, FromNumber = from, ToNumber = to, Body = text, At = clock.UtcNow, SentByUserId = me,
+            Status = result.Ok ? MessageStatuses.Sent : MessageStatuses.Failed, ProviderSid = result.ProviderId, Error = Trim(result.Error, 1000),
+        };
+        db.SmsMessages.Add(msg);
+        await db.SaveChangesAsync(ct);
+        return new SendResult(msg.Id, result.Ok, result.Error);
+    }
+
+    /// <summary>
     /// A text from a person to a company number. The tenant comes from the number it was sent to.
     /// Returns false when no company owns that number. Runs without a signed-in user.
     /// </summary>

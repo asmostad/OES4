@@ -6,7 +6,7 @@ using Oes.Web.Infrastructure;
 namespace Oes.Web.Pages.Messages;
 
 [HasPermission(Permissions.SmsViewAll)]
-public class UnmatchedModel(UnmatchedTextService texts) : CrmPageModel
+public class UnmatchedModel(UnmatchedTextService texts, MessagingService messaging) : CrmPageModel
 {
     public List<UnmatchedThread> Threads { get; private set; } = [];
 
@@ -24,6 +24,13 @@ public class UnmatchedModel(UnmatchedTextService texts) : CrmPageModel
         var (contactId, oppId) = await texts.NewLeadAsync(number, firstName, lastName, createOpportunity);
         Flash(oppId is null ? "Contact created." : "Contact and lead created.");
         return oppId is { } o ? RedirectToPage("/Opportunities/View", new { id = o }) : RedirectToPage("/Contacts/View", new { id = contactId });
+    });
+
+    public Task<IActionResult> OnPostReplyAsync(string number, string body) => Guard(async () =>
+    {
+        var sent = await messaging.ReplyToUnknownAsync(number, body);
+        Flash(sent.Ok ? "Reply sent." : $"The text didn't go through: {sent.Error}", sent.Ok ? "success" : "danger");
+        return RedirectToPage();
     });
 
     public Task<IActionResult> OnPostDismissAsync(string number) => Guard(async () =>
