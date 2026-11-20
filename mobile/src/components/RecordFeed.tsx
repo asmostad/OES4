@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -19,7 +20,11 @@ import { useCached } from '@/lib/useCached';
  * when there's no signal. Returns `reload` so the screen's pull-to-refresh can include it.
  */
 export function useRecordFeed(entityType: string, id: string, what: string, addTitle: string): { reload: () => Promise<void>; view: ReactNode } {
-  const { api } = useApi();
+  const { api, me } = useApi();
+  const canText = me.permissions.includes('sms.send');
+  const canEmail = me.permissions.includes('email.send');
+  const compose = (channel: 'sms' | 'email') =>
+    router.push({ pathname: '/compose', params: { entityType, entityId: id, channel, label: what } });
   const history = useCached<TimelineItem[]>(`/api/v1/records/${entityType}/${id}/timeline`, "Couldn't load the timeline.");
   const files = useCached<DocumentItem[]>(`/api/v1/records/${entityType}/${id}/documents?take=30`, "Couldn't load the documents.");
   const timeline = history.data ?? [];
@@ -98,6 +103,12 @@ export function useRecordFeed(entityType: string, id: string, what: string, addT
           <View style={{ flex: 1 }}><Button title="Take photo" kind="secondary" onPress={() => addPhoto('camera')} busy={busy === 'photo'} /></View>
           <View style={{ flex: 1 }}><Button title="Choose photos" kind="secondary" onPress={() => addPhoto('library')} disabled={busy === 'photo'} /></View>
         </View>
+        {(canText || canEmail) && (
+          <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
+            {canText && <View style={{ flex: 1 }}><Button title="Send a text" kind="secondary" onPress={() => compose('sms')} /></View>}
+            {canEmail && <View style={{ flex: 1 }}><Button title="Send an email" kind="secondary" onPress={() => compose('email')} /></View>}
+          </View>
+        )}
       </Card>
 
       <OutboxBanner />
@@ -139,7 +150,8 @@ export function useRecordFeed(entityType: string, id: string, what: string, addT
       <Card>
         {timeline.length === 0 && <Muted>Nothing here yet.</Muted>}
         {timeline.slice(0, 50).map((t, i) => (
-          <Row key={`${t.itemType}-${t.id}`} last={i === Math.min(timeline.length, 50) - 1}>
+          <Row key={`${t.itemType}-${t.id}`} last={i === Math.min(timeline.length, 50) - 1}
+            onPress={t.itemType === 'sms' || t.itemType === 'email' ? () => router.push(`/message/${t.itemType}/${t.id}`) : undefined}>
             <Muted>{[label(t.itemType === 'sms' ? 'text' : t.itemType), t.authorName, when(t.at)].filter(Boolean).join(' · ')}</Muted>
             {t.subject && <Text style={[styles.body, { fontWeight: '600' }]}>{t.subject}</Text>}
             <Text style={styles.body} numberOfLines={6}>{t.fileName ?? t.text}</Text>

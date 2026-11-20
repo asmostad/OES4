@@ -238,3 +238,10 @@ export type ProspectCard = {
   methods: ContactMethod[]; propertyId: string | null; address: string | null; ownerName: string | null; stormName: string | null;
   attempts: number; lastDisposition: string | null; calls: CallRow[]; lockedBy: string | null; canEdit: boolean;
 };
+export type Recipient = { contactId: string; contactName: string; kind: string; address: string; display: string; isPrimary: boolean };
+export type MessageTemplate = { id: string; name: string; subject: string | null; body: string; category: string };
+export type Sent = { messageId: string; ok: boolean; error: string | null };
+export type MessageFull = {
+  channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
+  subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
+};

@@ -15,7 +15,7 @@ import { useSession } from './session';
 export type OutboxItem = {
   key: string;
   owner: { server: string; userId: string; tenantId: string };
-  kind: 'note' | 'photo' | 'task' | 'task_done' | 'stage' | 'appointment' | 'lead';
+  kind: 'note' | 'photo' | 'task' | 'task_done' | 'stage' | 'appointment' | 'lead' | 'message';
   method: 'POST' | 'PUT';
   path: string;
   json?: unknown;

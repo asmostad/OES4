@@ -279,4 +279,55 @@ public sealed class MessagingTests(MySqlFixture fx)
         unknown.Headers.Add(SmsWebhookController.SecretHeader, "test-webhook-secret");
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(unknown)).StatusCode);
     }
+
+    [Fact]
+    public async Task Field_app_texts_and_emails_from_the_company_and_reads_them_back()
+    {
+        var w = await WorldAsync();
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin)) await s.Get<MessagingService>().SetPhoneNumberAsync(CompanyNumber(w));
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = w.Rep.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r) =>
+            await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        async Task<HttpResponseMessage> Post(string path, object body)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+            return await api.SendAsync(req);
+        }
+
+        var recipients = (await Json(await api.GetAsync($"/api/v1/records/opportunity/{w.Opportunity}/recipients"))).EnumerateArray().ToList();
+        Assert.Contains(recipients, r => r.GetProperty("kind").GetString() == "mobile" && r.GetProperty("address").GetString() == w.Mobile);
+        Assert.Contains(recipients, r => r.GetProperty("kind").GetString() == "email" && r.GetProperty("address").GetString() == "mia@example.com");
+
+        // No opt-in yet: a readable refusal, nothing sent.
+        var sms = new { entityType = "opportunity", entityId = w.Opportunity, contactId = w.Contact, to = w.Mobile, body = "On my way, {{contact.first_name}}" };
+        var refused = await Post("/api/v1/messages/sms", sms);
+        Assert.Equal((HttpStatusCode)422, refused.StatusCode);
+        Assert.Contains("opt-in", await refused.Content.ReadAsStringAsync());
+
+        await using (var s = fx.ScopeAs(w.Tenant, w.Rep))
+            await s.Get<ConsentService>().RecordAsync(w.Contact, Channels.Sms, MessagePurposes.Transactional, ConsentStatuses.OptedIn, "verbal", "At the door");
+        var sent = await Json(await Post("/api/v1/messages/sms", sms));
+        Assert.True(sent.GetProperty("ok").GetBoolean());
+        var text = await Json(await api.GetAsync($"/api/v1/messages/sms/{sent.GetProperty("messageId").GetGuid()}"));
+        Assert.StartsWith("On my way, Mia", text.GetProperty("body").GetString());
+        Assert.Equal(Directions.Outbound, text.GetProperty("direction").GetString());
+
+        var mail = await Json(await Post("/api/v1/messages/email",
+            new { entityType = "opportunity", entityId = w.Opportunity, contactId = w.Contact, to = "mia@example.com", subject = "Your roof", body = "Photos attached soon." }));
+        Assert.True(mail.GetProperty("ok").GetBoolean());
+        var email = await Json(await api.GetAsync($"/api/v1/messages/email/{mail.GetProperty("messageId").GetGuid()}"));
+        Assert.Equal(("Your roof", "mia@example.com"), (email.GetProperty("subject").GetString(), email.GetProperty("counterparty").GetString()));
+        Assert.Equal(HttpStatusCode.NotFound, (await api.GetAsync($"/api/v1/messages/fax/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await api.GetAsync($"/api/v1/messages/sms/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await api.GetAsync("/api/v1/messages/templates?channel=sms")).StatusCode);
+
+        // Both show on the lead's timeline.
+        var timeline = (await Json(await api.GetAsync($"/api/v1/records/opportunity/{w.Opportunity}/timeline"))).EnumerateArray().ToList();
+        Assert.Contains(timeline, t => t.GetProperty("itemType").GetString() == "sms");
+        Assert.Contains(timeline, t => t.GetProperty("itemType").GetString() == "email" && t.GetProperty("subject").GetString() == "Your roof");
+    }
 }
