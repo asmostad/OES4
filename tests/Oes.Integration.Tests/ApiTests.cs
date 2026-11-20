@@ -269,6 +269,21 @@ public sealed class ApiTests(MySqlFixture fx)
         var second = await Json(await app.PostAsJsonAsync("/api/v1/leads", Lead("Sam")));
         Assert.Equal(lead.GetProperty("propertyId").GetGuid(), second.GetProperty("propertyId").GetGuid());
 
+        // Search finds them; the contact and the house show their leads and links.
+        var hits = (await Json(await app.GetAsync("/api/v1/search?q=Doorstep"))).EnumerateArray().ToList();
+        Assert.Contains(hits, h => h.GetProperty("kind").GetString() == "contact" && h.GetProperty("title").GetString() == "Dana Doorstep");
+        Assert.Contains(hits, h => h.GetProperty("kind").GetString() == "opportunity" && h.GetProperty("id").GetGuid() == oppId);
+        var contact = await Json(await app.GetAsync($"/api/v1/contacts/{lead.GetProperty("contactId").GetGuid()}"));
+        Assert.Equal(2, contact.GetProperty("methods").GetArrayLength());
+        Assert.Equal(oppId, contact.GetProperty("opportunities")[0].GetProperty("id").GetGuid());
+        Assert.Equal(lead.GetProperty("propertyId").GetGuid(), contact.GetProperty("properties")[0].GetProperty("id").GetGuid());
+        var house = await Json(await app.GetAsync($"/api/v1/properties/{lead.GetProperty("propertyId").GetGuid()}"));
+        Assert.StartsWith(street, house.GetProperty("address").GetString());
+        Assert.Equal(2, house.GetProperty("opportunities").GetArrayLength());
+        Assert.Contains(house.GetProperty("contacts").EnumerateArray(), c => c.GetProperty("name").GetString() == "Sam Doorstep");
+        var otherRep = await SignedInAsync(await fx.AddMemberAsync(t.Id, "Sales Rep"));
+        Assert.Equal(HttpStatusCode.NotFound, (await otherRep.GetAsync($"/api/v1/contacts/{lead.GetProperty("contactId").GetGuid()}")).StatusCode);
+
         // An unfinished address is refused before anything is created.
         int contactsBefore;
         await using (var s = fx.ScopeAs(t.Id, admin)) contactsBefore = await s.Get<OesDbContext>().Contacts.CountAsync();

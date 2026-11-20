@@ -17,6 +17,12 @@ public sealed record OpportunityDto(Guid Id, string Number, string Name, string 
     decimal? ExpectedValue, string? OwnerName, Guid ContactId, string ContactName, IReadOnlyList<ContactMethodDto> ContactMethods,
     Guid? PropertyId, string? Address, string? Description, bool CanEdit);
 public sealed record StageOption(Guid Id, string Name, string Color, string Outcome);
+public sealed record LinkDto(Guid Id, string Label, string? Role);
+public sealed record OpportunityBriefDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome, string? Address);
+public sealed record ContactDto(Guid Id, string Name, string Type, string? OwnerName, List<ContactMethodDto> Methods, List<LinkDto> Properties,
+    List<OpportunityBriefDto> Opportunities, bool CanEdit);
+public sealed record PropertyContactDto(Guid Id, string Name, string Role, bool IsPrimary, string? Phone, string? Email);
+public sealed record PropertyDto(Guid Id, string Address, List<PropertyContactDto> Contacts, List<OpportunityBriefDto> Opportunities);
 public sealed record OptionsResponse(List<StageOption> Stages, List<Option> LostReasons, List<Option> AppointmentTypes, List<Option> LeadSources);
 public sealed record DeviceRequest(string Token, string Platform);
 public sealed record UnregisterDeviceRequest(string Token);
@@ -32,7 +38,7 @@ public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? 
 [ApiController]
 [Route("api/v1")]
 public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push,
-    CrmLookups lookups, FieldLeadService leads) : ControllerBase
+    CrmLookups lookups, FieldLeadService leads, ContactService contacts, PropertyService properties) : ControllerBase
 {
     public const long MaxPhotoBytes = 25 * 1024 * 1024;
 
@@ -96,6 +102,29 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         if (!EntityTypes.All.Contains(entityType)) return NotFound();
         return StatusCode(StatusCodes.Status201Created, new CreatedResponse(await items.AddNoteAsync(entityType, id, body.Body ?? "", ct)));
     }
+
+    /// <summary>A contact for the app: how to reach them, their properties and their leads (the same scope as the web page).</summary>
+    [HttpGet("contacts/{id:guid}")]
+    public async Task<ContactDto> Contact(Guid id, CancellationToken ct)
+    {
+        var d = await contacts.GetAsync(id, ct);
+        return new ContactDto(d.Contact.Id, d.Contact.DisplayName, d.Contact.Type, d.OwnerName,
+            d.Methods.OrderByDescending(m => m.IsPrimary).Select(m => new ContactMethodDto(m.Kind, m.Value, m.IsPrimary)).ToList(),
+            d.Properties.Where(p => p.IsCurrent).Select(p => new LinkDto(p.PropertyId, p.Address, p.RoleKey)).ToList(),
+            d.Opportunities.Select(Brief).ToList(), d.CanEdit);
+    }
+
+    /// <summary>A property for the app: who's on it and its leads.</summary>
+    [HttpGet("properties/{id:guid}")]
+    public async Task<PropertyDto> Property(Guid id, CancellationToken ct)
+    {
+        var d = await properties.GetAsync(id, ct);
+        return new PropertyDto(d.Property.Id, d.Property.SingleLine,
+            d.Contacts.Where(c => c.IsCurrent).Select(c => new PropertyContactDto(c.ContactId, c.Name, c.RoleKey, c.IsPrimary, c.Phone, c.Email)).ToList(),
+            d.Opportunities.Select(Brief).ToList());
+    }
+
+    private static OpportunityBriefDto Brief(OpportunityBrief o) => new(o.Id, o.Number, o.Name, o.StageName, o.StageColor, o.Outcome, o.Address);
 
     /// <summary>The choices the app's forms need: pipeline stages, lost reasons, appointment types and lead sources.</summary>
     [HttpGet("options")]

@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
 import { colors } from '@/lib/theme';
@@ -20,6 +20,9 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.navy,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: { borderTopColor: colors.border },
+        headerRight: () => (
+          <Ionicons name="search" size={22} color={colors.white} style={{ marginRight: 16 }} onPress={() => router.push('/search')} accessibilityLabel="Search" />
+        ),
       }}>
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('today-outline') }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar-outline') }} />

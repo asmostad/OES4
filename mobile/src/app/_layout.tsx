@@ -34,6 +34,9 @@ function Navigator() {
         <Stack.Screen name="opportunity/[id]" options={{ title: 'Lead' }} />
         <Stack.Screen name="book/[id]" options={{ title: 'Book appointment', presentation: 'modal' }} />
         <Stack.Screen name="new-lead" options={{ title: 'New lead', presentation: 'modal' }} />
+        <Stack.Screen name="search" options={{ title: 'Search' }} />
+        <Stack.Screen name="contact/[id]" options={{ title: 'Contact' }} />
+        <Stack.Screen name="property/[id]" options={{ title: 'Property' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

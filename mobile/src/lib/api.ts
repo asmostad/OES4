@@ -191,3 +191,13 @@ export type Option = { value: string; label: string };
 export type StageOption = { id: string; name: string; color: string; outcome: string };
 /** GET /api/v1/options: what the app's forms choose from. */
 export type Options = { stages: StageOption[]; lostReasons: Option[]; appointmentTypes: Option[]; leadSources: Option[] };
+
+export type SearchHit = { kind: 'contact' | 'organization' | 'property' | 'opportunity' | string; id: string; title: string; subtitle: string | null };
+export type OpportunityBrief = { id: string; number: string; name: string; stageName: string; stageColor: string; outcome: string; address: string | null };
+export type Link = { id: string; label: string; role: string | null };
+export type ContactDetail = {
+  id: string; name: string; type: string; ownerName: string | null; methods: ContactMethod[]; properties: Link[];
+  opportunities: OpportunityBrief[]; canEdit: boolean;
+};
+export type PropertyContact = { id: string; name: string; role: string; isPrimary: boolean; phone: string | null; email: string | null };
+export type PropertyDetail = { id: string; address: string; contacts: PropertyContact[]; opportunities: OpportunityBrief[] };

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 
@@ -115,13 +115,13 @@ export default function OpportunityScreen() {
       <Stack.Screen options={{ title: opp.number }} />
       <OfflineNote offline={lead.offline} savedAt={lead.savedAt} />
       <Card>
-        <Text style={[styles.title, { fontSize: 20 }]}>{opp.contactName}</Text>
+        <Text style={[styles.title, { fontSize: 20, color: colors.navy }]} onPress={() => router.push(`/contact/${opp.contactId}`)} accessibilityRole="link">{opp.contactName}</Text>
         <Muted>{opp.name}</Muted>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.sm }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: opp.stageColor || colors.slate }} />
           <Text style={{ color: colors.slate }}>{opp.stageName}{opp.expectedValue != null ? ` · ${money(opp.expectedValue)}` : ''}</Text>
         </View>
-        {opp.address && <Text style={[styles.body, { marginTop: space.sm }]}>{opp.address}</Text>}
+        {opp.address && <Text style={[styles.body, { marginTop: space.sm, color: colors.navy }]} onPress={opp.propertyId ? () => router.push(`/property/${opp.propertyId}`) : undefined} accessibilityRole="link">{opp.address}</Text>}
         {opp.ownerName && <Muted>Owner: {opp.ownerName}</Muted>}
         <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
           <Action icon="call" text="Call" onPress={digits ? () => Linking.openURL(`tel:${digits}`) : undefined} />
