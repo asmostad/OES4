@@ -201,4 +201,44 @@ public sealed class ApiTests(MySqlFixture fx)
         Assert.True(day.TryGetProperty("appointments", out _));
         Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/v1/appointments?from=2026-01-01&to=2026-12-31")).StatusCode);
     }
+
+    [Fact]
+    public async Task Field_app_books_appointments_and_moves_stages()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        Guid mine;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var c = await s.Get<ContactService>().CreateAsync(new ContactInput { FirstName = "Book", LastName = "Me", OwnerUserId = rep.Id });
+            mine = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = c, OwnerUserId = rep.Id });
+        }
+        var app = await SignedInAsync(rep);
+
+        var options = await Json(await app.GetAsync("/api/v1/options"));
+        var stages = options.GetProperty("stages").EnumerateArray().ToList();
+        Assert.Contains(stages, x => x.GetProperty("outcome").GetString() == "won");
+        Assert.NotEmpty(options.GetProperty("lostReasons").EnumerateArray());
+        Assert.NotEmpty(options.GetProperty("leadSources").EnumerateArray());
+        Assert.True(options.TryGetProperty("appointmentTypes", out _));
+
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3));
+        HttpRequestMessage Book() => new(HttpMethod.Post, "/api/v1/appointments")
+        {
+            Content = JsonContent.Create(new { title = "Roof inspection", typeKey = "inspection", date = date.ToString("yyyy-MM-dd"), startTime = "10:30:00",
+                durationMinutes = 90, entityType = EntityTypes.Opportunity, entityId = mine }),
+            Headers = { { "Idempotency-Key", "book-" + mine.ToString("N") } },
+        };
+        Assert.Equal(HttpStatusCode.Created, (await app.SendAsync(Book())).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await app.SendAsync(Book())).StatusCode); // resent by the outbox: still one
+        var week = (await Json(await app.GetAsync($"/api/v1/appointments?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}"))).EnumerateArray().ToList();
+        var booked = Assert.Single(week, a => a.GetProperty("title").GetString() == "Roof inspection");
+        Assert.StartsWith($"{date:yyyy-MM-dd}T10:30", booked.GetProperty("startLocal").GetString());
+        Assert.Equal((HttpStatusCode)422, (await app.PostAsJsonAsync("/api/v1/appointments", new { title = "", date = date.ToString("yyyy-MM-dd") })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await app.PutAsJsonAsync($"/api/v1/opportunities/{mine}/stage", new { stageId = stages[1].GetProperty("id").GetGuid() })).StatusCode);
+        Assert.Equal(stages[1].GetProperty("name").GetString(), (await Json(await app.GetAsync($"/api/v1/opportunities/{mine}"))).GetProperty("stageName").GetString());
+        var lost = stages.First(x => x.GetProperty("outcome").GetString() == "lost").GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.BadRequest, (await app.PutAsJsonAsync($"/api/v1/opportunities/{mine}/stage", new { stageId = lost })).StatusCode); // lost needs a reason
+    }
 }

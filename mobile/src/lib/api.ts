@@ -186,3 +186,8 @@ export class Api {
     return this.refreshing;
   }
 }
+
+export type Option = { value: string; label: string };
+export type StageOption = { id: string; name: string; color: string; outcome: string };
+/** GET /api/v1/options: what the app's forms choose from. */
+export type Options = { stages: StageOption[]; lostReasons: Option[]; appointmentTypes: Option[]; leadSources: Option[] };

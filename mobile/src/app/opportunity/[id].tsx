@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 
+import { LeadActions } from '@/components/LeadActions';
 import { OfflineNote } from '@/components/OfflineNote';
 import { OutboxBanner } from '@/components/OutboxBanner';
 import { Button, Card, Field, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
@@ -133,6 +134,10 @@ export default function OpportunityScreen() {
 
       <Message text={error} />
       <Message text={notice} kind="success" />
+
+      <LeadActions opp={opp} onSent={load} onMessage={(text, kind) => {
+        if (kind === 'success') { setNotice(text); setError(null); } else { setError(text); setNotice(null); }
+      }} />
 
       <SectionTitle>Add to this lead</SectionTitle>
       <Card>

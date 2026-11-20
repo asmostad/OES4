@@ -108,3 +108,22 @@ export const styles = StyleSheet.create({
   row: { paddingVertical: space.md },
   rowLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
 });
+
+/** A row of choices, one selected (due dates, stages, appointment types…). Wraps, or scrolls sideways with `scroll`. */
+export function Chips<T extends string | number | null>({ options, value, onChange, scroll }: {
+  options: { label: string; value: T }[]; value: T; onChange: (v: T) => void; scroll?: boolean;
+}) {
+  const items = options.map((o) => {
+    const on = o.value === value;
+    return (
+      <Pressable key={`${o.label}-${String(o.value)}`} onPress={() => onChange(o.value)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+        style={{ paddingVertical: 7, paddingHorizontal: space.md, borderRadius: radius, borderWidth: 1,
+          borderColor: on ? colors.navy : colors.border, backgroundColor: on ? colors.navy : colors.white }}>
+        <Text style={{ color: on ? colors.white : colors.text }}>{o.label}</Text>
+      </Pressable>
+    );
+  });
+  return scroll
+    ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>{items}</ScrollView>
+    : <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{items}</View>;
+}

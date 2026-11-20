@@ -16,6 +16,8 @@ public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary)
 public sealed record OpportunityDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome,
     decimal? ExpectedValue, string? OwnerName, Guid ContactId, string ContactName, IReadOnlyList<ContactMethodDto> ContactMethods,
     Guid? PropertyId, string? Address, string? Description, bool CanEdit);
+public sealed record StageOption(Guid Id, string Name, string Color, string Outcome);
+public sealed record OptionsResponse(List<StageOption> Stages, List<Option> LostReasons, List<Option> AppointmentTypes, List<Option> LeadSources);
 public sealed record DeviceRequest(string Token, string Platform);
 public sealed record UnregisterDeviceRequest(string Token);
 public sealed record DocumentDto(Guid Id, string FileName, string ContentType, long SizeBytes, string? Category, DateTime CreatedAt);
@@ -29,7 +31,8 @@ public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? 
 /// </summary>
 [ApiController]
 [Route("api/v1")]
-public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push) : ControllerBase
+public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push,
+    CrmLookups lookups) : ControllerBase
 {
     public const long MaxPhotoBytes = 25 * 1024 * 1024;
 
@@ -93,6 +96,22 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         if (!EntityTypes.All.Contains(entityType)) return NotFound();
         return StatusCode(StatusCodes.Status201Created, new CreatedResponse(await items.AddNoteAsync(entityType, id, body.Body ?? "", ct)));
     }
+
+    /// <summary>The choices the app's forms need: pipeline stages, lost reasons, appointment types and lead sources.</summary>
+    [HttpGet("options")]
+    public async Task<OptionsResponse> Options(CancellationToken ct)
+    {
+        var stages = await db.PipelineStages.Where(s => s.IsActive).OrderBy(s => s.Sort)
+            .Select(s => new StageOption(s.Id, s.Name, s.Color, s.Outcome)).ToListAsync(ct);
+        return new OptionsResponse(stages, await lookups.ValuesAsync(LookupTypes.LostReason, ct),
+            await lookups.ValuesAsync(Oes.Domain.Work.AppointmentTypes.LookupType, ct), await lookups.ValuesAsync(LookupTypes.LeadSource, ct));
+    }
+
+    /// <summary>An appointment on the user's calendar (or someone's, with calendar.manage), usually on a lead.</summary>
+    [HttpPost("appointments")]
+    [Idempotent]
+    public async Task<ActionResult<CreatedResponse>> CreateAppointment(AppointmentInput input, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, new CreatedResponse(await work.CreateAppointmentAsync(input, ct)));
 
     /// <summary>This phone's Expo push address, after the user allowed notifications. Calling again refreshes it.</summary>
     [HttpPost("devices")]
