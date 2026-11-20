@@ -1,49 +1,45 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 
+import { OfflineNote } from '@/components/OfflineNote';
 import { OutboxBanner } from '@/components/OutboxBanner';
 import { Button, Card, Field, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
-import { ApiError, DocumentItem, Opportunity, TimelineItem } from '@/lib/api';
+import { DocumentItem, Opportunity, TimelineItem } from '@/lib/api';
 import { openDocument } from '@/lib/files';
 import { label, money, size, when } from '@/lib/format';
 import { Outcome, outcomeMessage, useOutbox } from '@/lib/outbox';
 import { useApi } from '@/lib/session';
 import { colors, radius, space } from '@/lib/theme';
+import { useCached } from '@/lib/useCached';
 
 const PHONE_KINDS = ['mobile', 'phone', 'work', 'home', 'office'];
 
 export default function OpportunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useApi();
-  const [opp, setOpp] = useState<Opportunity | null>(null);
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // Each part is saved for offline; the lead's own details decide what the screen shows.
+  const lead = useCached<Opportunity>(`/api/v1/opportunities/${id}`, "Couldn't load this lead.");
+  const history = useCached<TimelineItem[]>(`/api/v1/records/opportunity/${id}/timeline`, "Couldn't load the timeline.");
+  const files = useCached<DocumentItem[]>(`/api/v1/records/opportunity/${id}/documents?take=30`, "Couldn't load the documents.");
+  const opp = lead.data;
+  const timeline = history.data ?? [];
+  const docs = files.data ?? [];
+  const [actionError, setError] = useState<string | null>(null);
+  const error = actionError ?? lead.error;
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<'note' | 'photo' | string | null>(null);
 
+  const { reload: reloadLead } = lead;
+  const { reload: reloadHistory } = history;
+  const { reload: reloadFiles } = files;
   const load = useCallback(async () => {
-    try {
-      const [o, t, d] = await Promise.all([
-        api.get<Opportunity>(`/api/v1/opportunities/${id}`),
-        api.get<TimelineItem[]>(`/api/v1/records/opportunity/${id}/timeline`),
-        api.get<DocumentItem[]>(`/api/v1/records/opportunity/${id}/documents?take=30`),
-      ]);
-      setOpp(o);
-      setTimeline(t);
-      setDocs(d);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load this lead.");
-    }
-  }, [api, id]);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+    await Promise.all([reloadLead(), reloadHistory(), reloadFiles()]);
+  }, [reloadLead, reloadHistory, reloadFiles]);
 
   const outbox = useOutbox();
   const base = `/api/v1/records/opportunity/${id}/`;
@@ -116,6 +112,7 @@ export default function OpportunityScreen() {
   return (
     <Screen refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
       <Stack.Screen options={{ title: opp.number }} />
+      <OfflineNote offline={lead.offline} savedAt={lead.savedAt} />
       <Card>
         <Text style={[styles.title, { fontSize: 20 }]}>{opp.contactName}</Text>
         <Muted>{opp.name}</Muted>

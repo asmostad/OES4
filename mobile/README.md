@@ -46,11 +46,13 @@ CI runs both on every push.
 
 ## Not yet
 
-- Reading screens offline (they need a connection; changes made offline are queued, see below).
 - Store builds: needs an Expo account, an Apple Developer account and a Google Play developer account. The bundle id
   `com.pich.field` in `app.json` is a placeholder until the real one is chosen.
 
 ## Offline
+
+Screens keep their last good data on the phone (`src/lib/useCached.ts`, `cache-store.ts`) and show it, marked
+"Offline", without a signal; the app also opens offline. Sign-out wipes it.
 
 Notes, photos, new tasks and ticking tasks done go through an outbox (`src/lib/outbox.tsx`): saved on the phone first
 (`outbox-store.ts`: a JSON file and copies of queued photos in the app's documents folder), then sent in order. With

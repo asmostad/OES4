@@ -1,42 +1,37 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { OfflineNote } from '@/components/OfflineNote';
 import { Card, Loading, Message, Muted, Row, Screen, styles } from '@/components/ui';
-import { ApiError, OpportunityRow, Paged } from '@/lib/api';
+import { OpportunityRow, Paged } from '@/lib/api';
 import { money } from '@/lib/format';
-import { useApi } from '@/lib/session';
+import { useCached } from '@/lib/useCached';
 import { colors, radius, space } from '@/lib/theme';
 
 /** Open leads: mine by default, searchable. */
 export default function Leads() {
-  const { api } = useApi();
   const [q, setQ] = useState('');
+  const [search, setSearch] = useState('');
   const [mine, setMine] = useState(true);
-  const [data, setData] = useState<Paged<OpportunityRow> | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pulling, setPulling] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const query = new URLSearchParams({ outcome: 'open', mine: String(mine), page: '1' });
-      if (q.trim()) query.set('q', q.trim());
-      setData(await api.get<Paged<OpportunityRow>>(`/api/v1/opportunities?${query}`));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load leads.");
-    }
-  }, [api, q, mine]);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
   // Search as you type, after a short pause.
   useEffect(() => {
-    const t = setTimeout(load, 350);
+    const t = setTimeout(() => setSearch(q.trim()), 350);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [q]);
+
+  const query = new URLSearchParams({ outcome: 'open', mine: String(mine), page: '1' });
+  if (search) query.set('q', search);
+  const leads = useCached<Paged<OpportunityRow>>(`/api/v1/opportunities?${query}`, "Couldn't load leads.");
+  const data = leads.data;
+  const error = leads.error;
+  const load = leads.reload;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
+    <Screen refreshing={pulling} onRefresh={async () => { setPulling(true); await load(); setPulling(false); }}>
+      <OfflineNote offline={leads.offline} savedAt={leads.savedAt} />
       <TextInput value={q} onChangeText={setQ} placeholder="Search name, number, address, phone" placeholderTextColor={colors.muted}
         autoCorrect={false} clearButtonMode="while-editing" style={[styles.input]} accessibilityLabel="Search leads" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>

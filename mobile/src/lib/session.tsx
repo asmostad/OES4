@@ -1,7 +1,9 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Api, clearTokens, loadTokens, Me, saveServer, savedServer, signIn as apiSignIn, TenantOption } from './api';
+import { Api, ApiError, clearTokens, loadTokens, Me, saveServer, savedServer, signIn as apiSignIn, TenantOption } from './api';
+import { clearCache } from './cache-store';
 import { disablePush, enablePush } from './push';
+import { storage } from './storage';
 
 type Session =
   | { status: 'loading' }
@@ -16,6 +18,18 @@ type SessionValue = Session & {
 
 const Ctx = createContext<SessionValue | null>(null);
 
+/** Who was signed in last, kept so the app opens without a signal. */
+const KEY_ME = 'pich.me';
+async function savedMe(server: string): Promise<Me | null> {
+  try {
+    const raw = await storage.get(KEY_ME);
+    const saved = raw ? (JSON.parse(raw) as { server: string; me: Me }) : null;
+    return saved?.server === server ? saved.me : null;
+  } catch {
+    return null;
+  }
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ status: 'loading' });
   const apiRef = useRef<Api | null>(null);
@@ -24,6 +38,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Stop pushes to this phone for this user first, while the sign-in still works.
     if (apiRef.current) await disablePush(apiRef.current);
     apiRef.current = null;
+    clearCache(); // saved screens hold customer data: none left behind for the next person
+    await storage.remove(KEY_ME);
     await clearTokens();
     setSession({ status: 'signed-out', server: await savedServer() });
   }, []);
@@ -34,13 +50,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const api = new Api(server, tokens, () => void signOut());
       try {
         const me = await api.get<Me>('/api/v1/me');
+        await storage.set(KEY_ME, JSON.stringify({ server, me }));
         apiRef.current = api;
         setSession({ status: 'signed-in', api, me });
         // Keep this phone's push address current if notifications were already allowed (never prompts here).
         enablePush(api, false).catch(() => undefined);
-      } catch {
-        // Offline or refused: back to sign-in (the refresh token may have ended).
-        setSession({ status: 'signed-out', server });
+      } catch (e) {
+        // No signal at launch: stay signed in with who we were, so saved screens and the outbox still work.
+        // Anything else (the sign-in ended or was refused): back to sign-in.
+        const saved = e instanceof ApiError && e.status === 0 ? await savedMe(server) : null;
+        if (saved) {
+          apiRef.current = api;
+          setSession({ status: 'signed-in', api, me: saved });
+        } else setSession({ status: 'signed-out', server });
       }
     },
     [signOut],

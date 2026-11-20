@@ -1,15 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { OfflineNote } from '@/components/OfflineNote';
 import { OutboxBanner } from '@/components/OutboxBanner';
 import { TaskItem } from '@/components/TaskRow';
 import { Button, Card, Field, Loading, Message, Muted, Screen, SectionTitle } from '@/components/ui';
-import { ApiError, TaskRow } from '@/lib/api';
+import { TaskRow } from '@/lib/api';
 import { todayIso } from '@/lib/format';
 import { outcomeMessage, useOutbox } from '@/lib/outbox';
-import { useApi } from '@/lib/session';
+import { useCached } from '@/lib/useCached';
 import { colors, radius, space } from '@/lib/theme';
 
 const DUE = [
@@ -21,25 +21,15 @@ const DUE = [
 
 /** My open tasks, and adding a new one. */
 export default function Tasks() {
-  const { api } = useApi();
-  const [tasks, setTasks] = useState<TaskRow[] | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const list = useCached<TaskRow[]>('/api/v1/tasks?mine=true&done=false', "Couldn't load your tasks.");
+  const tasks = list.data;
+  const load = list.reload;
+  const [pulling, setPulling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [due, setDue] = useState<number | null>(0);
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setTasks(await api.get<TaskRow[]>('/api/v1/tasks?mine=true&done=false'));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load your tasks.");
-    }
-  }, [api]);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const outbox = useOutbox();
   const waitingTasks = outbox.items.filter((i) => i.kind === 'task');
@@ -62,7 +52,8 @@ export default function Tasks() {
   }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
+    <Screen refreshing={pulling} onRefresh={async () => { setPulling(true); await load(); setPulling(false); }}>
+      <OfflineNote offline={list.offline} savedAt={list.savedAt} />
       <Card>
         <Field label="New task" value={title} onChangeText={(t) => { setTitle(t); setSaved(null); }} placeholder="Call the adjuster" returnKeyType="done" onSubmitEditing={add} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md }}>
@@ -76,7 +67,7 @@ export default function Tasks() {
         </View>
         <Button title="Add task" onPress={add} busy={busy} />
       </Card>
-      <Message text={error} />
+      <Message text={error ?? list.error} />
       <Message text={saved} kind="success" />
       <OutboxBanner />
       <SectionTitle>Open tasks</SectionTitle>
@@ -90,7 +81,7 @@ export default function Tasks() {
             </View>
           </View>
         ))}
-        {!tasks && !error && <Loading />}
+        {!tasks && !list.error && <Loading />}
         {tasks?.length === 0 && <Muted>No open tasks.</Muted>}
         {tasks?.map((t, i) => <TaskItem key={t.id} task={t} last={i === tasks.length - 1} onChanged={load} onError={setError} />)}
       </Card>

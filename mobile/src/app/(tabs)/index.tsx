@@ -1,45 +1,32 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { OfflineNote } from '@/components/OfflineNote';
 import { OutboxBanner } from '@/components/OutboxBanner';
 import { TaskItem } from '@/components/TaskRow';
 import { Card, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
-import { ApiError, MyDay } from '@/lib/api';
+import { MyDay } from '@/lib/api';
 import { label, time } from '@/lib/format';
 import { useApi } from '@/lib/session';
 import { colors, space } from '@/lib/theme';
+import { useCached } from '@/lib/useCached';
 
-/** Today: appointments, then overdue and due-today tasks (the API's my-day). */
+/** Today: appointments, then overdue and due-today tasks (the API's my-day). Saved for offline. */
 export default function Today() {
-  const { api, me } = useApi();
-  const [data, setData] = useState<MyDay | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setData(await api.get<MyDay>('/api/v1/my-day'));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load your day.");
-    }
-  }, [api]);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  async function refresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }
+  const { me } = useApi();
+  const day = useCached<MyDay>('/api/v1/my-day', "Couldn't load your day.");
+  const [pulling, setPulling] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const data = day.data;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={pulling} onRefresh={async () => { setPulling(true); await day.reload(); setPulling(false); }}>
       <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>Hi {me.firstName}</Text>
-      <Message text={error} />
+      <OfflineNote offline={day.offline} savedAt={day.savedAt} />
+      <Message text={day.error ?? actionError} />
       <OutboxBanner />
-      {!data && !error && <Loading />}
+      {!data && !day.error && <Loading />}
       {data && (
         <>
           <View style={{ flexDirection: 'row', gap: space.md }}>
@@ -72,7 +59,7 @@ export default function Today() {
           <Card>
             {data.tasks.length === 0 && <Muted>You’re all caught up.</Muted>}
             {data.tasks.map((t, i) => (
-              <TaskItem key={t.id} task={t} last={i === data.tasks.length - 1} onChanged={load} onError={setError} />
+              <TaskItem key={t.id} task={t} last={i === data.tasks.length - 1} onChanged={day.reload} onError={setActionError} />
             ))}
           </Card>
         </>
