@@ -23,6 +23,11 @@ public sealed class EmailInput
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public Guid? TemplateId { get; set; }
+    /// <summary>Extra recipients, comma or semicolon separated (an adjuster, a spouse). Up to 10 each.</summary>
+    public string? Cc { get; set; }
+    public string? Bcc { get; set; }
+    /// <summary>Documents to attach: stored files the sender can see (e.g. the proposal PDF just saved on the estimate).</summary>
+    public List<Guid> DocumentIds { get; set; } = [];
 }
 
 public sealed class SmsInput
@@ -149,18 +154,76 @@ public sealed class MessagingService(
         var body = MergeFields.Render(input.Body.Trim(), values);
         var from = await db.Users.Where(u => u.Id == me).Select(u => new { u.Email, Name = u.FirstName + " " + u.LastName }).FirstAsync(ct);
 
-        var result = await SafeAsync(() => mail.SendAsync(me, new OutgoingEmail(from.Email ?? "", from.Name, [to.Address], [], subject, ToHtml(body), body), ct));
+        var cc = Addresses(input.Cc, "CC").Where(a => a != to.Address).ToList();
+        var bcc = Addresses(input.Bcc, "BCC").Where(a => a != to.Address && !cc.Contains(a)).ToList();
+        foreach (var extra in cc.Concat(bcc))
+            if (await db.Suppressions.AnyAsync(s => s.Channel == Channels.Email && s.Address == extra && s.RemovedAt == null
+                                                   && (s.Scope == "all" || purpose == MessagePurposes.Marketing), ct))
+                throw new CrmRuleException($"Not sent: {extra} has unsubscribed.");
+        var (files, docs) = await AttachmentsAsync(input.DocumentIds, ct);
+
+        var result = await SafeAsync(() => mail.SendAsync(me, new OutgoingEmail(from.Email ?? "", from.Name, [to.Address], cc, subject, ToHtml(body), body,
+            Bcc: bcc, Attachments: files), ct));
         var msg = new EmailMessage
         {
             Direction = Directions.Outbound, FromAddress = from.Email ?? "", Subject = subject, Body = body, SentAt = clock.UtcNow, SentByUserId = me,
             Status = result.Ok ? MessageStatuses.Sent : MessageStatuses.Failed, ProviderMessageId = result.ProviderId, Error = Trim(result.Error, 1000),
             TemplateId = template?.Id, EntityType = input.EntityType, EntityId = input.EntityId,
-            Recipients = [new EmailRecipient { Kind = "to", Address = to.Address, ContactId = to.ContactId }],
+            Recipients =
+            [
+                new EmailRecipient { Kind = "to", Address = to.Address, ContactId = to.ContactId },
+                .. cc.Select(a => new EmailRecipient { Kind = "cc", Address = a }),
+                .. bcc.Select(a => new EmailRecipient { Kind = "bcc", Address = a }),
+            ],
+            Attachments = docs.Select(d => new EmailAttachment { DocumentId = d.Id, FileName = d.FileName, SizeBytes = d.SizeBytes }).ToList(),
         };
         db.EmailMessages.Add(msg);
         await LinkAsync(ItemTypes.Email, msg.Id, input.EntityType, input.EntityId, to.ContactId, ct);
         await db.SaveChangesAsync(ct);
         return new SendResult(msg.Id, result.Ok, result.Error);
+    }
+
+    public const int MaxExtraRecipients = 10;
+    public const int MaxAttachments = 10;
+    public const long MaxAttachmentBytes = 20 * 1024 * 1024;
+
+    /// <summary>CC/BCC addresses: comma or semicolon separated, each a valid address, lowercased, without repeats.</summary>
+    public static List<string> Addresses(string? raw, string label)
+    {
+        var list = new List<string>();
+        foreach (var part in (raw ?? "").Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.Length > 320 || !System.Net.Mail.MailAddress.TryCreate(part, out var a) || a.Address != part || !part.Contains('.'))
+                throw new CrmRuleException($"\"{(part.Length > 60 ? part[..60] + "…" : part)}\" isn't an email address ({label}).");
+            var address = part.ToLowerInvariant();
+            if (!list.Contains(address)) list.Add(address);
+        }
+        if (list.Count > MaxExtraRecipients) throw new CrmRuleException($"Up to {MaxExtraRecipients} {label} addresses.");
+        return list;
+    }
+
+    /// <summary>The documents to attach, read through the same visibility check as opening them on the page.</summary>
+    private async Task<(List<MailAttachment> Files, List<Document> Docs)> AttachmentsAsync(List<Guid> ids, CancellationToken ct)
+    {
+        var distinct = ids.Distinct().ToList();
+        if (distinct.Count > MaxAttachments) throw new CrmRuleException($"Attach up to {MaxAttachments} files.");
+        var files = new List<MailAttachment>();
+        var docs = new List<Document>();
+        long total = 0;
+        foreach (var id in distinct)
+        {
+            var (doc, content) = await items.OpenDocumentAsync(id, ct);
+            await using (content)
+            {
+                total += doc.SizeBytes;
+                if (total > MaxAttachmentBytes) throw new CrmRuleException("Attachments can total up to 20 MB.");
+                using var buffer = new MemoryStream();
+                await content.CopyToAsync(buffer, ct);
+                files.Add(new MailAttachment(doc.FileName, doc.ContentType, buffer.ToArray()));
+                docs.Add(doc);
+            }
+        }
+        return (files, docs);
     }
 
     /// <summary>Plain text to safe HTML: everything encoded, line breaks kept. No user HTML is ever sent.</summary>
@@ -330,7 +393,12 @@ public sealed class MessagingService(
     // ---------------- Reading ----------------
 
     public sealed record MessageView(string Channel, Guid Id, string Direction, DateTime At, string? SenderName, string Counterparty,
-        string? Subject, string Body, string Status, string? Error);
+        string? Subject, string Body, string Status, string? Error)
+    {
+        public string? Cc { get; init; }
+        public string? Bcc { get; init; }
+        public IReadOnlyList<TimelineAttachment> Attachments { get; init; } = [];
+    }
 
     public async Task<MessageView> GetAsync(string channel, Guid id, CancellationToken ct = default)
     {
@@ -342,10 +410,15 @@ public sealed class MessagingService(
 
         if (channel == ItemTypes.Email)
         {
-            var m = await db.EmailMessages.Include(x => x.Recipients).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new RecordNotFoundException("Message");
+            var m = await db.EmailMessages.Include(x => x.Recipients).Include(x => x.Attachments).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new RecordNotFoundException("Message");
             await EnsureMayReadAsync(m.SentByUserId, m.Direction, Permissions.EmailViewAll, ct);
             var sender = await NameAsync(m.SentByUserId, ct);
-            return new MessageView(channel, m.Id, m.Direction, m.SentAt, sender, string.Join(", ", m.Recipients.Select(r => r.Address)), m.Subject, m.Body, m.Status, m.Error);
+            string? Join(string kind) => m.Recipients.Where(r => r.Kind == kind).Select(r => r.Address).ToList() is { Count: > 0 } a ? string.Join(", ", a) : null;
+            return new MessageView(channel, m.Id, m.Direction, m.SentAt, sender, Join("to") ?? "", m.Subject, m.Body, m.Status, m.Error)
+            {
+                Cc = Join("cc"), Bcc = Join("bcc"),
+                Attachments = m.Attachments.Select(a => new TimelineAttachment(a.DocumentId, a.FileName)).ToList(),
+            };
         }
         var s = await db.SmsMessages.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new RecordNotFoundException("Message");
         await EnsureMayReadAsync(s.SentByUserId, s.Direction, Permissions.SmsViewAll, ct);

@@ -1059,6 +1059,49 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("contact_consents", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Communication.EmailAttachment", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("DocumentId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("EmailMessageId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("EmailMessageId");
+
+                    b.HasIndex("TenantId", "EmailMessageId");
+
+                    b.ToTable("email_attachments", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Communication.EmailMessage", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -5920,6 +5963,21 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Oes.Domain.Communication.EmailAttachment", b =>
+                {
+                    b.HasOne("Oes.Domain.Crm.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Oes.Domain.Communication.EmailMessage", null)
+                        .WithMany("Attachments")
+                        .HasForeignKey("EmailMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Oes.Domain.Communication.EmailRecipient", b =>
                 {
                     b.HasOne("Oes.Domain.Communication.EmailMessage", null)
@@ -6459,6 +6517,8 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Oes.Domain.Communication.EmailMessage", b =>
                 {
+                    b.Navigation("Attachments");
+
                     b.Navigation("Recipients");
                 });
 

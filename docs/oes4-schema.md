@@ -194,6 +194,7 @@ The sub portal uses `external_access_tokens` (purpose `sub_portal`): hashed, exp
 | `mail_accounts` | MembershipId, Provider (ms365), Address, DeltaToken, LastSyncAt, Status | The tenant user's own mailbox |
 | `email_messages` | TenantId, MailAccountId, ProviderMessageId (unique per account), ConversationId, InReplyTo, Direction, From, Subject, BodyDocumentId or BodyHtml, Preview, SentAt, BlastId | **One row per message**, linked to many records via `record_links` (OES3 duplicated the row per record) **Built in M8** as Direction, FromAddress, Subject, Body (plain text), SentAt, SentByUserId, Status, ProviderMessageId, Error, TemplateId, home EntityType/EntityId; mailbox, threading and blast columns come with Graph and M9 |
 | `email_recipients` | MessageId, Kind (to/cc/bcc), Address, ContactId | |
+| `email_attachments` | EmailMessageId, DocumentId, FileName, SizeBytes | **Built** (2026-11-19). Every attachment is a stored document on the record, so it can be opened again. |
 | `email_attachments` | MessageId, DocumentId | |
 | `sms_messages` | TenantId, ProviderSid, Direction, FromNumber, ToNumber, Body, Status, MediaJson, At | Linked via `record_links`. **Built in M8** without MediaJson, plus SentByUserId, ContactId, TemplateId, Error, home EntityType/EntityId |
 | `phone_numbers` | TenantId, Provider (twilio), Number, MessagingServiceSid, A2PStatus | Inbound webhooks route to the tenant by "To" number. **Built in M8** as `tenant_phone_numbers` (Number unique platform-wide, Provider, IsActive) |

@@ -2,7 +2,10 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
+using Oes.Domain.Crm;
 using Oes.Domain.Estimating;
+using Oes.Infrastructure.Persistence;
 using Oes.Infrastructure.Crm;
 using Oes.Infrastructure.Documents;
 using Oes.Infrastructure.Estimating;
@@ -18,14 +21,17 @@ public sealed class PdfTests(MySqlFixture fx)
     public async Task Print_documents_download_as_self_contained_pdfs()
     {
         var (t, admin) = await fx.CreateTenantAsync();
-        Guid versionId, coId, tradeId, woId;
+        Guid versionId, coId, tradeId, woId, contactId, estimateId;
         await using (var s = fx.ScopeAs(t.Id, admin))
         {
             var property = await s.Get<PropertyService>().CreateAsync(new PropertyInput { Line1 = "12 Paper Ln", City = "Lincoln", State = "NE", PostalCode = "68502" });
-            var contact = await s.Get<ContactService>().CreateAsync(new ContactInput { FirstName = "Penny", LastName = "Dee-Eff" });
+            var contact = contactId = await s.Get<ContactService>().CreateAsync(new ContactInput
+            {
+                FirstName = "Penny", LastName = "Dee-Eff", Methods = [new MethodInput(ContactMethodKinds.Email, "penny@example.com", null, true)],
+            });
             var opp = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = contact, PropertyId = property });
             var est = s.Get<EstimateService>();
-            var id = await est.CreateAsync(new NewEstimateInput { OpportunityId = opp, Method = EstimateMethods.LineItem });
+            var id = estimateId = await est.CreateAsync(new NewEstimateInput { OpportunityId = opp, Method = EstimateMethods.LineItem });
             var section = (await est.GetAsync(id)).Sections.Single().Section.Id;
             await est.UpdateSectionAsync(section, "Roof", "- Tear off to the deck.\n- Install <new> shingles & ridge cap.");
             var product = await s.Get<CatalogService>().SaveProductAsync(null, new ProductInput { Sku = "SQ", Name = "Roof per square", Unit = "SQ", DefaultPrice = 400m });
@@ -80,6 +86,37 @@ public sealed class PdfTests(MySqlFixture fx)
         Assert.Contains("Replace rotted decking", await Download($"/Projects/ChangeOrder/{coId}?handler=Pdf", @"^P-\d{4}-\d+-change-order-1\.pdf$"));
         Assert.Contains("Material order", await Download($"/Projects/OrderSheet/{tradeId}?handler=Pdf", @"^P-\d{4}-\d+-General-order\.pdf$"));
         Assert.Contains("Dumpster in driveway", await Download($"/WorkOrders/Print/{woId}?handler=Pdf", @"\.pdf$"));
+
+        // Email the proposal: the PDF is saved on the estimate and attached, sent to the customer with a CC.
+        var proposalPage = await web.GetStringAsync($"/Estimates/Proposal/{versionId}");
+        Assert.Contains($"value=\"{contactId}|penny@example.com\"", proposalPage);
+        Assert.Contains("Your proposal from", proposalPage);
+        string PageToken(string html) => System.Text.RegularExpressions.Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        var emailed = await web.PostAsync($"/Estimates/Proposal/{versionId}?handler=Email", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Mail.To"] = $"{contactId}|penny@example.com", ["Mail.Cc"] = "adjuster@example.com",
+            ["Mail.Subject"] = "Your proposal", ["Mail.Body"] = "Hi Penny, it's attached.", ["__RequestVerificationToken"] = PageToken(proposalPage),
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, emailed.StatusCode);
+        Assert.Equal($"/Estimates/Proposal/{versionId}", emailed.Headers.Location?.OriginalString);
+        Assert.Contains("Proposal emailed to penny@example.com", await web.GetStringAsync($"/Estimates/Proposal/{versionId}"));
+        Assert.DoesNotContain("data-proposal-email", fx.Pdf.LastHtml!); // the form isn't in the PDF
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            var saved = await db.Documents.SingleAsync(d => d.EntityId == estimateId && d.CategoryKey == "proposal");
+            Assert.Matches(@"^EST-\d{4}-\d+-v1\.pdf$", saved.FileName);
+            var mail = await db.EmailMessages.Include(m => m.Attachments).Include(m => m.Recipients).SingleAsync(m => m.Subject == "Your proposal");
+            Assert.Equal(saved.Id, mail.Attachments.Single().DocumentId);
+            Assert.Contains(mail.Recipients, r => r.Kind == "cc" && r.Address == "adjuster@example.com");
+            Assert.True(await db.ActivityEvents.AnyAsync(a => a.EntityId == estimateId && a.EventType == "estimate.emailed"));
+        }
+        var noRecipient = await web.PostAsync($"/Estimates/Proposal/{versionId}?handler=Email", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Mail.To"] = "", ["Mail.Subject"] = "x", ["Mail.Body"] = "x", ["__RequestVerificationToken"] = PageToken(proposalPage),
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, noRecipient.StatusCode);
+        Assert.Contains("Pick who to send it to.", await web.GetStringAsync($"/Estimates/Proposal/{versionId}"));
 
         // Another company's document is a 404, as on the print view.
         var (other, otherAdmin) = await fx.CreateTenantAsync();

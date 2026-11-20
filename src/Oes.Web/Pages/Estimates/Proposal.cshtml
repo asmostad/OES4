@@ -16,6 +16,36 @@
         <button type="button" class="btn btn-sm btn-outline-light" data-print><i class="bi bi-printer me-1"></i>Print</button></span>
 </div>
 
+@if (Model.CanEmail && !Oes.Web.Infrastructure.PdfDocument.IsPdf(ViewData))
+{
+    <details class="no-print proposal-email" data-proposal-email>
+        <summary class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope me-1"></i>Email to the customer</summary>
+        @if (Model.Recipients.Count == 0)
+        {
+            <p class="small text-muted mt-2 mb-0">The customer has no email address on file. Add one on their contact page first.</p>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Email" class="row g-2 mt-1">
+                <div class="col-md-6"><label class="form-label small mb-0" for="pe-to">To</label>
+                    <select id="pe-to" name="Mail.To" class="form-select form-select-sm">
+                        @foreach (var r in Model.Recipients) { var key = $"{r.ContactId}|{r.Address}"; <option value="@key" selected="@(key == Model.Mail.To)">@r.Display</option> }
+                    </select></div>
+                <div class="col-md-3"><label class="form-label small mb-0" for="pe-cc">CC</label>
+                    <input id="pe-cc" name="Mail.Cc" class="form-control form-control-sm" maxlength="2000" placeholder="e.g. the adjuster"></div>
+                <div class="col-md-3"><label class="form-label small mb-0" for="pe-bcc">BCC</label>
+                    <input id="pe-bcc" name="Mail.Bcc" class="form-control form-control-sm" maxlength="2000"></div>
+                <div class="col-12"><label class="form-label small mb-0" for="pe-subject">Subject</label>
+                    <input id="pe-subject" name="Mail.Subject" value="@Model.Mail.Subject" class="form-control form-control-sm" maxlength="300" required></div>
+                <div class="col-12"><label class="form-label small mb-0" for="pe-body">Message</label>
+                    <textarea id="pe-body" name="Mail.Body" class="form-control form-control-sm" rows="5" maxlength="20000" required>@Model.Mail.Body</textarea>
+                    <div class="form-text">Sent from your mailbox with <strong>@($"{c.Number}-v{c.VersionNo}.pdf")</strong> attached. A copy of the PDF is saved on the estimate.</div></div>
+                <div class="col-12"><button type="submit" class="btn btn-sm btn-primary" data-busy-text="Sending…"><i class="bi bi-send me-1"></i>Send</button></div>
+            </form>
+        }
+    </details>
+}
+
 <article class="proposal">
     <header class="proposal-head">
         <div>

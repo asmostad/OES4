@@ -65,7 +65,11 @@ public interface INumberSequence
 }
 
 public sealed record OutgoingEmail(string FromAddress, string? FromName, IReadOnlyList<string> To, IReadOnlyList<string> Cc,
-    string Subject, string HtmlBody, string TextBody, IReadOnlyDictionary<string, string>? Headers = null);
+    string Subject, string HtmlBody, string TextBody, IReadOnlyDictionary<string, string>? Headers = null,
+    IReadOnlyList<string>? Bcc = null, IReadOnlyList<MailAttachment>? Attachments = null);
+
+/// <summary>A file sent with an email.</summary>
+public sealed record MailAttachment(string FileName, string ContentType, byte[] Content);
 
 public sealed record ProviderResult(bool Ok, string? ProviderId, string? Error);
 

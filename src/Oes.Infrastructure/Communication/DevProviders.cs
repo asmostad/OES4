@@ -29,12 +29,21 @@ public sealed class DevMailProvider(IOptions<MessagingOptions> options, ILogger<
         Directory.CreateDirectory(dir);
         var id = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
         var head = $"<!-- From: {WebUtility.HtmlEncode(email.FromAddress)}\n     To: {WebUtility.HtmlEncode(string.Join(", ", email.To))}" +
-                   $"{(email.Cc.Count > 0 ? "\n     Cc: " + WebUtility.HtmlEncode(string.Join(", ", email.Cc)) : "")}\n     Subject: {WebUtility.HtmlEncode(email.Subject)}" +
+                   $"{(email.Cc.Count > 0 ? "\n     Cc: " + WebUtility.HtmlEncode(string.Join(", ", email.Cc)) : "")}" +
+                   $"{(email.Bcc is { Count: > 0 } bcc ? "\n     Bcc: " + WebUtility.HtmlEncode(string.Join(", ", bcc)) : "")}\n     Subject: {WebUtility.HtmlEncode(email.Subject)}" +
+                   string.Concat((email.Attachments ?? []).Select((a, i) => $"\n     Attachment: {WebUtility.HtmlEncode(a.FileName)} ({a.Content.Length} bytes) -> {id}-{i + 1}-{SafeName(a.FileName)}")) +
                    string.Concat((email.Headers ?? new Dictionary<string, string>()).Select(h => $"\n     {WebUtility.HtmlEncode(h.Key)}: {WebUtility.HtmlEncode(h.Value)}")) + " -->\n";
         await File.WriteAllTextAsync(Path.Combine(dir, id + ".html"), head + email.HtmlBody, ct);
+        var n = 0;
+        foreach (var a in email.Attachments ?? [])
+            await File.WriteAllBytesAsync(Path.Combine(dir, $"{id}-{++n}-{SafeName(a.FileName)}"), a.Content, ct);
         log.LogInformation("Email {Subject} written to the pickup folder as {Id}", email.Subject, id);
         return new ProviderResult(true, "dev-" + id, null);
     }
+
+    /// <summary>A file name that can't leave the pickup folder.</summary>
+    internal static string SafeName(string name) =>
+        new string(Path.GetFileName(name).Select(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_' ? c : '_').ToArray()) is { Length: > 0 } s ? s : "file";
 }
 
 /// <summary>Development SMS provider: appends each text to a log file instead of sending it.</summary>

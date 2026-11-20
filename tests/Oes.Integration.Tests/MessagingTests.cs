@@ -35,6 +35,59 @@ public sealed class MessagingTests(MySqlFixture fx)
         return new World(t.Id, admin, rep, contact, property, opp, mobile, t.Name);
     }
 
+
+    [Fact]
+    public async Task Email_carries_cc_bcc_and_attached_documents_the_sender_can_see()
+    {
+        var w = await WorldAsync();
+        Guid doc, hidden, sent;
+        await using (var s = fx.ScopeAs(w.Tenant, w.Admin))
+        {
+            var items = s.Get<RecordItems>();
+            doc = await items.UploadAsync(EntityTypes.Opportunity, w.Opportunity, new MemoryStream("%PDF-1.7 quote"u8.ToArray()), "Quote.pdf", "application/pdf", null);
+            // A document on someone else's record the rep can't open.
+            var other = await s.Get<ContactService>().CreateAsync(new ContactInput { FirstName = "Not", LastName = "Theirs", OwnerUserId = w.Admin.Id });
+            hidden = await items.UploadAsync(EntityTypes.Contact, other, new MemoryStream("secret"u8.ToArray()), "secret.txt", "text/plain", null);
+            s.Get<OesDbContext>().Suppressions.Add(new Suppression { Channel = Channels.Email, Address = "gone@example.com", Scope = "all" });
+            await s.Get<OesDbContext>().SaveChangesAsync();
+        }
+
+        await using (var s = fx.ScopeAs(w.Tenant, w.Rep))
+        {
+            var messaging = s.Get<MessagingService>();
+            EmailInput Input() => new()
+            {
+                EntityType = EntityTypes.Opportunity, EntityId = w.Opportunity, ContactId = w.Contact, To = "mia@example.com",
+                Subject = "Your quote", Body = "Attached.", Cc = "Adjuster@Example.com; adjuster@example.com, mia@example.com", Bcc = "office@example.com",
+                DocumentIds = [doc, doc],
+            };
+            var r = await messaging.SendEmailAsync(Input());
+            Assert.True(r.Ok);
+            sent = r.MessageId;
+
+            var bad = Input(); bad.Cc = "not an address";
+            Assert.Contains("isn't an email address", (await Assert.ThrowsAsync<CrmRuleException>(() => messaging.SendEmailAsync(bad))).Message);
+            bad = Input(); bad.Bcc = "gone@example.com";
+            Assert.Contains("unsubscribed", (await Assert.ThrowsAsync<CrmRuleException>(() => messaging.SendEmailAsync(bad))).Message);
+            bad = Input(); bad.DocumentIds = [hidden];
+            await Assert.ThrowsAsync<RecordNotFoundException>(() => messaging.SendEmailAsync(bad));
+
+            var m = await s.Get<OesDbContext>().EmailMessages.Include(x => x.Recipients).Include(x => x.Attachments).SingleAsync(x => x.Id == sent);
+            Assert.Equal([("to", "mia@example.com"), ("cc", "adjuster@example.com"), ("bcc", "office@example.com")], m.Recipients.Select(x => (x.Kind, x.Address)));
+            Assert.Equal(("Quote.pdf", doc), (m.Attachments.Single().FileName, m.Attachments.Single().DocumentId));
+
+            // The provider got the file; the timeline and the message page show it.
+            var id = m.ProviderMessageId![4..];
+            var dir = Path.Combine(fx.FilesRoot, "messages", "email");
+            Assert.Equal("%PDF-1.7 quote", await File.ReadAllTextAsync(Path.Combine(dir, $"{id}-1-Quote.pdf")));
+            Assert.Contains("Bcc: office@example.com", await File.ReadAllTextAsync(Path.Combine(dir, id + ".html")));
+            var item = (await s.Get<RecordItems>().TimelineAsync(EntityTypes.Opportunity, w.Opportunity, TimelineScope.Everything, null, 20)).Single(i => i.Id == sent);
+            Assert.Equal("mia@example.com", item.Message!.Counterparty);
+            Assert.Equal(doc, item.Message.Attachments.Single().DocumentId);
+            var view = await messaging.GetAsync(ItemTypes.Email, sent);
+            Assert.Equal(("mia@example.com", "adjuster@example.com", "office@example.com", 1), (view.Counterparty, view.Cc, view.Bcc, view.Attachments.Count));
+        }
+    }
     private static string CompanyNumber(World w) => "+1531555" + w.Mobile[^4..];
 
     [Fact]

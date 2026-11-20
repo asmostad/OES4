@@ -117,6 +117,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
     public DbSet<Domain.Communication.EmailMessage> EmailMessages => Set<Domain.Communication.EmailMessage>();
     public DbSet<Domain.Communication.EmailRecipient> EmailRecipients => Set<Domain.Communication.EmailRecipient>();
+    public DbSet<Domain.Communication.EmailAttachment> EmailAttachments => Set<Domain.Communication.EmailAttachment>();
     public DbSet<Domain.Communication.SmsMessage> SmsMessages => Set<Domain.Communication.SmsMessage>();
     public DbSet<Domain.Communication.ContactConsent> ContactConsents => Set<Domain.Communication.ContactConsent>();
     public DbSet<Domain.Communication.Suppression> Suppressions => Set<Domain.Communication.Suppression>();
@@ -483,7 +484,16 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.Property(m => m.Error).HasMaxLength(1000);
             e.Property(m => m.EntityType).HasMaxLength(30);
             e.HasMany(m => m.Recipients).WithOne().HasForeignKey(r => r.EmailMessageId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(m => m.Attachments).WithOne().HasForeignKey(a => a.EmailMessageId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(m => new { m.TenantId, m.SentAt });
+        });
+
+        b.Entity<Domain.Communication.EmailAttachment>(e =>
+        {
+            e.ToTable("email_attachments");
+            e.Property(a => a.FileName).HasMaxLength(255);
+            e.HasIndex(a => new { a.TenantId, a.EmailMessageId });
+            e.HasOne<Document>().WithMany().HasForeignKey(a => a.DocumentId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Domain.Communication.EmailRecipient>(e =>

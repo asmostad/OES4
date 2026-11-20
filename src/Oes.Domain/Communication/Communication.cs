@@ -73,6 +73,16 @@ public class EmailMessage : TenantEntity
     public string? EntityType { get; set; }
     public Guid? EntityId { get; set; }
     public List<EmailRecipient> Recipients { get; set; } = [];
+    public List<EmailAttachment> Attachments { get; set; } = [];
+}
+
+/// <summary>A file an email carried: always a stored document on the record (so it can be opened again).</summary>
+public class EmailAttachment : TenantEntity
+{
+    public Guid EmailMessageId { get; set; }
+    public Guid DocumentId { get; set; }
+    public string FileName { get; set; } = "";
+    public long SizeBytes { get; set; }
 }
 
 public class EmailRecipient : TenantEntity

@@ -33,6 +33,8 @@
                                 <option value="">No template</option>
                                 @foreach (var t in Model.EmailTemplates) { <option value="@t.Id" data-subject="@t.Subject" data-body="@t.Body">@t.Name</option> }</select></div>
                         }
+                        <div class="col-6"><input name="email.Cc" class="form-control form-control-sm" placeholder="CC (optional)" maxlength="2000" aria-label="CC"></div>
+                        <div class="col-6"><input name="email.Bcc" class="form-control form-control-sm" placeholder="BCC (optional)" maxlength="2000" aria-label="BCC"></div>
                         <div class="col-12"><input name="email.Subject" class="form-control form-control-sm" placeholder="Subject" required maxlength="300" aria-label="Subject" data-template-subject></div>
                         <div class="col-12"><textarea name="email.Body" class="form-control form-control-sm" rows="5" placeholder="Message" required maxlength="100000" aria-label="Message" data-template-body></textarea></div>
                         <div class="col-12 d-flex align-items-center"><span class="form-text mt-0">Sent from your mailbox. {{merge.fields}} are filled in.</span>

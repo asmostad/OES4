@@ -35,3 +35,8 @@ body.print-body { background: #e2e8f0; font-family: 'Inter', -apple-system, Blin
     .no-print { display: none !important; }
     .proposal { box-shadow: none; margin: 0; padding: 0; max-width: none; }
 }
+
+/* Email the proposal (screen only) */
+.proposal-email { max-width: 8.5in; margin: 1rem auto 0; background: #fff; padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.proposal-email > summary { list-style: none; }
+.proposal-email > summary::-webkit-details-marker { display: none; }

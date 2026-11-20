@@ -13,6 +13,19 @@ namespace Oes.Web.Infrastructure;
 /// </summary>
 public sealed class PdfPageResult(string fileName, string? footer, string printUrl) : PageResult
 {
+    /// <summary>
+    /// Instead of downloading: hands the PDF to this (to save and email it), then goes back to the print view
+    /// with the message it returns. A rule or permission error is shown there instead.
+    /// </summary>
+    public Func<byte[], Task<string>>? Deliver { get; init; }
+
+    private static void Flash(HttpContext http, string message, string type)
+    {
+        var tempData = http.RequestServices.GetRequiredService<ITempDataDictionaryFactory>().GetTempData(http);
+        tempData["Flash"] = message;
+        tempData["FlashType"] = type;
+    }
+
     public override async Task ExecuteResultAsync(ActionContext context)
     {
         var http = context.HttpContext;
@@ -27,9 +40,17 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
         try { pdf = await http.RequestServices.GetRequiredService<IPdfRenderer>().RenderAsync(html, footer, http.RequestAborted); }
         catch (PdfUnavailableException ex)
         {
-            var tempData = http.RequestServices.GetRequiredService<ITempDataDictionaryFactory>().GetTempData(http);
-            tempData["Flash"] = ex.Message;
-            tempData["FlashType"] = "danger";
+            Flash(http, ex.Message, "danger");
+            await new LocalRedirectResult(printUrl).ExecuteResultAsync(context);
+            return;
+        }
+        if (Deliver is not null)
+        {
+            try { Flash(http, await Deliver(pdf), "success"); }
+            catch (Exception ex) when (ex is Oes.Infrastructure.Crm.CrmRuleException or Oes.Infrastructure.Crm.RecordForbiddenException)
+            {
+                Flash(http, ex.Message, "danger");
+            }
             await new LocalRedirectResult(printUrl).ExecuteResultAsync(context);
             return;
         }

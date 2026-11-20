@@ -14,7 +14,13 @@ public sealed record TimelineItem(
     public TimelineMessage? Message { get; init; }
 }
 
-public sealed record TimelineMessage(string Direction, string Status, string? Subject, string Counterparty);
+public sealed record TimelineMessage(string Direction, string Status, string? Subject, string Counterparty)
+{
+    /// <summary>Files an email carried (stored documents).</summary>
+    public IReadOnlyList<TimelineAttachment> Attachments { get; init; } = [];
+}
+
+public sealed record TimelineAttachment(Guid DocumentId, string FileName);
 
 public enum TimelineScope { ThisRecord, Everything }
 
@@ -261,10 +267,17 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
                                 join u in db.Users on m.SentByUserId equals u.Id into us from u in us.DefaultIfEmpty()
                                 select new { m.Id, m.SentAt, m.Subject, m.Body, m.Direction, m.Status, m.EntityType, m.EntityId, m.FromAddress,
                                     Sender = u == null ? null : u.FirstName + " " + u.LastName,
-                                    To = m.Recipients.Select(r => r.Address).FirstOrDefault() }).ToListAsync(ct);
+                                    To = m.Recipients.Where(r => r.Kind == "to").Select(r => r.Address).FirstOrDefault() }).ToListAsync(ct);
+            var shownIds = emails.Select(m => m.Id).ToList();
+            var attachments = (await db.EmailAttachments.Where(a => shownIds.Contains(a.EmailMessageId))
+                    .Select(a => new { a.EmailMessageId, a.DocumentId, a.FileName }).ToListAsync(ct))
+                .GroupBy(a => a.EmailMessageId).ToDictionary(g => g.Key, g => (IReadOnlyList<TimelineAttachment>)g.Select(a => new TimelineAttachment(a.DocumentId, a.FileName)).ToList());
             result.AddRange(emails.Select(m => new TimelineItem(ItemTypes.Email, m.Id, m.SentAt, m.Sender ?? m.FromAddress, Preview(m.Body), false,
                 home.GetValueOrDefault(m.Id).EntityType ?? "", home.GetValueOrDefault(m.Id).EntityId, null, null, null, false)
-            { Message = new TimelineMessage(m.Direction, m.Status, m.Subject, m.Direction == Domain.Communication.Directions.Inbound ? m.FromAddress : m.To ?? "") }));
+            {
+                Message = new TimelineMessage(m.Direction, m.Status, m.Subject, m.Direction == Domain.Communication.Directions.Inbound ? m.FromAddress : m.To ?? "")
+                    { Attachments = attachments.GetValueOrDefault(m.Id) ?? [] },
+            }));
         }
         if (smsIds.Count > 0)
         {

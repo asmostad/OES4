@@ -92,6 +92,10 @@
                             </div>
                             @if (msg.Subject is not null) { <div class="timeline-msg-subject">@msg.Subject</div> }
                             <div class="timeline-text">@i.Text</div>
+                            @if (msg.Attachments is { Count: > 0 } files)
+                            {
+                                <div class="small" data-email-attachments>@foreach (var f in files) { <a class="me-2" href="/Records/Items?handler=Download&id=@f.DocumentId"><i class="bi bi-paperclip"></i>@f.FileName</a> }</div>
+                            }
                             <a class="small" href="/Messages/View?channel=@i.ItemType&amp;id=@i.Id&amp;returnUrl=@Uri.EscapeDataString(self)">Open</a>
                         }
                         else
