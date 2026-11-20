@@ -1,0 +1,52 @@
+# Pich field app
+
+The phone app for reps and field crews: today's appointments and tasks, tasks, leads, and on a lead: call, text,
+email, directions, notes, photos, documents (saved proposal and work order PDFs) and the timeline. It's an
+[Expo](https://expo.dev) app (React Native, SDK 58, Expo Router) that talks to the Pich API (`/api/v1`) with the same
+record scope and permissions as the web.
+
+No Mac is needed: develop on Windows, try it on an iPhone or Android phone with the free **Expo Go** app, and build
+the store apps in Expo's cloud (EAS Build).
+
+## Run it
+
+```powershell
+cd mobile
+npm install
+npx expo start
+```
+
+- **On your phone:** install Expo Go, connect the phone to the same Wi-Fi as this PC, and scan the QR code shown in the
+  terminal (iPhone: with the Camera app). On the sign-in screen, the server is this PC's address on your network, e.g.
+  `http://192.168.1.20:5169`. The web app must listen on the network for that, not just on localhost:
+  `dotnet run --project src/Oes.Web --launch-profile http --urls http://0.0.0.0:5169` (Windows may ask to allow it
+  through the firewall).
+- **In a browser (quick checks):** `npx expo start --web`, then sign in with server `http://localhost:5169`. The web
+  app allows this origin in Development only. Files open in a new tab instead of the phone's viewer.
+
+## Check it
+
+```powershell
+npx tsc --noEmit
+npx expo lint
+```
+
+CI runs both on every push.
+
+## How it's built
+
+- `src/app/`: screens (Expo Router). `sign-in`, the tabs (`index` = Today, `tasks`, `leads`, `account`) and
+  `opportunity/[id]`. Signed-out users only see sign-in (`Stack.Protected`).
+- `src/lib/api.ts`: the API client and response types. Access tokens last 30 minutes and are refreshed with the
+  30-day refresh token; when that's refused too, the app signs out.
+- `src/lib/storage.ts`: tokens in the phone's secure storage (Keychain / Keystore). `storage.web.ts` is the browser
+  fallback (this tab's session only).
+- `src/lib/files.ts`: opens a document by downloading it with the token and showing it in the phone's viewer.
+- `src/lib/theme.ts`: Pich colors.
+
+## Not yet
+
+- Working offline: queueing notes, photos and task changes and sending them when the connection comes back.
+- Push notifications.
+- Store builds: needs an Expo account, an Apple Developer account and a Google Play developer account. The bundle id
+  `com.pich.field` in `app.json` is a placeholder until the real one is chosen.

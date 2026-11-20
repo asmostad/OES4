@@ -61,7 +61,7 @@ OES4/
 ├─ tools/
 │  └─ Oes.Migrator/           OES3 → OES4 data migration (JRS = tenant #1), re-runnable
 ├─ docs/
-└─ mobile/                    (later) React Native/Expo app against /api/v1
+└─ mobile/                    Expo (React Native) field app against /api/v1 (started 2026-11-19; see mobile/README.md)
 ```
 
 **Dependency rule:** Web and Worker → Infrastructure → Application → Domain. Pages and controllers stay thin and call Application services, so web and mobile run exactly the same business logic and permission checks.
@@ -310,4 +310,8 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Per-user API rate limit (token bucket, `RateLimits:ApiPerMinute`, default 300) on all controllers; the rate limiter now runs after authentication. Token endpoints use the login limit.
    - Service errors become ProblemDetails for every API controller (404 not found or not visible, 403 forbidden, 422 rule broken).
    - Field-app endpoints on the same services and record scope as the web: `my-day`, `tasks` (list, create, done), `appointments` (≤ 62 days), `opportunities/{id}` (with contact phone/email), `records/{type}/{id}/timeline`, `.../notes`, `.../photos` (images/PDF, 25 MB), `.../documents` (the record's files, newest first, only ones the user can open) and `documents/{id}` (download).
-   - Still to do: push notifications (`device_tokens`, APNs/FCM), offline sync and conflict handling, the app itself.
+   - **The field app** (started 2026-11-19, `mobile/`): Expo SDK 58 (React Native, Expo Router, TypeScript), Pich branded, built and tested from Windows (Expo Go on the phone; EAS Build in the cloud for store builds, so no Mac is needed).
+     - Screens: sign-in (server, email, password, company picker when the account is in several); Today (`my-day`: overdue and due-today counts, appointments, tasks); Tasks (open tasks, tick done, add with a due day); Leads (open opportunities, mine or everyone visible, search); a lead (call, text, email and directions from the contact and address, note, camera or library photos, documents opened in the phone's viewer, timeline); Account (sign out).
+     - Tokens in SecureStore; the client refreshes an expired access token once and signs out when the refresh token is refused. Times from the API's "local" fields are shown as the company's wall-clock time.
+     - Development: the web app allows the Expo web build's origin (`http://localhost:8081`) in Development only (CORS), so the app can be checked in a browser; a phone uses the PC's network address. CI type-checks and lints `mobile/`.
+   - Still to do: offline queueing (notes, photos, task changes sent when the connection returns, with idempotent writes on the server), push notifications (`device_tokens`, APNs/FCM), store builds and accounts.

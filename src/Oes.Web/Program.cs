@@ -127,6 +127,12 @@ builder.Services.AddRateLimiter(o =>
 
 builder.Services.AddHealthChecks().AddDbContextCheck<OesDbContext>("database");
 
+// Development only: the mobile app's web build (mobile/, `npx expo start --web` on localhost:8081) calls the API from
+// another origin. Phone apps don't need CORS, and production has none.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddCors(o => o.AddPolicy("expo-web", p => p.WithOrigins("http://localhost:8081")
+        .AllowAnyHeader().AllowAnyMethod().WithExposedHeaders("Content-Disposition")));
+
 // Data protection (shared key ring with the worker) is set up in AddOesInfrastructure.
 
 var app = builder.Build();
@@ -148,6 +154,7 @@ app.UseSerilogRequestLogging();
 app.UseStatusCodePagesWithReExecute("/Error", "?code={0}");
 
 app.UseRouting();
+if (app.Environment.IsDevelopment()) app.UseCors("expo-web");
 
 app.UseAuthentication();
 app.UseRateLimiter(); // after authentication so API limits can be per user

@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Pich",
+    "slug": "pich",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "pich",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.pich.field",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.pich.field",
+      "adaptiveIcon": {
+        "backgroundColor": "#062536",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#062536",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Pich uses the camera to add job photos to a record.",
+          "photosPermission": "Pich uses your photos to add job photos to a record.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
