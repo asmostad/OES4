@@ -19,5 +19,6 @@ builder.Services.AddHostedService<CleanupJob>();
 builder.Services.AddHostedService<AutomationJob>();
 builder.Services.AddHostedService<ReportsJob>();
 builder.Services.AddHostedService<BusyCalendarJob>();
+builder.Services.AddHostedService<PushJob>();
 
 builder.Build().Run();

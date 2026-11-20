@@ -16,6 +16,8 @@ public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary)
 public sealed record OpportunityDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome,
     decimal? ExpectedValue, string? OwnerName, Guid ContactId, string ContactName, IReadOnlyList<ContactMethodDto> ContactMethods,
     Guid? PropertyId, string? Address, string? Description, bool CanEdit);
+public sealed record DeviceRequest(string Token, string Platform);
+public sealed record UnregisterDeviceRequest(string Token);
 public sealed record DocumentDto(Guid Id, string FileName, string ContentType, long SizeBytes, string? Category, DateTime CreatedAt);
 public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? AuthorName, string Text, string EntityType, Guid EntityId,
     string? FileName, string? Subject, string? Direction);
@@ -27,7 +29,7 @@ public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? 
 /// </summary>
 [ApiController]
 [Route("api/v1")]
-public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db) : ControllerBase
+public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push) : ControllerBase
 {
     public const long MaxPhotoBytes = 25 * 1024 * 1024;
 
@@ -90,6 +92,22 @@ public sealed class MobileController(WorkService work, OpportunityService opport
     {
         if (!EntityTypes.All.Contains(entityType)) return NotFound();
         return StatusCode(StatusCodes.Status201Created, new CreatedResponse(await items.AddNoteAsync(entityType, id, body.Body ?? "", ct)));
+    }
+
+    /// <summary>This phone's Expo push address, after the user allowed notifications. Calling again refreshes it.</summary>
+    [HttpPost("devices")]
+    public async Task<IActionResult> RegisterDevice(DeviceRequest body, CancellationToken ct)
+    {
+        await push.RegisterAsync(body.Token, body.Platform, ct);
+        return NoContent();
+    }
+
+    /// <summary>Stop pushing to this phone (the app calls it when signing out).</summary>
+    [HttpPost("devices/unregister")]
+    public async Task<IActionResult> UnregisterDevice(UnregisterDeviceRequest body, CancellationToken ct)
+    {
+        await push.UnregisterAsync(body.Token, ct);
+        return NoContent();
     }
 
     /// <summary>

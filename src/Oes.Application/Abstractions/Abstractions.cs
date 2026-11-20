@@ -100,3 +100,17 @@ public interface IPdfRenderer
 
 /// <summary>No browser could be started to render PDFs (none installed, or the configured path is wrong).</summary>
 public sealed class PdfUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>One push to one phone. Data travels with it to the app (where to go when it's tapped).</summary>
+public sealed record PushMessage(string To, string Title, string? Body, IReadOnlyDictionary<string, string> Data, int? Badge = null);
+
+/// <summary>The push service's answer for one message. DeviceGone: stop sending to that address.</summary>
+public sealed record PushTicket(bool Ok, bool DeviceGone, string? Error);
+
+/// <summary>Phone push notifications (Expo's push service in production; off until configured; a fake in tests).</summary>
+public interface IPushSender
+{
+    bool IsConfigured { get; }
+    /// <summary>Sends a batch; returns one ticket per message, in order.</summary>
+    Task<IReadOnlyList<PushTicket>> SendAsync(IReadOnlyList<PushMessage> messages, CancellationToken ct = default);
+}

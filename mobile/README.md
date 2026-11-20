@@ -47,7 +47,6 @@ CI runs both on every push.
 ## Not yet
 
 - Reading screens offline (they need a connection; changes made offline are queued, see below).
-- Push notifications.
 - Store builds: needs an Expo account, an Apple Developer account and a Google Play developer account. The bundle id
   `com.pich.field` in `app.json` is a placeholder until the real one is chosen.
 
@@ -61,3 +60,18 @@ refuses (say, the lead was deleted) waits on the Account tab with the reason, fo
 
 To try it: open a lead, turn on airplane mode, add a note and a photo (the app says "Saved on this phone"), turn
 airplane mode off, and watch the "waiting to send" banner empty and the note appear in the timeline.
+
+## Push notifications
+
+New tasks, appointments, online bookings and texts can buzz the phone. The app asks permission only when you tap
+**Turn on notifications** on the Account tab, then registers the phone with the server (`src/lib/push.ts`); signing
+out unregisters it. Tapping a notification opens the lead, Tasks or Today. The server's worker sends them through
+Expo's push service (`PushJob`).
+
+It's built but switched off until these exist (Expo Go can't receive pushes on Android, and the push address needs an
+Expo project):
+
+1. An Expo account, then `npx eas-cli init` in `mobile/` (adds the project id to `app.json`).
+2. A Firebase project for Android, and an Apple Developer account for the iOS push key (`npx eas-cli credentials`).
+3. A development build to install on your phone: `npx eas-cli build --profile development`.
+4. On the worker: `Push:Provider=Expo` (optionally `Push:ExpoAccessToken`, from Expo's enhanced push security).

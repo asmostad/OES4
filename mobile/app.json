@@ -41,6 +41,13 @@
           "photosPermission": "Pich uses your photos to add job photos to a record.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#062536"
+        }
       ]
     ],
     "experiments": {

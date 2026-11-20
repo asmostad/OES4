@@ -43,6 +43,7 @@
 | `invitations` | TenantId, Email, RoleIds, TokenHash, ExpiresAt, AcceptedAt | |
 | `audit_log` | TenantId, ActorUserId, Action, EntityType, EntityId, ChangesJson, Ip, At | Security and admin changes (roles, settings, exports, deletes) |
 | `idempotency_records` | TenantId, UserId, Key (unique per user), Request (method + path), StatusCode (null while running), ResponseJson, CreatedAt | **Built** (2026-11-20). The phone app's Idempotency-Key: a resend gets the first reply instead of repeating the write. Kept 7 days. |
+| `device_push_tokens` | TenantId, UserId, Token (Expo push token, unique per company), Platform (ios/android), LastSeenAt, DisabledAt | **Built** (2026-11-20). Phones to push to; switched off when Expo reports them gone. `notifications.PushedAt` marks a notification the push job handled. |
 | `device_tokens` | UserId, TenantId, Platform (ios/android), Token, LastSeenAt | Push notifications |
 | OpenIddict tables | applications, authorizations, scopes, tokens | Mobile OAuth2 |
 | `external_access_tokens` | TenantId, Purpose (sub_portal/booking_manage/unsubscribe/...), EntityType, EntityId, TokenHash, ExpiresAt, RevokedAt, LastUsedAt | One hashed, expiring, revocable token pattern for every public link |

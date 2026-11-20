@@ -45,6 +45,9 @@ public sealed class MySqlFixture : IAsyncLifetime
     /// <summary>PDFs: captures the HTML instead of starting a browser (PdfTests runs the real renderer once).</summary>
     public CapturingPdfRenderer Pdf { get; } = new();
 
+    /// <summary>Phone pushes: recorded, never sent.</summary>
+    public FakePushSender Push { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _mysql.StartAsync();
@@ -161,6 +164,7 @@ public sealed class TestApp(MySqlFixture fx) : WebApplicationFactory<Program>
             s.RemoveAll<IAiClient>(); s.AddSingleton<IAiClient>(fx.Ai);
             s.RemoveAll<Oes.Infrastructure.Http.ISafeFetcher>(); s.AddSingleton<Oes.Infrastructure.Http.ISafeFetcher>(fx.Feeds);
             s.RemoveAll<IPdfRenderer>(); s.AddSingleton<IPdfRenderer>(fx.Pdf);
+            s.RemoveAll<IPushSender>(); s.AddSingleton<IPushSender>(fx.Push);
         });
     }
 
@@ -213,5 +217,21 @@ public sealed class CapturingPdfRenderer : IPdfRenderer
         if (Unavailable) throw new PdfUnavailableException("PDFs can't be made on this server: no Edge or Chrome browser was found.");
         (LastHtml, LastFooter) = (html, footer);
         return Task.FromResult("%PDF-1.7 stand-in"u8.ToArray());
+    }
+}
+
+/// <summary>Records pushes; answers ok unless told which tokens are gone.</summary>
+public sealed class FakePushSender : IPushSender
+{
+    public bool IsConfigured => true;
+    public List<PushMessage> Sent { get; } = [];
+    public HashSet<string> Gone { get; } = [];
+
+    public void Reset() { Sent.Clear(); Gone.Clear(); }
+
+    public Task<IReadOnlyList<PushTicket>> SendAsync(IReadOnlyList<PushMessage> messages, CancellationToken ct = default)
+    {
+        lock (Sent) Sent.AddRange(messages);
+        return Task.FromResult<IReadOnlyList<PushTicket>>(messages.Select(m => Gone.Contains(m.To) ? new PushTicket(false, true, "DeviceNotRegistered") : new PushTicket(true, false, null)).ToList());
     }
 }

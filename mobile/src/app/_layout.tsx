@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { OutboxProvider } from '@/lib/outbox';
+import { usePushTaps } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
@@ -12,6 +13,7 @@ SplashScreen.preventAutoHideAsync();
 function Navigator() {
   const session = useSession();
   const signedIn = session.status === 'signed-in';
+  usePushTaps(signedIn); // a tapped notification opens its screen once signed in
 
   useEffect(() => {
     if (session.status !== 'loading') SplashScreen.hideAsync();

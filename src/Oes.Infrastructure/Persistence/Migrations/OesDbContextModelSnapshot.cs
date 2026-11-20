@@ -5753,6 +5753,52 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("automation_runs", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Work.DevicePushToken", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DisabledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UserId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Token")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.ToTable("device_push_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Work.Notification", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -5774,6 +5820,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime?>("PushedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("ReadAt")
                         .HasColumnType("datetime(6)");
@@ -5799,6 +5848,8 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasColumnType("binary(16)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PushedAt", "CreatedAt");
 
                     b.HasIndex("TenantId", "UserId", "DedupeKey")
                         .IsUnique();

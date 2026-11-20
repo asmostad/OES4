@@ -80,4 +80,32 @@ public class Notification : TenantEntity
 
     /// <summary>Set for automatic alerts so each one is sent once (e.g. "task.overdue:{id}:{due}").</summary>
     public string? DedupeKey { get; set; }
+
+    /// <summary>When the push job handled it (sent to the user's phones, or found none). Null = not yet.</summary>
+    public DateTime? PushedAt { get; set; }
+}
+
+/// <summary>The notification kinds that also buzz the user's phone. The rest stay in the bell only.</summary>
+public static class PushKinds
+{
+    public static readonly string[] All =
+    [
+        "task.assigned", "task.due",
+        "appointment.assigned", "appointment.invited", "appointment.moved", "appointment.cancelled",
+        "booking.new", "booking.moved", "booking.cancelled",
+        "sms.received", "sms.unmatched",
+    ];
+}
+
+/// <summary>A phone's Expo push address, registered by the field app after the user allows notifications.</summary>
+public class DevicePushToken : TenantEntity
+{
+    public Guid UserId { get; set; }
+    /// <summary>"ExponentPushToken[…]".</summary>
+    public string Token { get; set; } = "";
+    /// <summary>ios / android.</summary>
+    public string Platform { get; set; } = "";
+    public DateTime LastSeenAt { get; set; }
+    /// <summary>Set when Expo says the phone can't receive pushes any more (app removed, permission revoked).</summary>
+    public DateTime? DisabledAt { get; set; }
 }

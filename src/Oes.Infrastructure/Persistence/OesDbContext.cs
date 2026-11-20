@@ -105,6 +105,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Work.Appointment> Appointments => Set<Domain.Work.Appointment>();
     public DbSet<Domain.Work.AppointmentAttendee> AppointmentAttendees => Set<Domain.Work.AppointmentAttendee>();
     public DbSet<Domain.Work.Notification> Notifications => Set<Domain.Work.Notification>();
+    public DbSet<Domain.Work.DevicePushToken> DevicePushTokens => Set<Domain.Work.DevicePushToken>();
     public DbSet<Domain.Work.AutomationRule> AutomationRules => Set<Domain.Work.AutomationRule>();
     public DbSet<Domain.Work.AutomationRun> AutomationRuns => Set<Domain.Work.AutomationRun>();
     public DbSet<Domain.Ai.AiConversation> AiConversations => Set<Domain.Ai.AiConversation>();
@@ -314,6 +315,16 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(n => new { n.TenantId, n.UserId, n.ReadAt, n.CreatedAt });
             e.Property(n => n.DedupeKey).HasMaxLength(200);
             e.HasIndex(n => new { n.TenantId, n.UserId, n.DedupeKey }).IsUnique(); // NULLs (ordinary notifications) never collide
+            e.HasIndex(n => new { n.PushedAt, n.CreatedAt }); // the push job's "not yet handled, recent" scan (across tenants)
+        });
+
+        b.Entity<Domain.Work.DevicePushToken>(e =>
+        {
+            e.ToTable("device_push_tokens");
+            e.Property(d => d.Token).HasMaxLength(200);
+            e.Property(d => d.Platform).HasMaxLength(10);
+            e.HasIndex(d => new { d.TenantId, d.Token }).IsUnique();
+            e.HasIndex(d => new { d.TenantId, d.UserId });
         });
 
         b.Entity<Domain.Work.AutomationRule>(e =>
