@@ -108,6 +108,19 @@ export async function signIn(server: string, email: string, password: string, te
   return { kind: 'ok', tokens };
 }
 
+/** A multipart body with one file, for photo uploads. */
+export async function fileForm(uri: string, fileName: string, mimeType: string): Promise<FormData> {
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    form.append('file', blob, fileName);
+  } else {
+    // React Native's FormData takes a file reference ({ uri, name, type }) instead of a Blob.
+    form.append('file', { uri, name: fileName, type: mimeType } as unknown as Blob);
+  }
+  return form;
+}
+
 /**
  * Calls the API as the signed-in user. An expired access token is refreshed once (refresh tokens last 30 days);
  * if that's refused too, onSignedOut runs and the call fails.
@@ -128,19 +141,6 @@ export class Api {
     this.json<T>(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
   put = <T>(path: string, body: unknown) =>
     this.json<T>(path, { method: 'PUT', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
-
-  /** A photo from the camera or library, filed on the record. */
-  async uploadPhoto(entityType: string, entityId: string, uri: string, fileName: string, mimeType: string) {
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('file', blob, fileName);
-    } else {
-      // React Native's FormData takes a file reference ({ uri, name, type }) instead of a Blob.
-      form.append('file', { uri, name: fileName, type: mimeType } as unknown as Blob);
-    }
-    return this.json<{ id: string }>(`/api/v1/records/${entityType}/${entityId}/photos`, { method: 'POST', body: form });
-  }
 
   /** The current access token, for downloads that send their own request (file previews). */
   authHeader = () => ({ Authorization: `Bearer ${this.tokens.accessToken}` });

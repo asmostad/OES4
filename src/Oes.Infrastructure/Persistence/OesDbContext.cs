@@ -32,6 +32,7 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<MembershipRole> MembershipRoles => Set<MembershipRole>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<TenantSequence> TenantSequences => Set<TenantSequence>();
 
     // CRM core
@@ -224,6 +225,16 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.HasIndex(r => new { r.MembershipId, r.RoleId }).IsUnique();
             e.HasIndex(r => r.TenantId);
             e.HasOne(r => r.Role).WithMany().HasForeignKey(r => r.RoleId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<IdempotencyRecord>(e =>
+        {
+            e.ToTable("idempotency_records");
+            e.Property(r => r.Key).HasMaxLength(100);
+            e.Property(r => r.Request).HasMaxLength(300);
+            e.Property(r => r.ResponseJson).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(r => new { r.TenantId, r.UserId, r.Key }).IsUnique();
+            e.HasIndex(r => new { r.TenantId, r.UserId, r.CreatedAt });
         });
 
         b.Entity<AuditEntry>(e =>

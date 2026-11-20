@@ -4,6 +4,7 @@ using Oes.Domain.Crm;
 using Oes.Infrastructure.Crm;
 using Oes.Infrastructure.Persistence;
 using Oes.Infrastructure.Work;
+using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Controllers.Api;
 
@@ -43,6 +44,7 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         work.TasksAsync(onlyMine: mine, includeDone: done, ct: ct);
 
     [HttpPost("tasks")]
+    [Idempotent]
     public async Task<ActionResult<CreatedResponse>> CreateTask(TaskInput input, CancellationToken ct) =>
         StatusCode(StatusCodes.Status201Created, new CreatedResponse(await work.CreateTaskAsync(input, ct)));
 
@@ -83,6 +85,7 @@ public sealed class MobileController(WorkService work, OpportunityService opport
     }
 
     [HttpPost("records/{entityType}/{id:guid}/notes")]
+    [Idempotent]
     public async Task<ActionResult<CreatedResponse>> AddNote(string entityType, Guid id, NoteRequest body, CancellationToken ct)
     {
         if (!EntityTypes.All.Contains(entityType)) return NotFound();
@@ -112,6 +115,7 @@ public sealed class MobileController(WorkService work, OpportunityService opport
 
     /// <summary>A photo (or PDF) from the field, filed on the record and everything above it.</summary>
     [HttpPost("records/{entityType}/{id:guid}/photos")]
+    [Idempotent]
     [RequestSizeLimit(MaxPhotoBytes)]
     public async Task<ActionResult<CreatedResponse>> UploadPhoto(string entityType, Guid id, IFormFile file, CancellationToken ct)
     {

@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { OutboxBanner } from '@/components/OutboxBanner';
 import { TaskItem } from '@/components/TaskRow';
 import { Card, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
 import { ApiError, MyDay } from '@/lib/api';
@@ -37,6 +38,7 @@ export default function Today() {
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>Hi {me.firstName}</Text>
       <Message text={error} />
+      <OutboxBanner />
       {!data && !error && <Loading />}
       {data && (
         <>

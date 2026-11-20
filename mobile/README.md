@@ -46,7 +46,18 @@ CI runs both on every push.
 
 ## Not yet
 
-- Working offline: queueing notes, photos and task changes and sending them when the connection comes back.
+- Reading screens offline (they need a connection; changes made offline are queued, see below).
 - Push notifications.
 - Store builds: needs an Expo account, an Apple Developer account and a Google Play developer account. The bundle id
   `com.pich.field` in `app.json` is a placeholder until the real one is chosen.
+
+## Offline
+
+Notes, photos, new tasks and ticking tasks done go through an outbox (`src/lib/outbox.tsx`): saved on the phone first
+(`outbox-store.ts`: a JSON file and copies of queued photos in the app's documents folder), then sent in order. With
+no connection they wait, and go when the connection returns, when the app comes back to the front, or every minute.
+Each item keeps one `Idempotency-Key` through every retry, so the server never applies it twice. Something the server
+refuses (say, the lead was deleted) waits on the Account tab with the reason, for Try again or Discard.
+
+To try it: open a lead, turn on airplane mode, add a note and a photo (the app says "Saved on this phone"), turn
+airplane mode off, and watch the "waiting to send" banner empty and the note appear in the timeline.

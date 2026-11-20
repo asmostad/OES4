@@ -1,11 +1,14 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { OutboxBanner } from '@/components/OutboxBanner';
 import { TaskItem } from '@/components/TaskRow';
 import { Button, Card, Field, Loading, Message, Muted, Screen, SectionTitle } from '@/components/ui';
 import { ApiError, TaskRow } from '@/lib/api';
 import { todayIso } from '@/lib/format';
+import { outcomeMessage, useOutbox } from '@/lib/outbox';
 import { useApi } from '@/lib/session';
 import { colors, radius, space } from '@/lib/theme';
 
@@ -38,20 +41,24 @@ export default function Tasks() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const outbox = useOutbox();
+  const waitingTasks = outbox.items.filter((i) => i.kind === 'task');
+
   async function add() {
     if (!title.trim()) return setError('What needs doing?');
     setBusy(true);
     setError(null);
-    try {
-      await api.post('/api/v1/tasks', { title: title.trim(), dueDate: due === null ? null : todayIso(due) });
+    const outcome = await outbox.enqueue({
+      kind: 'task', method: 'POST', path: '/api/v1/tasks', json: { title: title.trim(), dueDate: due === null ? null : todayIso(due) },
+      label: `New task: ${title.trim()}`,
+    });
+    const m = outcomeMessage(outcome, 'Task added.');
+    if (m.kind === 'success') {
       setTitle('');
-      setSaved('Task added.');
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't add the task.");
-    } finally {
-      setBusy(false);
-    }
+      setSaved(m.text);
+      if (outcome.status === 'sent') await load();
+    } else setError(m.text);
+    setBusy(false);
   }
 
   return (
@@ -71,8 +78,18 @@ export default function Tasks() {
       </Card>
       <Message text={error} />
       <Message text={saved} kind="success" />
+      <OutboxBanner />
       <SectionTitle>Open tasks</SectionTitle>
       <Card>
+        {waitingTasks.map((w) => (
+          <View key={w.key} style={{ paddingVertical: space.md, flexDirection: 'row', gap: space.md, opacity: 0.7 }}>
+            <Ionicons name="cloud-upload-outline" size={22} color={w.error ? colors.danger : colors.warning} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text }}>{(w.json as { title: string }).title}</Text>
+              <Muted>{w.error ? 'Couldn’t be sent' : 'Waiting to send'}</Muted>
+            </View>
+          </View>
+        ))}
         {!tasks && !error && <Loading />}
         {tasks?.length === 0 && <Muted>No open tasks.</Muted>}
         {tasks?.map((t, i) => <TaskItem key={t.id} task={t} last={i === tasks.length - 1} onChanged={load} onError={setError} />)}

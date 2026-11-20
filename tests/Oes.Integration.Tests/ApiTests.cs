@@ -165,6 +165,38 @@ public sealed class ApiTests(MySqlFixture fx)
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/documents/{hiddenFile}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/records/opportunity/{theirs}/documents")).StatusCode);
 
+        // The app's offline queue resends with the same Idempotency-Key: each action happens once.
+        async Task<HttpResponseMessage> Send(HttpContent content, string path, string key)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
+            req.Headers.Add("Idempotency-Key", key);
+            return await c.SendAsync(req);
+        }
+        var noteKey = Guid.NewGuid().ToString("N");
+        var first = await Send(JsonContent.Create(new { body = "Queued while offline" }), $"/api/v1/records/opportunity/{mine}/notes", noteKey);
+        var again = await Send(JsonContent.Create(new { body = "Queued while offline" }), $"/api/v1/records/opportunity/{mine}/notes", noteKey);
+        Assert.Equal((HttpStatusCode.Created, HttpStatusCode.Created), (first.StatusCode, again.StatusCode));
+        Assert.Equal((await Json(first)).GetProperty("id").GetGuid(), (await Json(again)).GetProperty("id").GetGuid());
+        Assert.True(again.Headers.Contains("Idempotent-Replayed"));
+        Assert.False(first.Headers.Contains("Idempotent-Replayed"));
+        var photoKey = Guid.NewGuid().ToString("N");
+        MultipartFormDataContent Photo() => new() { { new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xE1]) { Headers = { ContentType = new MediaTypeHeaderValue("image/jpeg") } }, "file", "queued.jpg" } };
+        Assert.Equal(HttpStatusCode.Created, (await Send(Photo(), $"/api/v1/records/opportunity/{mine}/photos", photoKey)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await Send(Photo(), $"/api/v1/records/opportunity/{mine}/photos", photoKey)).StatusCode);
+        var taskKey = Guid.NewGuid().ToString("N");
+        Assert.Equal((HttpStatusCode)422, (await Send(JsonContent.Create(new { title = "" }), "/api/v1/tasks", taskKey)).StatusCode); // a failure isn't kept…
+        Assert.Equal(HttpStatusCode.Created, (await Send(JsonContent.Create(new { title = "Queued task" }), "/api/v1/tasks", taskKey)).StatusCode); // …so the fixed retry runs
+        Assert.Equal(HttpStatusCode.Created, (await Send(JsonContent.Create(new { title = "Queued task" }), "/api/v1/tasks", taskKey)).StatusCode);
+        Assert.Equal((HttpStatusCode)422, (await Send(JsonContent.Create(new { body = "x" }), $"/api/v1/records/opportunity/{mine}/notes", taskKey)).StatusCode); // same key, other request
+        Assert.Equal(HttpStatusCode.BadRequest, (await Send(JsonContent.Create(new { body = "x" }), $"/api/v1/records/opportunity/{mine}/notes", "bad key!")).StatusCode);
+        await using (var s = fx.ScopeAs(t.Id, rep))
+        {
+            var db = s.Get<OesDbContext>();
+            Assert.Equal(1, await db.Notes.CountAsync(n => n.Body == "Queued while offline"));
+            Assert.Equal(1, await db.Documents.CountAsync(d => d.FileName == "queued.jpg"));
+            Assert.Equal(1, await db.Tasks.CountAsync(x => x.Title == "Queued task"));
+        }
+
         var day = await Json(await c.GetAsync("/api/v1/my-day"));
         Assert.True(day.TryGetProperty("appointments", out _));
         Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/v1/appointments?from=2026-01-01&to=2026-12-31")).StatusCode);

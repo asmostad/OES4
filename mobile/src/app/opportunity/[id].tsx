@@ -4,10 +4,12 @@ import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 
+import { OutboxBanner } from '@/components/OutboxBanner';
 import { Button, Card, Field, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
 import { ApiError, DocumentItem, Opportunity, TimelineItem } from '@/lib/api';
 import { openDocument } from '@/lib/files';
 import { label, money, size, when } from '@/lib/format';
+import { Outcome, outcomeMessage, useOutbox } from '@/lib/outbox';
 import { useApi } from '@/lib/session';
 import { colors, radius, space } from '@/lib/theme';
 
@@ -43,19 +45,28 @@ export default function OpportunityScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const outbox = useOutbox();
+  const base = `/api/v1/records/opportunity/${id}/`;
+  const waitingHere = outbox.items.filter((i) => i.path.startsWith(base));
+
+  /** Notes and photos go through the outbox, so they're kept and sent later when there's no signal. */
+  function report(outcome: Outcome, sentText: string) {
+    const m = outcomeMessage(outcome, sentText);
+    if (m.kind === 'success') setNotice(m.text);
+    else setError(m.text);
+    return m.kind === 'success';
+  }
+
   async function addNote() {
     if (!note.trim()) return;
     setBusy('note');
-    try {
-      await api.post(`/api/v1/records/opportunity/${id}/notes`, { body: note.trim() });
-      setNote('');
-      setNotice('Note added.');
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't add the note.");
-    } finally {
-      setBusy(null);
-    }
+    setError(null);
+    const outcome = await outbox.enqueue({
+      kind: 'note', method: 'POST', path: `${base}notes`, json: { body: note.trim() }, label: `Note on ${opp?.number ?? 'a lead'}`,
+    });
+    if (report(outcome, 'Note added.')) setNote('');
+    if (outcome.status === 'sent') await load();
+    setBusy(null);
   }
 
   async function addPhoto(source: 'camera' | 'library') {
@@ -67,18 +78,18 @@ export default function OpportunityScreen() {
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: true, selectionLimit: 10 });
     if (result.canceled || !result.assets?.length) return;
     setBusy('photo');
-    try {
-      for (const [i, a] of result.assets.entries()) {
-        const name = a.fileName ?? `photo-${Date.now()}-${i + 1}.jpg`;
-        await api.uploadPhoto('opportunity', id, a.uri, name, a.mimeType ?? 'image/jpeg');
-      }
-      setNotice(result.assets.length === 1 ? 'Photo added.' : `${result.assets.length} photos added.`);
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't upload the photo.");
-    } finally {
-      setBusy(null);
+    let last: Outcome = { status: 'sent' };
+    for (const [i, a] of result.assets.entries()) {
+      const name = a.fileName ?? `photo-${Date.now()}-${i + 1}.jpg`;
+      last = await outbox.enqueue({
+        kind: 'photo', method: 'POST', path: `${base}photos`, file: { uri: a.uri, name, type: a.mimeType ?? 'image/jpeg' },
+        label: `Photo on ${opp?.number ?? 'a lead'}`,
+      });
+      if (last.status === 'failed') break;
     }
+    report(last, result.assets.length === 1 ? 'Photo added.' : `${result.assets.length} photos added.`);
+    if (last.status === 'sent') await load();
+    setBusy(null);
   }
 
   async function open(doc: DocumentItem) {
@@ -136,6 +147,23 @@ export default function OpportunityScreen() {
           <View style={{ flex: 1 }}><Button title="Choose photos" kind="secondary" onPress={() => addPhoto('library')} disabled={busy === 'photo'} /></View>
         </View>
       </Card>
+
+      <OutboxBanner />
+      {waitingHere.length > 0 && (
+        <Card>
+          {waitingHere.map((w, i) => (
+            <Row key={w.key} last={i === waitingHere.length - 1}>
+              <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
+                <Ionicons name={w.kind === 'photo' ? 'image-outline' : 'document-text-outline'} size={20} color={w.error ? colors.danger : colors.warning} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.body} numberOfLines={2}>{w.kind === 'note' ? (w.json as { body: string }).body : w.file?.name}</Text>
+                  <Muted>{w.error ? `Couldn’t be sent: ${w.error}` : 'Waiting to send'}</Muted>
+                </View>
+              </View>
+            </Row>
+          ))}
+        </Card>
+      )}
 
       <SectionTitle>Documents</SectionTitle>
       <Card>

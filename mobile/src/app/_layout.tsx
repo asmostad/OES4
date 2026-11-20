@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { OutboxProvider } from '@/lib/outbox';
 import { SessionProvider, useSession } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
@@ -41,7 +42,9 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <StatusBar style="light" />
-      <Navigator />
+      <OutboxProvider>
+        <Navigator />
+      </OutboxProvider>
     </SessionProvider>
   );
 }

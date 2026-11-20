@@ -4,30 +4,31 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Row, styles } from '@/components/ui';
-import { ApiError, TaskRow as Task } from '@/lib/api';
+import { TaskRow as Task } from '@/lib/api';
 import { day, time } from '@/lib/format';
-import { useApi } from '@/lib/session';
+import { useOutbox } from '@/lib/outbox';
 import { colors, space } from '@/lib/theme';
 
 /** A task with a tick box; ticking it marks it done on the server (and back). Tapping the text opens its lead. */
 export function TaskItem({ task, last, onChanged, onError }: { task: Task; last?: boolean; onChanged: () => void; onError: (m: string) => void }) {
-  const { api } = useApi();
+  const outbox = useOutbox();
   const [done, setDone] = useState(task.completedAt !== null);
   const [busy, setBusy] = useState(false);
 
+  // Through the outbox: ticked offline, it stays ticked here and is sent when the connection's back.
   async function toggle() {
     if (!task.canEdit || busy) return;
     setBusy(true);
     setDone(!done);
-    try {
-      await api.put(`/api/v1/tasks/${task.id}/done`, { done: !done });
-      onChanged();
-    } catch (e) {
+    const outcome = await outbox.enqueue({
+      kind: 'task_done', method: 'PUT', path: `/api/v1/tasks/${task.id}/done`, json: { done: !done },
+      label: `${done ? 'Reopen' : 'Done'}: ${task.title}`,
+    });
+    if (outcome.status === 'failed') {
       setDone(done);
-      onError(e instanceof ApiError ? e.message : "Couldn't update the task.");
-    } finally {
-      setBusy(false);
-    }
+      onError(outcome.message);
+    } else if (outcome.status === 'sent') onChanged();
+    setBusy(false);
   }
 
   const opensLead = task.entityType === 'opportunity' && task.entityId;
