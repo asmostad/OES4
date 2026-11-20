@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { OfflineNote } from '@/components/OfflineNote';
-import { Card, Loading, Message, Muted, Row, Screen, styles } from '@/components/ui';
+import { Button, Card, Loading, Message, Muted, Row, Screen, styles } from '@/components/ui';
 import { OpportunityRow, Paged } from '@/lib/api';
 import { money } from '@/lib/format';
 import { useCached } from '@/lib/useCached';
@@ -32,6 +32,7 @@ export default function Leads() {
   return (
     <Screen refreshing={pulling} onRefresh={async () => { setPulling(true); await load(); setPulling(false); }}>
       <OfflineNote offline={leads.offline} savedAt={leads.savedAt} />
+      <Button title="New lead" onPress={() => router.push('/new-lead')} />
       <TextInput value={q} onChangeText={setQ} placeholder="Search name, number, address, phone" placeholderTextColor={colors.muted}
         autoCorrect={false} clearButtonMode="while-editing" style={[styles.input]} accessibilityLabel="Search leads" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>

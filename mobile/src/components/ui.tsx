@@ -110,7 +110,7 @@ export const styles = StyleSheet.create({
 });
 
 /** A row of choices, one selected (due dates, stages, appointment types…). Wraps, or scrolls sideways with `scroll`. */
-export function Chips<T extends string | number | null>({ options, value, onChange, scroll }: {
+export function Chips<T extends string | number | boolean | null>({ options, value, onChange, scroll }: {
   options: { label: string; value: T }[]; value: T; onChange: (v: T) => void; scroll?: boolean;
 }) {
   const items = options.map((o) => {

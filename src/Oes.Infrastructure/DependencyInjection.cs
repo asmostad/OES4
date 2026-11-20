@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<Work.TenantTime>();
         services.AddScoped<Work.NotificationService>();
         services.AddScoped<Work.PushService>();
+        services.AddScoped<Crm.FieldLeadService>();
         services.Configure<Work.PushOptions>(config.GetSection(Work.PushOptions.Section));
         if (string.Equals(config.GetSection(Work.PushOptions.Section)["Provider"], "Expo", StringComparison.OrdinalIgnoreCase))
             services.AddHttpClient<IPushSender, Work.ExpoPushSender>(c => c.Timeout = TimeSpan.FromSeconds(20));

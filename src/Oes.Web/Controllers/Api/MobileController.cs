@@ -32,7 +32,7 @@ public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? 
 [ApiController]
 [Route("api/v1")]
 public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push,
-    CrmLookups lookups) : ControllerBase
+    CrmLookups lookups, FieldLeadService leads) : ControllerBase
 {
     public const long MaxPhotoBytes = 25 * 1024 * 1024;
 
@@ -106,6 +106,12 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         return new OptionsResponse(stages, await lookups.ValuesAsync(LookupTypes.LostReason, ct),
             await lookups.ValuesAsync(Oes.Domain.Work.AppointmentTypes.LookupType, ct), await lookups.ValuesAsync(LookupTypes.LeadSource, ct));
     }
+
+    /// <summary>A lead taken in the field (door knock by default): contact, opportunity owned by the user, and address.</summary>
+    [HttpPost("leads")]
+    [Idempotent]
+    public async Task<ActionResult<FieldLeadResult>> CreateLead(FieldLeadInput input, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await leads.CreateAsync(input, ct));
 
     /// <summary>An appointment on the user's calendar (or someone's, with calendar.manage), usually on a lead.</summary>
     [HttpPost("appointments")]

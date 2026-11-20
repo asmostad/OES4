@@ -29,7 +29,7 @@ export type OutboxItem = {
 };
 
 export type NewItem = Pick<OutboxItem, 'kind' | 'method' | 'path' | 'json' | 'file' | 'label'>;
-export type Outcome = { status: 'sent' } | { status: 'queued' } | { status: 'failed'; message: string };
+export type Outcome = { status: 'sent'; body?: unknown } | { status: 'queued' } | { status: 'failed'; message: string };
 
 type OutboxValue = {
   /** This user's items, oldest first. */
@@ -48,12 +48,22 @@ const Ctx = createContext<OutboxValue | null>(null);
 /** Worth trying again later: no connection, the server busy or broken, or the first copy still running. */
 const retryable = (e: unknown) => !(e instanceof ApiError) || e.status === 0 || e.status >= 500 || [401, 408, 409, 429].includes(e.status);
 
-async function send(api: Api, item: OutboxItem): Promise<void> {
+/** A reply's JSON, if it has one (a new lead's id, say). */
+async function body(res: Response): Promise<unknown> {
+  if (res.status === 204) return undefined;
+  try {
+    return await res.json();
+  } catch {
+    return undefined;
+  }
+}
+
+async function send(api: Api, item: OutboxItem): Promise<unknown> {
   const headers: Record<string, string> = { 'Idempotency-Key': item.key };
   if (item.file) {
-    await api.send(item.path, { method: item.method, body: await fileForm(item.file.uri, item.file.name, item.file.type), headers });
+    return body(await api.send(item.path, { method: item.method, body: await fileForm(item.file.uri, item.file.name, item.file.type), headers }));
   } else {
-    await api.send(item.path, { method: item.method, body: JSON.stringify(item.json ?? {}), headers: { ...headers, 'Content-Type': 'application/json' } });
+    return body(await api.send(item.path, { method: item.method, body: JSON.stringify(item.json ?? {}), headers: { ...headers, 'Content-Type': 'application/json' } }));
   }
 }
 
@@ -63,6 +73,8 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
   const current = useRef<OutboxItem[]>([]);
   const [sending, setSending] = useState(false);
   const busy = useRef(false);
+  /** Replies to items sent straight away, for enqueue to hand back. */
+  const replies = useRef(new Map<string, unknown>());
 
   const api = session.status === 'signed-in' ? session.api : null;
   const me = session.status === 'signed-in' ? session.me : null;
@@ -91,7 +103,7 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
     try {
       for (const item of current.current.filter((i) => isMine(i) && !i.error)) {
         try {
-          await send(api, item);
+          replies.current.set(item.key, await send(api, item));
           if (item.file) dropFile(item.file.uri);
           await update((list) => list.filter((i) => i.key !== item.key));
         } catch (e) {
@@ -143,7 +155,7 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
       await update((list) => [...list, item]);
       await flush();
       const after = current.current.find((i) => i.key === key);
-      if (!after) return { status: 'sent' };
+      if (!after) { const reply = replies.current.get(key); replies.current.delete(key); return { status: 'sent', body: reply }; }
       return after.error ? { status: 'failed', message: after.error } : { status: 'queued' };
     },
     [api, me, update, flush],

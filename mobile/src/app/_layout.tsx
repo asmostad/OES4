@@ -33,6 +33,7 @@ function Navigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="opportunity/[id]" options={{ title: 'Lead' }} />
         <Stack.Screen name="book/[id]" options={{ title: 'Book appointment', presentation: 'modal' }} />
+        <Stack.Screen name="new-lead" options={{ title: 'New lead', presentation: 'modal' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

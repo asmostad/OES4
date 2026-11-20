@@ -241,4 +241,47 @@ public sealed class ApiTests(MySqlFixture fx)
         var lost = stages.First(x => x.GetProperty("outcome").GetString() == "lost").GetProperty("id").GetGuid();
         Assert.Equal(HttpStatusCode.BadRequest, (await app.PutAsJsonAsync($"/api/v1/opportunities/{mine}/stage", new { stageId = lost })).StatusCode); // lost needs a reason
     }
+
+    [Fact]
+    public async Task Field_app_takes_new_leads_in_one_step()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        var app = await SignedInAsync(rep);
+        var street = $"{Random.Shared.Next(100, 9999)} Knock St";
+        object Lead(string first) => new { firstName = first, lastName = "Doorstep", phone = "(402) 555-0188", email = $"{first.ToLowerInvariant()}@example.com",
+            line1 = street, city = "Lincoln", state = "NE", postalCode = "68502", isInsurance = true, notes = "Hail damage on the north slope" };
+
+        using var first = new HttpRequestMessage(HttpMethod.Post, "/api/v1/leads") { Content = JsonContent.Create(Lead("Dana")) };
+        first.Headers.Add("Idempotency-Key", "lead-" + Guid.NewGuid().ToString("N"));
+        var created = await app.SendAsync(first);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var lead = await Json(created);
+        var oppId = lead.GetProperty("opportunityId").GetGuid();
+
+        var detail = await Json(await app.GetAsync($"/api/v1/opportunities/{oppId}"));
+        Assert.Equal("Dana Doorstep", detail.GetProperty("contactName").GetString());
+        Assert.StartsWith(street, detail.GetProperty("address").GetString());
+        Assert.Equal(2, detail.GetProperty("contactMethods").GetArrayLength());
+        Assert.True(detail.GetProperty("canEdit").GetBoolean());
+
+        // The neighbour's spouse at the same house: the property is reused.
+        var second = await Json(await app.PostAsJsonAsync("/api/v1/leads", Lead("Sam")));
+        Assert.Equal(lead.GetProperty("propertyId").GetGuid(), second.GetProperty("propertyId").GetGuid());
+
+        // An unfinished address is refused before anything is created.
+        int contactsBefore;
+        await using (var s = fx.ScopeAs(t.Id, admin)) contactsBefore = await s.Get<OesDbContext>().Contacts.CountAsync();
+        var bad = await app.PostAsJsonAsync("/api/v1/leads", new { firstName = "Half", line1 = "1 Nowhere Rd" });
+        Assert.Equal((HttpStatusCode)422, bad.StatusCode);
+        Assert.Contains("city, state and ZIP", (await Json(bad)).GetProperty("detail").GetString());
+        Assert.Equal((HttpStatusCode)422, (await app.PostAsJsonAsync("/api/v1/leads", new { phone = "4025550100" })).StatusCode); // no name
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            Assert.Equal(contactsBefore, await db.Contacts.CountAsync());
+            var opp = await db.Opportunities.SingleAsync(o => o.Id == oppId);
+            Assert.Equal((rep.Id, "door_knock", true), (opp.OwnerUserId, opp.SourceKey, opp.IsInsurance));
+        }
+    }
 }
