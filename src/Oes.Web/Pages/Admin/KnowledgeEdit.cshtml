@@ -25,7 +25,7 @@
     <div class="col-12"><label class="form-label" for="k-body">Text</label>
         <textarea id="k-body" name="Input.Body" class="form-control font-monospace small" rows="18" maxlength="100000"
                   placeholder="# Workmanship warranty&#10;&#10;We warrant our installation work for …">@Model.Input.Body</textarea>
-        <div class="form-text">Plain text or Markdown, up to 100,000 characters. Or fill it from a file: <input type="file" name="File" accept=".txt,.md,.markdown" class="form-control form-control-sm d-inline-block w-auto ms-1" aria-label="Text or Markdown file"></div></div>
+        <div class="form-text">Plain text or Markdown, up to 100,000 characters. Or fill it from a file (PDF, .txt or .md; a scanned PDF has no text to read): <input type="file" name="File" accept=".pdf,.txt,.md,.markdown" class="form-control form-control-sm d-inline-block w-auto ms-1" aria-label="PDF, text or Markdown file"></div></div>
     <div class="col-12"><div class="form-check">
         <input class="form-check-input" type="checkbox" name="Input.IsActive" value="true" id="k-active" checked="@Model.Input.IsActive">
         <label class="form-check-label" for="k-active">On (the assistant can search it)</label></div>

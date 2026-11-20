@@ -5,7 +5,7 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Admin;
 
-/// <summary>Write or paste a knowledge base article, or fill it from a text or Markdown file.</summary>
+/// <summary>Write or paste a knowledge base article, or fill it from a PDF (its text, read locally), text or Markdown file.</summary>
 [HasPermission(Permissions.AiManage)]
 public class KnowledgeEditModel(KnowledgeService knowledge) : CrmPageModel
 {
@@ -34,10 +34,21 @@ public class KnowledgeEditModel(KnowledgeService knowledge) : CrmPageModel
         if (Upload is { Length: > 0 } f)
         {
             var ext = Path.GetExtension(f.FileName).ToLowerInvariant();
-            if (ext is not (".txt" or ".md" or ".markdown")) { ModelState.AddModelError("", "Upload a .txt or .md file, or paste the text."); return Page(); }
-            if (f.Length > MaxFileBytes) { ModelState.AddModelError("", "That file is too big for one article. Split it up."); return Page(); }
-            using var reader = new StreamReader(f.OpenReadStream());
-            Input.Body = await reader.ReadToEndAsync();
+            if (ext is not (".txt" or ".md" or ".markdown" or ".pdf")) { ModelState.AddModelError("", "Upload a PDF, .txt or .md file, or paste the text."); return Page(); }
+            if (ext == ".pdf")
+            {
+                if (f.Length > PdfText.MaxBytes) { ModelState.AddModelError("", "That PDF is over 20 MB."); return Page(); }
+                using var buffer = new MemoryStream();
+                await f.CopyToAsync(buffer);
+                try { Input.Body = PdfText.Extract(buffer.ToArray(), KnowledgeService.MaxBodyChars); }
+                catch (Oes.Infrastructure.Crm.CrmRuleException ex) { ModelState.AddModelError("", ex.Message); return Page(); }
+            }
+            else
+            {
+                if (f.Length > MaxFileBytes) { ModelState.AddModelError("", "That file is too big for one article. Split it up."); return Page(); }
+                using var reader = new StreamReader(f.OpenReadStream());
+                Input.Body = await reader.ReadToEndAsync();
+            }
             if (string.IsNullOrWhiteSpace(Input.Title)) Input.Title = Path.GetFileNameWithoutExtension(f.FileName);
         }
         return await Guard(async () =>

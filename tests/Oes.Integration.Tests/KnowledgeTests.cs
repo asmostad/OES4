@@ -142,7 +142,29 @@ public sealed class KnowledgeTests(MySqlFixture fx)
             { new StringContent("x"), "Input.Title" },
             { new ByteArrayContent([1, 2, 3]), "File", "scan.pdf" },
         });
-        Assert.Contains("Upload a .txt or .md file", await bad.Content.ReadAsStringAsync());
+        Assert.Contains("couldn&#x27;t be read as a PDF", await bad.Content.ReadAsStringAsync());
+
+        // A real PDF with text becomes an article the assistant can search.
+        var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        var pdfPage = builder.AddPage(UglyToad.PdfPig.Content.PageSize.Letter);
+        pdfPage.AddText("Gutter guard care", 14, new UglyToad.PdfPig.Core.PdfPoint(72, 720), font);
+        pdfPage.AddText("Rinse the guards with a hose every spring.", 12, new UglyToad.PdfPig.Core.PdfPoint(72, 700), font);
+        var newForm = await web.GetStringAsync("/Admin/KnowledgeEdit");
+        var pdfSaved = await web.PostAsync("/Admin/KnowledgeEdit", new MultipartFormDataContent
+        {
+            { new StringContent(Token(newForm)), "__RequestVerificationToken" },
+            { new StringContent("true"), "Input.IsActive" },
+            { new ByteArrayContent(builder.Build()), "File", "Gutter guard care.pdf" },
+        });
+        Assert.Equal(HttpStatusCode.Redirect, pdfSaved.StatusCode);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var hit = (await s.Get<KnowledgeService>().SearchAsync("rinse gutter guards")).First();
+            Assert.Equal("Gutter guard care", hit.Title); // title from the file name
+            Assert.Contains("Rinse the guards with a hose every spring.", hit.Text);
+            await s.Get<KnowledgeService>().DeleteAsync(hit.ArticleId);
+        }
 
         var deleted = await web.PostAsync($"/Admin/KnowledgeEdit/{id}?handler=Delete", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = Token(edit) }));
         Assert.Equal(HttpStatusCode.Redirect, deleted.StatusCode);
