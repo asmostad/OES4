@@ -22,6 +22,7 @@ export default function TabsLayout() {
         tabBarStyle: { borderTopColor: colors.border },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('today-outline') }} />
+      <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar-outline') }} />
       <Tabs.Screen name="tasks" options={{ title: 'Tasks', tabBarIcon: icon('checkbox-outline') }} />
       <Tabs.Screen name="leads" options={{ title: 'Leads', tabBarIcon: icon('briefcase-outline') }} />
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarIcon: icon('person-circle-outline') }} />

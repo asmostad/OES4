@@ -35,7 +35,7 @@ CI runs both on every push.
 
 ## How it's built
 
-- `src/app/`: screens (Expo Router). `sign-in`, the tabs (`index` = Today, `tasks`, `leads`, `account`) and
+- `src/app/`: screens (Expo Router). `sign-in`, the tabs (`index` = Today, `calendar`, `tasks`, `leads`, `account`) and
   `opportunity/[id]`. Signed-out users only see sign-in (`Stack.Protected`).
 - `src/lib/api.ts`: the API client and response types. Access tokens last 30 minutes and are refreshed with the
   30-day refresh token; when that's refused too, the app signs out.
