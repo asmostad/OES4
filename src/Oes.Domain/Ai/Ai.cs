@@ -50,3 +50,28 @@ public class AiUsageDaily : TenantEntity
     public int Requests { get; set; }
     public decimal CostUsd { get; set; }
 }
+
+/// <summary>
+/// A company knowledge base article (warranty terms, product notes, procedures) the assistant can search.
+/// Company-wide: anyone who can use the assistant can search it; ai.manage edits it.
+/// </summary>
+public class KnowledgeArticle : TenantEntity
+{
+    public string Title { get; set; } = "";
+    public string? Category { get; set; }
+    public string Body { get; set; } = "";
+    public bool IsActive { get; set; } = true;
+    public Guid? UpdatedByUserId { get; set; }
+}
+
+/// <summary>A passage of an article, as searched: rebuilt whenever the article is saved.</summary>
+public class KnowledgeChunk : TenantEntity
+{
+    public Guid ArticleId { get; set; }
+    public int Seq { get; set; }
+    /// <summary>The nearest heading above the passage, if the article has headings.</summary>
+    public string? Heading { get; set; }
+    public string Text { get; set; } = "";
+    /// <summary>Lowercase words of the title, heading and text, for matching.</summary>
+    public string SearchText { get; set; } = "";
+}

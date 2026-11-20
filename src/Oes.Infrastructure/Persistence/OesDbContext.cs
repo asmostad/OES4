@@ -110,6 +110,8 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
     public DbSet<Domain.Ai.AiChatMessage> AiMessages => Set<Domain.Ai.AiChatMessage>();
     public DbSet<Domain.Ai.AiToolCall> AiToolCalls => Set<Domain.Ai.AiToolCall>();
     public DbSet<Domain.Ai.AiUsageDaily> AiUsageDaily => Set<Domain.Ai.AiUsageDaily>();
+    public DbSet<Domain.Ai.KnowledgeArticle> KnowledgeArticles => Set<Domain.Ai.KnowledgeArticle>();
+    public DbSet<Domain.Ai.KnowledgeChunk> KnowledgeChunks => Set<Domain.Ai.KnowledgeChunk>();
     public DbSet<ScopeImport> ScopeImports => Set<ScopeImport>();
 
     public DbSet<Domain.Communication.MessageTemplate> MessageTemplates => Set<Domain.Communication.MessageTemplate>();
@@ -356,6 +358,25 @@ public class OesDbContext(DbContextOptions<OesDbContext> options, ITenantContext
             e.ToTable("ai_usage_daily");
             e.Property(x => x.CostUsd).HasPrecision(12, 6);
             e.HasIndex(x => new { x.TenantId, x.UserId, x.Date }).IsUnique();
+        });
+
+        b.Entity<Domain.Ai.KnowledgeArticle>(e =>
+        {
+            e.ToTable("knowledge_articles");
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Category).HasMaxLength(60);
+            e.Property(x => x.Body).HasColumnType("mediumtext").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.TenantId, x.Category, x.Title });
+        });
+
+        b.Entity<Domain.Ai.KnowledgeChunk>(e =>
+        {
+            e.ToTable("knowledge_chunks");
+            e.Property(x => x.Heading).HasMaxLength(200);
+            e.Property(x => x.Text).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.Property(x => x.SearchText).HasColumnType("text").Metadata.SetMaxLength(null);
+            e.HasIndex(x => new { x.TenantId, x.ArticleId, x.Seq });
+            e.HasOne<Domain.Ai.KnowledgeArticle>().WithMany().HasForeignKey(x => x.ArticleId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<ScopeImport>(e =>

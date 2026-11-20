@@ -1,0 +1,65 @@
+@page
+@model Oes.Web.Pages.Admin.KnowledgeModel
+@{
+    ViewData["Title"] = "AI Knowledge Base";
+}
+<div class="page-header">
+    <div>
+        <h1>AI Knowledge Base</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">AI Knowledge Base</li></ol></nav>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Admin/KnowledgeEdit"><i class="bi bi-plus-lg me-1"></i> Add article</a>
+</div>
+
+<div class="alert alert-light border small">
+    <i class="bi bi-info-circle me-1"></i>Write down how your company does things (warranty terms, products you install, policies, procedures) and the
+    assistant searches it when someone asks, and says which article the answer came from. Everyone who can use the assistant can search every active article,
+    so keep anything private out. Headings (a line starting with <code>#</code>, or a short line ending in a colon) help it find the right part.
+</div>
+
+<form method="get" class="d-flex gap-2 mb-3" style="max-width:640px">
+    <input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="Try a question, e.g. how long is our workmanship warranty" aria-label="Test a search">
+    <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-search me-1"></i>Test search</button>
+</form>
+@if (Model.Hits is { } hits)
+{
+    <div class="card mb-3">
+        <div class="card-header small">What the assistant would find for “@Model.Q”</div>
+        <ul class="list-group list-group-flush">
+            @if (hits.Count == 0) { <li class="list-group-item small text-muted">Nothing matches. The assistant would say it doesn't know.</li> }
+            @foreach (var h in hits)
+            {
+                <li class="list-group-item" data-hit>
+                    <div class="small fw-semibold"><a href="/Admin/KnowledgeEdit/@h.ArticleId">@h.Title</a>@(h.Heading is null ? "" : " › " + h.Heading)</div>
+                    <div class="small text-muted pre-wrap">@(h.Text.Length > 400 ? h.Text[..400] + "…" : h.Text)</div>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead><tr><th>Article</th><th>Category</th><th class="text-end">Passages</th><th>Updated</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Articles.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-muted small">No articles yet. Start with your warranties and the products you install.</td></tr>
+                }
+                @foreach (var r in Model.Articles)
+                {
+                    var a = r.Article;
+                    <tr class="@(a.IsActive ? "" : "text-muted")">
+                        <td class="fw-medium"><a href="/Admin/KnowledgeEdit/@a.Id">@a.Title</a>
+                            @if (!a.IsActive) { <span class="badge bg-secondary-subtle text-secondary ms-1">Off</span> }</td>
+                        <td>@a.Category</td>
+                        <td class="text-end">@r.Passages</td>
+                        <td class="small text-muted">@Fmt.Ago(a.UpdatedAt)@(r.UpdatedBy is null ? "" : " by " + r.UpdatedBy)</td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/Admin/KnowledgeEdit/@a.Id"><i class="bi bi-pencil"></i> Edit</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -284,6 +284,92 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_usage_daily", (string)null);
                 });
 
+            modelBuilder.Entity("Oes.Domain.Ai.KnowledgeArticle", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("mediumtext");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("UpdatedByUserId")
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Category", "Title");
+
+                    b.ToTable("knowledge_articles", (string)null);
+                });
+
+            modelBuilder.Entity("Oes.Domain.Ai.KnowledgeChunk", b =>
+                {
+                    b.Property<byte[]>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<byte[]>("ArticleId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Heading")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId");
+
+                    b.HasIndex("TenantId", "ArticleId", "Seq");
+
+                    b.ToTable("knowledge_chunks", (string)null);
+                });
+
             modelBuilder.Entity("Oes.Domain.Booking.AvailabilityRule", b =>
                 {
                     b.Property<byte[]>("Id")
@@ -5803,6 +5889,15 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.HasOne("Oes.Infrastructure.Identity.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Oes.Domain.Ai.KnowledgeChunk", b =>
+                {
+                    b.HasOne("Oes.Domain.Ai.KnowledgeArticle", null)
+                        .WithMany()
+                        .HasForeignKey("ArticleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

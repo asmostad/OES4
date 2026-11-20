@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<Ai.AiUsageMeter>();
         services.AddScoped<Ai.MeasurementExtractor>();
         services.AddScoped<Ai.ScopeImportService>();
+        services.AddScoped<Ai.KnowledgeService>();
         services.AddScoped<Ai.AssistantTools>();
         services.AddScoped<Ai.AssistantService>();
 

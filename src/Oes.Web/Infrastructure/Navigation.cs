@@ -101,7 +101,7 @@ public static class Navigation
                 new("Pipeline & Lists", "bi-list-check", "/Admin/Lists", Permissions.SettingsManage),
                 new("Settings", "bi-gear", "/Admin/Settings", Permissions.SettingsManage),
                 new("Audit Log", "bi-journal-check", "/Admin/Audit", Permissions.AuditView),
-                new("AI Knowledge Base", "bi-journal-text", null, Permissions.AiManage),
+                new("AI Knowledge Base", "bi-journal-text", "/Admin/Knowledge", Permissions.AiManage),
                 new("AI Usage", "bi-graph-up", "/Admin/AiUsage", Permissions.AiManage),
             ]),
         ]),

@@ -16,7 +16,7 @@ namespace Oes.Infrastructure.Ai;
 /// </summary>
 public sealed class AssistantTools(
     CrmLookups lookups, OpportunityService opportunities, ContactService contacts, PropertyService properties,
-    ProjectService projects, RecordItems items, WorkService work, ReportService reports, TenantTime time)
+    ProjectService projects, RecordItems items, WorkService work, ReportService reports, TenantTime time, KnowledgeService knowledge)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -37,6 +37,8 @@ public sealed class AssistantTools(
                 },
                 required = new[] { "type", "id" },
             })),
+        new("search_knowledge", "Search the company's own knowledge base: warranties, products, policies, procedures and other things the company wrote down. Returns the best passages with their article titles. Use it before answering questions about how the company does things.",
+            Schema(new { type = "object", properties = new { query = new { type = "string", description = "What to look for, in a few words, e.g. \"workmanship warranty length\"." } }, required = new[] { "query" } })),
         new("list_my_tasks", "The user's own tasks, overdue and due first.",
             Schema(new { type = "object", properties = new { include_done = new { type = "boolean", description = "Also list finished tasks." } } })),
         new("my_schedule", "The user's appointments between two dates (company time zone). Defaults to the next 7 days.",
@@ -69,6 +71,7 @@ public sealed class AssistantTools(
             {
                 "search_records" => await SearchAsync(Str(input, "query") ?? "", ct),
                 "get_record" => await GetRecordAsync(Str(input, "type") ?? "", Id(input, "id"), ct),
+                "search_knowledge" => await KnowledgeAsync(Str(input, "query") ?? "", ct),
                 "list_my_tasks" => await TasksAsync(Bool(input, "include_done"), ct),
                 "my_schedule" => await ScheduleAsync(Date(input, "from"), Date(input, "to"), ct),
                 "pipeline_summary" => await PipelineAsync(ct),
@@ -94,6 +97,15 @@ public sealed class AssistantTools(
         if (q.Trim().Length < 2) return new ToolOutcome("Search for at least 2 characters.", true, "error", "query too short");
         var hits = await lookups.SearchAsync(q.Trim(), 5, ct);
         return Ok(hits.Select(h => new { kind = h.Kind, id = h.Id, title = h.Title, detail = h.Subtitle }), $"searched \"{Cut(q, 40)}\": {hits.Count} found");
+    }
+
+    private async Task<ToolOutcome> KnowledgeAsync(string q, CancellationToken ct)
+    {
+        if (q.Trim().Length < 2) return new ToolOutcome("Search for at least 2 characters.", true, "error", "query too short");
+        var hits = await knowledge.SearchAsync(q, 5, ct);
+        if (hits.Count == 0) return Ok(new { found = 0, note = "Nothing in the knowledge base matches. Say so; don't guess the company's policy." }, $"knowledge \"{Cut(q, 40)}\": nothing");
+        return Ok(hits.Select(h => new { article = h.Title, h.Category, section = h.Heading, passage = h.Text }),
+            $"knowledge \"{Cut(q, 40)}\": {hits.Count} passages from {string.Join(", ", hits.Select(h => h.Title).Distinct().Take(3))}");
     }
 
     private async Task<object> TimelineAsync(string type, Guid id, CancellationToken ct) =>
