@@ -206,6 +206,8 @@ public sealed class CapturingPdfRenderer : IPdfRenderer
     public string? LastFooter { get; private set; }
     public bool Unavailable { get; set; }
 
+    public void Reset() => (LastHtml, LastFooter) = (null, null);
+
     public Task<byte[]> RenderAsync(string html, string? footer = null, CancellationToken ct = default)
     {
         if (Unavailable) throw new PdfUnavailableException("PDFs can't be made on this server: no Edge or Chrome browser was found.");

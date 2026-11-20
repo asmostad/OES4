@@ -49,7 +49,8 @@ public sealed record SectionView(EstimateSection Section, List<EstimateLine> Lin
 /// <summary>A measurement offered as a quantity: value converted to the unit a line usually wants.</summary>
 public sealed record MeasurementOption(string Label, decimal Qty, string Unit);
 
-public sealed record VersionRow(Guid Id, int VersionNo, string Status, decimal Total, DateTime IssuedAt, string? IssuedBy, string? RevisionReason, string? SignerName, DateTime? SignedAt);
+public sealed record VersionRow(Guid Id, int VersionNo, string Status, decimal Total, DateTime IssuedAt, string? IssuedBy, string? RevisionReason, string? SignerName, DateTime? SignedAt,
+    Guid? PdfDocumentId = null, Guid? SignedPdfDocumentId = null);
 
 public sealed record EstimateDetail(
     Estimate Estimate, Opportunity Opportunity, Contact Contact, Property? Property, InsuranceClaim? Claim, PriceList? PriceList,
@@ -149,7 +150,7 @@ public sealed class EstimateService(
                               join u in db.Users on v.IssuedByUserId equals u.Id into us from u in us.DefaultIfEmpty()
                               orderby v.VersionNo descending
                               select new VersionRow(v.Id, v.VersionNo, v.Status, v.Total, v.CreatedAt, u == null ? null : u.FirstName + " " + u.LastName,
-                                  v.RevisionReason, v.SignerName, v.SignedAt)).ToListAsync(ct);
+                                  v.RevisionReason, v.SignerName, v.SignedAt, v.PdfDocumentId, v.SignedPdfDocumentId)).ToListAsync(ct);
 
         return new EstimateDetail(est, opp, contact, property, claim, priceList, owner, views, versions,
             await CanEditAsync(est), await user.HasPermissionAsync(Permissions.PricingApprove, ct));
@@ -616,6 +617,27 @@ public sealed class EstimateService(
         var v = await db.EstimateVersions.FirstOrDefaultAsync(x => x.Id == versionId, ct) ?? throw new RecordNotFoundException("Version");
         var est = await (await scope.EstimatesAsync(true)).FirstOrDefaultAsync(e => e.Id == v.EstimateId, ct) ?? throw new RecordNotFoundException("Version");
         return (v, JsonSerializer.Deserialize<VersionContent>(v.ContentJson, Json)!, est);
+    }
+
+    /// <summary>The saved PDF for the version as it stands now (the signed copy once signed), if there is one.</summary>
+    public static Guid? CurrentCopy(EstimateVersion v) => v.Status == VersionStatuses.Signed ? v.SignedPdfDocumentId : v.PdfDocumentId;
+
+    /// <summary>
+    /// Saves a rendered PDF of the version on the estimate (category proposal, or signed_proposal once signed) and
+    /// records it as the version's copy for its current state. Only one copy per state: returns the existing one if
+    /// it's already saved.
+    /// </summary>
+    public async Task<Guid> SaveVersionCopyAsync(Guid versionId, byte[] pdf, CancellationToken ct = default)
+    {
+        var (v, content, est) = await GetVersionAsync(versionId, ct); // visibility
+        if (CurrentCopy(v) is { } existing) return existing;
+        var signed = v.Status == VersionStatuses.Signed;
+        using var stream = new MemoryStream(pdf);
+        var name = $"{content.Number}-v{content.VersionNo}{(signed ? "-signed" : "")}.pdf";
+        var documentId = await items.UploadAsync(EntityTypes.Estimate, est.Id, stream, name, "application/pdf", signed ? "signed_proposal" : "proposal", ct);
+        if (signed) v.SignedPdfDocumentId = documentId; else v.PdfDocumentId = documentId;
+        await db.SaveChangesAsync(ct);
+        return documentId;
     }
 
     /// <summary>Records the customer's signature on the latest issued version and marks the opportunity won.</summary>

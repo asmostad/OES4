@@ -83,11 +83,15 @@ public class ViewModel(EstimateService estimates, MeasurementService measurement
     {
         var versionId = await estimates.IssueAsync(Id, revisionReason);
         Flash("Estimate issued. This version is now frozen.");
-        return RedirectToPage("/Estimates/Proposal", new { id = versionId });
+        return RedirectToPage("/Estimates/Proposal", new { id = versionId, save = true }); // the proposal page saves its PDF
     });
 
-    public Task<IActionResult> OnPostSignAsync(Guid versionId, string signerName) =>
-        Do(() => estimates.MarkSignedAsync(versionId, signerName), "Marked signed. The opportunity is now won.");
+    public Task<IActionResult> OnPostSignAsync(Guid versionId, string signerName) => Guard(async () =>
+    {
+        await estimates.MarkSignedAsync(versionId, signerName);
+        Flash("Marked signed. The opportunity is now won.");
+        return RedirectToPage("/Estimates/Proposal", new { id = versionId, save = true }); // saves the signed copy
+    });
 
     public Task<IActionResult> OnPostDeclineAsync(Guid versionId, string? reason) => Do(() => estimates.MarkDeclinedAsync(versionId, reason), "Marked declined.");
 }

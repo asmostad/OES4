@@ -297,6 +297,10 @@ public class EstimateVersion : TenantEntity
     public string ContentHash { get; set; } = "";
     public DateTime? SignedAt { get; set; }
     public string? SignerName { get; set; }
+    /// <summary>The PDF of this version as issued, saved on the estimate (what the customer was sent).</summary>
+    public Guid? PdfDocumentId { get; set; }
+    /// <summary>The PDF once signed (with the signer's name), saved on the estimate.</summary>
+    public Guid? SignedPdfDocumentId { get; set; }
 }
 
 public static class ScopeImportStatuses

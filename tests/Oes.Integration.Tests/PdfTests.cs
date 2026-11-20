@@ -104,8 +104,9 @@ public sealed class PdfTests(MySqlFixture fx)
         await using (var s = fx.ScopeAs(t.Id, admin))
         {
             var db = s.Get<OesDbContext>();
-            var saved = await db.Documents.SingleAsync(d => d.EntityId == estimateId && d.CategoryKey == "proposal");
-            Assert.Matches(@"^EST-\d{4}-\d+-v1\.pdf$", saved.FileName);
+            var saved = await db.Documents.SingleAsync(d => d.EntityId == estimateId && d.CategoryKey == "signed_proposal"); // the version is signed
+            Assert.Matches(@"^EST-\d{4}-\d+-v1-signed\.pdf$", saved.FileName);
+            Assert.Equal(saved.Id, (await db.EstimateVersions.SingleAsync(v => v.Id == versionId)).SignedPdfDocumentId);
             var mail = await db.EmailMessages.Include(m => m.Attachments).Include(m => m.Recipients).SingleAsync(m => m.Subject == "Your proposal");
             Assert.Equal(saved.Id, mail.Attachments.Single().DocumentId);
             Assert.Contains(mail.Recipients, r => r.Kind == "cc" && r.Address == "adjuster@example.com");
@@ -148,6 +149,82 @@ public sealed class PdfTests(MySqlFixture fx)
         if (Environment.GetEnvironmentVariable("OES_PDF_OUT") is { Length: > 0 } saveTo) await File.WriteAllBytesAsync(saveTo, pdf); // to look at it
         Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(pdf, 0, 5));
         Assert.True(pdf.Length > 5_000, $"PDF is only {pdf.Length} bytes");
+    }
+
+    [Fact]
+    public async Task Issuing_and_signing_save_a_pdf_of_each_and_emailing_reuses_it()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        Guid estimateId, contactId;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            contactId = await s.Get<ContactService>().CreateAsync(new ContactInput
+            {
+                FirstName = "Sal", LastName = "Saved", Methods = [new MethodInput(ContactMethodKinds.Email, "sal@example.com", null, true)],
+            });
+            var opp = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = contactId });
+            var est = s.Get<EstimateService>();
+            estimateId = await est.CreateAsync(new NewEstimateInput { OpportunityId = opp, Method = EstimateMethods.LineItem });
+            var product = await s.Get<CatalogService>().SaveProductAsync(null, new ProductInput { Sku = "SQ", Name = "Roof per square", Unit = "SQ", DefaultPrice = 400m });
+            await est.AddProductLineAsync(estimateId, (await est.GetAsync(estimateId)).Sections.Single().Section.Id, product, 20);
+        }
+        var web = fx.App.Browser();
+        string Token(string html) => System.Text.RegularExpressions.Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = admin.Email!, ["Password"] = MySqlFixture.Password, ["__RequestVerificationToken"] = Token(await web.GetStringAsync("/Account/Login")),
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+
+        // Issue: the proposal page saves the PDF as issued, once.
+        var view = await web.GetStringAsync($"/Estimates/View/{estimateId}");
+        var issued = await web.PostAsync($"/Estimates/View/{estimateId}?handler=Issue", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = Token(view) }));
+        var saveUrl = issued.Headers.Location!.OriginalString;
+        Assert.Matches(@"^/Estimates/Proposal/[0-9a-f-]{36}\?save=True$", saveUrl);
+        var versionId = Guid.Parse(saveUrl[20..56]);
+        var saving = await web.GetAsync(saveUrl);
+        Assert.Equal($"/Estimates/Proposal/{versionId}", saving.Headers.Location?.OriginalString);
+        Assert.Contains("Estimate issued. This version is now frozen. A PDF copy is saved on the estimate.", await web.GetStringAsync($"/Estimates/Proposal/{versionId}"));
+        Guid issuedPdf;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var v = await s.Get<OesDbContext>().EstimateVersions.SingleAsync(x => x.Id == versionId);
+            issuedPdf = v.PdfDocumentId!.Value;
+            Assert.Equal("proposal", (await s.Get<OesDbContext>().Documents.SingleAsync(d => d.Id == issuedPdf)).CategoryKey);
+        }
+        fx.Pdf.Reset();
+        Assert.Equal($"/Estimates/Proposal/{versionId}", (await web.GetAsync(saveUrl)).Headers.Location?.OriginalString); // already saved
+        Assert.Null(fx.Pdf.LastHtml);
+
+        // Emailing uses the saved copy; nothing is rendered again.
+        var page = await web.GetStringAsync($"/Estimates/Proposal/{versionId}");
+        await web.PostAsync($"/Estimates/Proposal/{versionId}?handler=Email", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Mail.To"] = $"{contactId}|sal@example.com", ["Mail.Subject"] = "Proposal attached", ["Mail.Body"] = "Here it is.", ["__RequestVerificationToken"] = Token(page),
+        }));
+        Assert.Null(fx.Pdf.LastHtml);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+            Assert.Equal(issuedPdf, (await s.Get<OesDbContext>().EmailMessages.Include(m => m.Attachments).SingleAsync(m => m.Subject == "Proposal attached")).Attachments.Single().DocumentId);
+
+        // Signing saves a second copy, with the signature.
+        view = await web.GetStringAsync($"/Estimates/View/{estimateId}");
+        var signed = await web.PostAsync($"/Estimates/View/{estimateId}?handler=Sign", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["versionId"] = versionId.ToString(), ["signerName"] = "Sal Saved", ["__RequestVerificationToken"] = Token(view),
+        }));
+        await web.GetAsync(signed.Headers.Location!.OriginalString);
+        Assert.Contains("Sal Saved", fx.Pdf.LastHtml);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var v = await s.Get<OesDbContext>().EstimateVersions.SingleAsync(x => x.Id == versionId);
+            Assert.Equal(issuedPdf, v.PdfDocumentId); // the issued copy stays
+            var signedDoc = await s.Get<OesDbContext>().Documents.SingleAsync(d => d.Id == v.SignedPdfDocumentId);
+            Assert.Equal("signed_proposal", signedDoc.CategoryKey);
+            Assert.EndsWith("-v1-signed.pdf", signedDoc.FileName);
+        }
+        view = await web.GetStringAsync($"/Estimates/View/{estimateId}");
+        Assert.Contains("PDF as issued", view);
+        Assert.Contains("Signed PDF", view);
     }
 
     [Theory]

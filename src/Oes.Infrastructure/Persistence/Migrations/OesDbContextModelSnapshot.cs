@@ -3195,6 +3195,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("decimal(12,2)");
 
+                    b.Property<byte[]>("PdfDocumentId")
+                        .HasColumnType("binary(16)");
+
                     b.Property<decimal>("Profit")
                         .HasPrecision(12, 2)
                         .HasColumnType("decimal(12,2)");
@@ -3205,6 +3208,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("SignedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("SignedPdfDocumentId")
+                        .HasColumnType("binary(16)");
 
                     b.Property<string>("SignerName")
                         .HasMaxLength(150)

@@ -260,6 +260,13 @@ else if (e.Status == EstimateStatuses.Draft && e.LatestVersionNo > 0)
                         </div>
                         <div class="text-muted">@v.IssuedAt.ToString("MMM d, yyyy") · @v.IssuedBy@(v.RevisionReason is null ? "" : " · " + v.RevisionReason)</div>
                         @if (v.SignerName is not null) { <div class="text-success"><i class="bi bi-pen"></i> Signed by @v.SignerName @v.SignedAt?.ToString("MMM d")</div> }
+                        @if (v.PdfDocumentId is not null || v.SignedPdfDocumentId is not null)
+                        {
+                            <div data-version-copies>
+                                @if (v.PdfDocumentId is { } issuedPdf) { <a class="me-2" href="/Records/Items?handler=Download&id=@issuedPdf"><i class="bi bi-file-earmark-pdf"></i> PDF as issued</a> }
+                                @if (v.SignedPdfDocumentId is { } signedPdf) { <a href="/Records/Items?handler=Download&id=@signedPdf"><i class="bi bi-file-earmark-pdf"></i> Signed PDF</a> }
+                            </div>
+                        }
                         @if (edit && v.Status == VersionStatuses.Issued && v.VersionNo == e.LatestVersionNo && e.Status == EstimateStatuses.Issued)
                         {
                             <form method="post" asp-page-handler="Sign" class="d-flex gap-1 mt-2">
