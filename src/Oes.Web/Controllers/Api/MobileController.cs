@@ -26,6 +26,8 @@ public sealed record PropertyDto(Guid Id, string Address, List<PropertyContactDt
 public sealed record OptionsResponse(List<StageOption> Stages, List<Option> LostReasons, List<Option> AppointmentTypes, List<Option> LeadSources);
 public sealed record DeviceRequest(string Token, string Platform);
 public sealed record UnregisterDeviceRequest(string Token);
+public sealed record NotificationDto(Guid Id, string Kind, string Title, string? Body, string? Url, DateTime CreatedAt, bool Read);
+public sealed record NotificationsResponse(int Unread, List<NotificationDto> Items);
 public sealed record DocumentDto(Guid Id, string FileName, string ContentType, long SizeBytes, string? Category, DateTime CreatedAt);
 public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? AuthorName, string Text, string EntityType, Guid EntityId,
     string? FileName, string? Subject, string? Direction);
@@ -38,7 +40,7 @@ public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? 
 [ApiController]
 [Route("api/v1")]
 public sealed class MobileController(WorkService work, OpportunityService opportunities, RecordItems items, OesDbContext db, PushService push,
-    CrmLookups lookups, FieldLeadService leads, ContactService contacts, PropertyService properties) : ControllerBase
+    CrmLookups lookups, FieldLeadService leads, ContactService contacts, PropertyService properties, NotificationService notifications) : ControllerBase
 {
     public const long MaxPhotoBytes = 25 * 1024 * 1024;
 
@@ -149,6 +151,26 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         StatusCode(StatusCodes.Status201Created, new CreatedResponse(await work.CreateAppointmentAsync(input, ct)));
 
     /// <summary>This phone's Expo push address, after the user allowed notifications. Calling again refreshes it.</summary>
+    /// <summary>The user's bell: unread first, then the newest. The same list as the web header.</summary>
+    [HttpGet("notifications")]
+    public async Task<NotificationsResponse> Notifications(int take = 50, CancellationToken ct = default)
+    {
+        var list = await notifications.LatestAsync(Math.Clamp(take, 1, 100), ct);
+        return new(await notifications.UnreadCountAsync(ct),
+            list.Select(n => new NotificationDto(n.Id, n.Kind, n.Title, n.Body, n.Url, n.CreatedAt, n.ReadAt != null)).ToList());
+    }
+
+    [HttpPut("notifications/{id:guid}/read")]
+    public async Task<IActionResult> ReadNotification(Guid id, CancellationToken ct) =>
+        await notifications.MarkReadAsync(id, ct) ? NoContent() : NotFound();
+
+    [HttpPost("notifications/read-all")]
+    public async Task<IActionResult> ReadAllNotifications(CancellationToken ct)
+    {
+        await notifications.MarkAllReadAsync(ct);
+        return NoContent();
+    }
+
     [HttpPost("devices")]
     public async Task<IActionResult> RegisterDevice(DeviceRequest body, CancellationToken ct)
     {

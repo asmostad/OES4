@@ -64,6 +64,16 @@ public sealed class NotificationService(OesDbContext db, ICurrentUser user, IClo
         return n.Url;
     }
 
+    /// <summary>Marks one of the current user's notifications read. False when it isn't theirs (or doesn't exist).</summary>
+    public async Task<bool> MarkReadAsync(Guid id, CancellationToken ct = default)
+    {
+        var n = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == user.UserId, ct);
+        if (n is null) return false;
+        n.ReadAt ??= clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     public async Task MarkAllReadAsync(CancellationToken ct = default)
     {
         if (user.UserId is not { } me) return;

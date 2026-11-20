@@ -2,11 +2,12 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import type { Api } from './api';
+import { routeFor } from './routes';
 import { storage } from './storage';
 
 /**
@@ -70,15 +71,6 @@ export async function disablePush(api: Api): Promise<void> {
   await storage.remove(KEY);
 }
 
-/** The app screen for a notification's web link: a lead opens its lead, tasks open Tasks, anything else Today. */
-export function routeFor(url: unknown): Href {
-  const u = typeof url === 'string' ? url : '';
-  const lead = /^\/Opportunities\/View\/([0-9a-f-]{36})/i.exec(u);
-  if (lead) return `/opportunity/${lead[1]}`;
-  if (/^\/Tasks\b/i.test(u)) return '/tasks';
-  return '/';
-}
-
 /** Opens the matching screen when a notification is tapped (including the one that launched the app). */
 export function usePushTaps(enabled: boolean): void {
   const last = Notifications.useLastNotificationResponse();
@@ -88,7 +80,12 @@ export function usePushTaps(enabled: boolean): void {
     const id = last.notification.request.identifier;
     if (handled.current === id) return;
     handled.current = id;
-    router.push(routeFor(last.notification.request.content.data?.url));
+    router.push(routeFor(last.notification.request.content.data?.url) ?? '/');
     Notifications.clearLastNotificationResponseAsync();
   }, [enabled, last]);
+}
+
+/** The number on the app icon: kept in step with the bell when the user reads notifications in the app. */
+export function setBadge(count: number): void {
+  Notifications.setBadgeCountAsync(count).catch(() => {});
 }

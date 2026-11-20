@@ -201,3 +201,5 @@ export type ContactDetail = {
 };
 export type PropertyContact = { id: string; name: string; role: string; isPrimary: boolean; phone: string | null; email: string | null };
 export type PropertyDetail = { id: string; address: string; contacts: PropertyContact[]; opportunities: OpportunityBrief[] };
+export type NotificationItem = { id: string; kind: string; title: string; body: string | null; url: string | null; createdAt: string; read: boolean };
+export type Bell = { unread: number; items: NotificationItem[] };

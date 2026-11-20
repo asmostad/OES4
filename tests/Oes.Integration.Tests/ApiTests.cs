@@ -299,4 +299,44 @@ public sealed class ApiTests(MySqlFixture fx)
             Assert.Equal((rep.Id, "door_knock", true), (opp.OwnerUserId, opp.SourceKey, opp.IsInsurance));
         }
     }
+
+    [Fact]
+    public async Task Field_app_reads_and_clears_the_bell()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        Guid adminNote;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var notes = s.Get<Oes.Infrastructure.Work.NotificationService>();
+            notes.Notify(rep.Id, "task.assigned", "Call the adjuster", "Due Friday", "/Tasks");
+            notes.Notify(rep.Id, "opportunity.stale", "A lead went quiet", null, "/Opportunities");
+            await s.Get<OesDbContext>().SaveChangesAsync();
+        }
+        await using (var s = fx.ScopeAs(t.Id, rep))
+        {
+            s.Get<Oes.Infrastructure.Work.NotificationService>().Notify(admin.Id, "task.due", "Admin's own", null, "/Tasks");
+            await s.Get<OesDbContext>().SaveChangesAsync();
+            adminNote = await s.Get<OesDbContext>().Notifications.Where(n => n.UserId == admin.Id).Select(n => n.Id).SingleAsync();
+        }
+
+        var app = await SignedInAsync(rep);
+        var bell = await Json(await app.GetAsync("/api/v1/notifications"));
+        Assert.Equal(2, bell.GetProperty("unread").GetInt32());
+        var items = bell.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count); // only the rep's own
+        var first = items.Single(i => i.GetProperty("title").GetString() == "Call the adjuster");
+        Assert.Equal(("task.assigned", "/Tasks", false), (first.GetProperty("kind").GetString(), first.GetProperty("url").GetString(), first.GetProperty("read").GetBoolean()));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await app.PutAsync($"/api/v1/notifications/{first.GetProperty("id").GetGuid()}/read", null)).StatusCode);
+        Assert.Equal(1, (await Json(await app.GetAsync("/api/v1/notifications"))).GetProperty("unread").GetInt32());
+        Assert.Equal(HttpStatusCode.NotFound, (await app.PutAsync($"/api/v1/notifications/{adminNote}/read", null)).StatusCode); // someone else's
+
+        Assert.Equal(HttpStatusCode.NoContent, (await app.PostAsync("/api/v1/notifications/read-all", null)).StatusCode);
+        bell = await Json(await app.GetAsync("/api/v1/notifications"));
+        Assert.Equal(0, bell.GetProperty("unread").GetInt32());
+        Assert.All(bell.GetProperty("items").EnumerateArray(), i => Assert.True(i.GetProperty("read").GetBoolean()));
+        await using (var s = fx.ScopeAs(t.Id, admin))
+            Assert.Null(await s.Get<OesDbContext>().Notifications.Where(n => n.Id == adminNote).Select(n => n.ReadAt).SingleAsync()); // untouched
+    }
 }
