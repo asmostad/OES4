@@ -10,8 +10,8 @@ using Oes.Web.Infrastructure;
 namespace Oes.Web.Pages.Estimates;
 
 /// <summary>
-/// The proposal, rendered from a frozen version (never live data), behind sign-in. Print or
-/// save as PDF from the browser; server-side PDF rendering (Playwright) comes later.
+/// The proposal, rendered from a frozen version (never live data), behind sign-in. Print from the
+/// browser, or download the server-made PDF (?handler=Pdf).
 /// </summary>
 public class ProposalModel(EstimateService estimates, OesDbContext db, ITenantContext tenant) : CrmPageModel
 {
@@ -27,5 +27,13 @@ public class ProposalModel(EstimateService estimates, OesDbContext db, ITenantCo
         (Version, Doc, Estimate) = await estimates.GetVersionAsync(Id);
         Company = await db.Tenants.FirstAsync(t => t.Id == tenant.TenantId);
         return Page();
+    });
+
+    /// <summary>The same frozen version as a PDF download.</summary>
+    public Task<IActionResult> OnGetPdfAsync() => Guard(async () =>
+    {
+        (Version, Doc, Estimate) = await estimates.GetVersionAsync(Id);
+        Company = await db.Tenants.FirstAsync(t => t.Id == tenant.TenantId);
+        return await PdfAsync($"{Doc.Number}-v{Doc.VersionNo}", $"{Company.Name} · proposal {Doc.Number} v{Doc.VersionNo}", $"/Estimates/Proposal/{Id}");
     });
 }

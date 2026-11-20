@@ -53,6 +53,17 @@ public abstract class CrmPageModel : PageModel
         foreach (var key in ModelState.Keys.Where(k => k.StartsWith("Address.", StringComparison.Ordinal)).ToList()) ModelState.Remove(key);
     }
 
+    /// <summary>
+    /// This page, rendered as a PDF download: the page's own Razor view in PDF mode (its layout inlines
+    /// the styles and drops the toolbar and scripts), then the server's browser prints it. Load the
+    /// page's data first. If no browser is available, it flashes why and goes to <paramref name="printUrl"/>.
+    /// </summary>
+    protected Task<IActionResult> PdfAsync(string fileName, string? footer, string printUrl)
+    {
+        ViewData[PdfDocument.ViewDataKey] = true;
+        return Task.FromResult<IActionResult>(new PdfPageResult(fileName, footer, printUrl));
+    }
+
     protected IActionResult BackTo(string? returnUrl, string fallback) =>
         LocalRedirect(!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : fallback);
 }

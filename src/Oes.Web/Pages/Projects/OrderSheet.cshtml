@@ -19,7 +19,8 @@
     <div class="print-toolbar no-print">
         <a href="/Projects/OrderSheet/@t.Id" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Back to the order sheet</a>
         <span class="small text-muted">@(t.OrderedAt is null ? "Not ordered yet" : "Ordered " + t.OrderedAt.Value.ToString("MMM d, yyyy"))</span>
-        <button type="button" class="btn btn-sm btn-primary" data-print><i class="bi bi-printer me-1"></i>Print / save as PDF</button>
+        <span class="d-flex gap-2"><a class="btn btn-sm btn-primary" href="?handler=Pdf" data-pdf-download><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+            <button type="button" class="btn btn-sm btn-outline-light" data-print><i class="bi bi-printer me-1"></i>Print</button></span>
     </div>
     <article class="proposal">
         <header class="proposal-head">

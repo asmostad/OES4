@@ -133,6 +133,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
 - **Dev:** local .NET + MySQL in Docker.
 - **Staging:** on the VPS as a second IIS site and database. Optional for now, but recommended before JRS cuts over.
 - **Prod:** IIS site (ASP.NET Core Hosting Bundle) + `Oes.Worker` Windows Service + MySQL on the same VPS.
+  - Microsoft Edge (or Chrome) must be installed for server-side PDFs; nothing else is downloaded.
   - The file store is a folder outside `wwwroot`.
   - Nightly backups of MySQL plus the file store go off-box.
 - **CI:** GitHub Actions builds, tests (including the tenant-isolation suite) and packages. Deploy is a zip/web-deploy step at first, later automated.
@@ -204,8 +205,12 @@ Today the worker runs plain timed hosted services, each job working per tenant i
        - The takeoff page previews the section's scope of work: one "- " item per rule that adds a line, in rule order, with identical wording listed once. Rules still needing a product add no wording.
        - "Use it as this section's scope of work" replaces the section's scope when the lines go on. It's ticked unless the scope was typed or changed by hand since the last takeoff wrote it (`estimate_sections.TakeoffScope`), so hand wording isn't overwritten by accident.
        - New companies' starter rules come with customer-facing wording (nails, miters and end caps have none). Companies set up before this have no wording on their rules until an admin adds it.
-   - Still to do:
-     - Server-side PDF (Playwright).
+     - Server-side PDFs (done 2026-11-19):
+       - "Download PDF" on the proposal (a frozen version), work order, change order and order sheet print views (`?handler=Pdf`). Each is the page's own Razor view, run in-process into a buffer in PDF mode (`PdfPageResult`), so the PDF always matches the print view and needs no print URL or key.
+       - In PDF mode the print layout inlines its styles (`css/pich-document.css`, a small Bootstrap subset, plus `oes4-print.css`), drops the scripts and flash message, and adds a CSP that allows nothing to load.
+       - `IPdfRenderer` → `PlaywrightPdfRenderer`: headless Chromium through Playwright, using a browser already installed (Edge, then Chrome; or `Pdf:Channel` / `Pdf:ExecutablePath`), so nothing is downloaded. JavaScript is off, every request is aborted and the context is offline. Letter size, "Page n of m" and the document name in the footer. One browser is kept and relaunched if it dies; `Pdf:MaxConcurrent` (2) documents at a time.
+       - With no browser on the server, the download goes back to the print view with the reason, and printing from the browser still works.
+       - Not yet: storing a PDF on the record (e.g. at issue or sign), emailing it, or a PDF endpoint in the API.
 6. **Production** (done 2026-11-19)
    - Done:
      - Projects from signed estimates (one trade per estimate trade, contract = signed total).
@@ -227,7 +232,7 @@ Today the worker runs plain timed hosted services, each job working per tenant i
    - Work orders on trades, with lines copied from the rates in effect on the work date.
    - Issuing emails a hashed, 60-day, revocable portal link; revise, new link and cancel all revoke it.
    - Sub portal (no sign-in, rate limited, no-referrer, noindex): accept or decline, then report completion with photos that roll up to the trade and project.
-   - Work order print view (`/WorkOrders/Print/{id}`; print or save as PDF from the browser, like the proposal). Server-side PDF rendering for both comes with Playwright later. Insurance-expiry alerts are done (worker `ChecksJob`).
+   - Work order print view (`/WorkOrders/Print/{id}`), printed from the browser or downloaded as a server-made PDF, like the proposal. Insurance-expiry alerts are done (worker `ChecksJob`).
 8. **Communication** (in progress: tasks, calendar, notifications, templates, one-to-one email and texts, consent and STOP done 2026-11-17)
    - Done:
      - Tasks: standalone or on any record, rolled up through record_links (a task on an opportunity shows on its property and contact). Date-only tasks are stored at noon in the company time zone; overdue/today grouping; mine/everyone (`tasks.view_all`); done-toggle logs to the record and notifies the creator.

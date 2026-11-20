@@ -42,6 +42,9 @@ public sealed class MySqlFixture : IAsyncLifetime
     /// <summary>Calendar feeds by URL: tests never reach the internet.</summary>
     public FakeFetcher Feeds { get; } = new();
 
+    /// <summary>PDFs: captures the HTML instead of starting a browser (PdfTests runs the real renderer once).</summary>
+    public CapturingPdfRenderer Pdf { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _mysql.StartAsync();
@@ -157,6 +160,7 @@ public sealed class TestApp(MySqlFixture fx) : WebApplicationFactory<Program>
             s.RemoveAll<IClock>(); s.AddSingleton<IClock>(fx.Clock);
             s.RemoveAll<IAiClient>(); s.AddSingleton<IAiClient>(fx.Ai);
             s.RemoveAll<Oes.Infrastructure.Http.ISafeFetcher>(); s.AddSingleton<Oes.Infrastructure.Http.ISafeFetcher>(fx.Feeds);
+            s.RemoveAll<IPdfRenderer>(); s.AddSingleton<IPdfRenderer>(fx.Pdf);
         });
     }
 
@@ -192,5 +196,20 @@ public sealed class FakeFetcher : Oes.Infrastructure.Http.ISafeFetcher
     {
         var key = Oes.Infrastructure.Http.SafeHttpFetcher.Normalize(url).ToString();
         return _content.TryGetValue(key, out var c) ? Task.FromResult(c) : throw new Oes.Infrastructure.Http.SafeFetchException("Couldn't reach the calendar site.");
+    }
+}
+
+/// <summary>Records what it was asked to render and returns a stand-in PDF; can pretend no browser is installed.</summary>
+public sealed class CapturingPdfRenderer : IPdfRenderer
+{
+    public string? LastHtml { get; private set; }
+    public string? LastFooter { get; private set; }
+    public bool Unavailable { get; set; }
+
+    public Task<byte[]> RenderAsync(string html, string? footer = null, CancellationToken ct = default)
+    {
+        if (Unavailable) throw new PdfUnavailableException("PDFs can't be made on this server: no Edge or Chrome browser was found.");
+        (LastHtml, LastFooter) = (html, footer);
+        return Task.FromResult("%PDF-1.7 stand-in"u8.ToArray());
     }
 }

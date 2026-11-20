@@ -30,6 +30,8 @@ public static class DependencyInjection
             if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi(protectToLocalMachine: true);
         }
         services.AddSingleton<Http.ISafeFetcher, Http.SafeHttpFetcher>();
+        services.Configure<Documents.PdfOptions>(config.GetSection(Documents.PdfOptions.Section));
+        services.AddSingleton<IPdfRenderer, Documents.PlaywrightPdfRenderer>();
 
         services.AddScoped<TenantContext>();
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());

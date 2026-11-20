@@ -26,6 +26,15 @@ public class OrderSheetModel(OrderSheetService orders, OesDbContext db, ITenantC
         return Page();
     });
 
+    /// <summary>The supplier copy as a PDF download.</summary>
+    public Task<IActionResult> OnGetPdfAsync() => Guard(async () =>
+    {
+        await LoadAsync(null);
+        Print = true;
+        var name = $"{Sheet.Trade.Project.Number} {Sheet.Trade.Type.Name} order";
+        return await PdfAsync(name, $"{Company.Name} · {name}", $"/Projects/OrderSheet/{Id}?print=true");
+    });
+
     public Task<IActionResult> OnPostPreviewAsync() => Guard(async () =>
     {
         await LoadAsync(Choices);

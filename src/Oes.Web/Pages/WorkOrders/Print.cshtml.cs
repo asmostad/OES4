@@ -23,4 +23,11 @@ public class PrintModel(WorkOrderService workOrders, OesDbContext db, ITenantCon
         Company = await db.Tenants.FirstAsync(t => t.Id == tenant.TenantId);
         return Page();
     });
+
+    public Task<IActionResult> OnGetPdfAsync() => Guard(async () =>
+    {
+        Detail = await workOrders.GetAsync(Id);
+        Company = await db.Tenants.FirstAsync(t => t.Id == tenant.TenantId);
+        return await PdfAsync(Detail.WorkOrder.Number, $"{Company.Name} · work order {Detail.WorkOrder.Number}", $"/WorkOrders/Print/{Id}");
+    });
 }

@@ -85,3 +85,14 @@ public interface ISmsProvider
     string Name { get; }
     Task<ProviderResult> SendAsync(string fromNumber, string toNumber, string body, CancellationToken ct = default);
 }
+
+/// <summary>Turns a self-contained HTML document into a PDF (letter size, page numbers in the footer).</summary>
+public interface IPdfRenderer
+{
+    /// <param name="html">A complete document. It can't load anything: styles must be inline and images data: URIs.</param>
+    /// <param name="footer">Text at the bottom left of every page (e.g. the document number), beside "Page n of m".</param>
+    Task<byte[]> RenderAsync(string html, string? footer = null, CancellationToken ct = default);
+}
+
+/// <summary>No browser could be started to render PDFs (none installed, or the configured path is wrong).</summary>
+public sealed class PdfUnavailableException(string message, Exception? inner = null) : Exception(message, inner);

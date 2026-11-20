@@ -24,6 +24,16 @@ public class ChangeOrderModel(ProjectService projects, OesDbContext db, ITenantC
         return Page();
     });
 
+    /// <summary>The printable copy as a PDF download.</summary>
+    public Task<IActionResult> OnGetPdfAsync() => Guard(async () =>
+    {
+        Detail = await projects.GetChangeOrderAsync(Id);
+        Company = await db.Tenants.FirstAsync(t => t.Id == tenant.TenantId);
+        Print = true;
+        var name = $"{Detail.Project.Number} change order {Detail.ChangeOrder.Sequence}";
+        return await PdfAsync(name, $"{Company.Name} · {name}", $"/Projects/ChangeOrder/{Id}?print=true");
+    });
+
     public Task<IActionResult> OnPostPriceItemAsync(Guid priceListItemId, decimal qty) => Do(() => projects.AddChangeOrderPriceItemAsync(Id, priceListItemId, qty));
 
     public Task<IActionResult> OnPostProductAsync(Guid productId, decimal qty) => Do(() => projects.AddChangeOrderProductAsync(Id, productId, qty));
