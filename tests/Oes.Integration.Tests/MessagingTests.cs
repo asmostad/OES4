@@ -73,7 +73,7 @@ public sealed class MessagingTests(MySqlFixture fx)
             await Assert.ThrowsAsync<RecordNotFoundException>(() => messaging.SendEmailAsync(bad));
 
             var m = await s.Get<OesDbContext>().EmailMessages.Include(x => x.Recipients).Include(x => x.Attachments).SingleAsync(x => x.Id == sent);
-            Assert.Equal([("to", "mia@example.com"), ("cc", "adjuster@example.com"), ("bcc", "office@example.com")], m.Recipients.Select(x => (x.Kind, x.Address)));
+            Assert.Equal([("to", "mia@example.com"), ("cc", "adjuster@example.com"), ("bcc", "office@example.com")], m.Recipients.OrderBy(x => Array.IndexOf(["to", "cc", "bcc"], x.Kind)).Select(x => (x.Kind, x.Address)));
             Assert.Equal(("Quote.pdf", doc), (m.Attachments.Single().FileName, m.Attachments.Single().DocumentId));
 
             // The provider got the file; the timeline and the message page show it.

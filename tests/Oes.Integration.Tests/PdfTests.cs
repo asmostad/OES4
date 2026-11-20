@@ -21,7 +21,7 @@ public sealed class PdfTests(MySqlFixture fx)
     public async Task Print_documents_download_as_self_contained_pdfs()
     {
         var (t, admin) = await fx.CreateTenantAsync();
-        Guid versionId, coId, tradeId, woId, contactId, estimateId;
+        Guid versionId, coId, tradeId, woId, contactId, estimateId, projectId;
         await using (var s = fx.ScopeAs(t.Id, admin))
         {
             var property = await s.Get<PropertyService>().CreateAsync(new PropertyInput { Line1 = "12 Paper Ln", City = "Lincoln", State = "NE", PostalCode = "68502" });
@@ -40,7 +40,7 @@ public sealed class PdfTests(MySqlFixture fx)
             await est.MarkSignedAsync(versionId, "Penny Dee-Eff");
 
             var projects = s.Get<ProjectService>();
-            var projectId = await projects.CreateFromEstimateAsync(id);
+            projectId = await projects.CreateFromEstimateAsync(id);
             tradeId = (await projects.GetAsync(projectId)).Trades.Single().Trade.Id;
             coId = await projects.AddChangeOrderAsync(projectId, null, "Replace rotted decking", 285m, "Found at tear-off", false);
             var sub = await s.Get<SubcontractorService>().CreateAsync(new NewSubInput { OrganizationName = "Paper Crew LLC", Email = $"crew{Guid.NewGuid():N}@example.com", TradeCodes = ["roofing"] });
@@ -118,6 +118,55 @@ public sealed class PdfTests(MySqlFixture fx)
         }));
         Assert.Equal(HttpStatusCode.Redirect, noRecipient.StatusCode);
         Assert.Contains("Pick who to send it to.", await web.GetStringAsync($"/Estimates/Proposal/{versionId}"));
+
+        // A change order goes to the customer the same way, saved on the project.
+        var coPrint = await web.GetStringAsync($"/Projects/ChangeOrder/{coId}?print=true");
+        Assert.Contains("Email to the customer", coPrint);
+        Assert.Contains($"value=\"{contactId}|penny@example.com\"", coPrint);
+        var coSent = await web.PostAsync($"/Projects/ChangeOrder/{coId}?handler=Email", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Mail.To"] = $"{contactId}|penny@example.com", ["Mail.Subject"] = "Change order 1", ["Mail.Body"] = "Please review.", ["__RequestVerificationToken"] = PageToken(coPrint),
+        }));
+        Assert.Equal($"/Projects/ChangeOrder/{coId}?print=true", coSent.Headers.Location?.OriginalString);
+        Assert.Contains("Change order emailed to penny@example.com", await web.GetStringAsync($"/Projects/ChangeOrder/{coId}?print=true"));
+
+        // An order sheet goes to a typed supplier address, and can be marked ordered at the same time.
+        var sheetPrint = await web.GetStringAsync($"/Projects/OrderSheet/{tradeId}?print=true");
+        Assert.Contains("Email to the supplier", sheetPrint);
+        Assert.Contains("Mark as ordered from", sheetPrint);
+        async Task<string> EmailOrder(Dictionary<string, string> form)
+        {
+            form["__RequestVerificationToken"] = PageToken(sheetPrint);
+            await web.PostAsync($"/Projects/OrderSheet/{tradeId}?handler=Email", new FormUrlEncodedContent(form));
+            return await web.GetStringAsync($"/Projects/OrderSheet/{tradeId}?print=true");
+        }
+        Assert.Contains("The order sheet is empty", await EmailOrder(new() { ["Mail.To"] = "orders@supplier.example", ["Mail.Subject"] = "x", ["Mail.Body"] = "x" }));
+        await using (var s = fx.ScopeAs(t.Id, admin))
+            await s.Get<OrderSheetService>().AddLineAsync(tradeId, null, "Coil nails", 4, "BX", null);
+        Assert.Contains("Enter the supplier&#x27;s name", await EmailOrder(new() { ["Mail.To"] = "orders@supplier.example", ["Mail.Subject"] = "x", ["Mail.Body"] = "x", ["Mail.MarkOrdered"] = "true" }));
+        Assert.Contains("isn&#x27;t an email address", await EmailOrder(new() { ["Mail.To"] = "not an address", ["Mail.Subject"] = "x", ["Mail.Body"] = "x" }));
+        var okPage = await EmailOrder(new()
+        {
+            ["Mail.To"] = "orders@supplier.example", ["Mail.Cc"] = "pm@example.com", ["Mail.Subject"] = "Material order", ["Mail.Body"] = "Attached.",
+            ["Mail.MarkOrdered"] = "true", ["Mail.Supplier"] = "ABC Supply",
+        });
+        Assert.True(okPage.Contains("Order emailed to orders@supplier.example and marked ordered"), System.Text.RegularExpressions.Regex.Match(okPage, "class=\"alert[^>]*>([^<]*)<").Groups[1].Value);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            var coDoc = await db.Documents.SingleAsync(d => d.EntityId == projectId && d.CategoryKey == "change_order");
+            Assert.Equal(coDoc.Id, (await db.EmailMessages.Include(m => m.Attachments).SingleAsync(m => m.Subject == "Change order 1")).Attachments.Single().DocumentId);
+            var order = await db.EmailMessages.Include(m => m.Attachments).Include(m => m.Recipients).SingleAsync(m => m.Subject == "Material order");
+            Assert.Equal([("to", "orders@supplier.example", (Guid?)null), ("cc", "pm@example.com", null)], order.Recipients.OrderByDescending(r => r.Kind).Select(r => (r.Kind, r.Address, r.ContactId)));
+            Assert.Equal("order_sheet", (await db.Documents.SingleAsync(d => d.Id == order.Attachments.Single().DocumentId)).CategoryKey);
+            var trade = await db.ProjectTrades.SingleAsync(x => x.Id == tradeId);
+            Assert.Equal(("ABC Supply", true), (trade.OrderSupplier, trade.OrderedAt is not null));
+            Assert.True(await db.RecordLinks.AnyAsync(l => l.ItemType == "email" && l.ItemId == order.Id && l.EntityType == "trade" && l.EntityId == tradeId));
+            await Assert.ThrowsAsync<CrmRuleException>(() => s.Get<Oes.Infrastructure.Communication.MessagingService>().SendToAddressAsync(new()
+            {
+                EntityType = "trade", EntityId = tradeId, To = "a@example.com, b@example.com", Subject = "x", Body = "x",
+            })); // one address only
+        }
 
         // Another company's document is a 404, as on the print view.
         var (other, otherAdmin) = await fx.CreateTenantAsync();

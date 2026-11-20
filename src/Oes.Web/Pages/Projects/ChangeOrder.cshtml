@@ -22,6 +22,7 @@
         <span class="d-flex gap-2"><a class="btn btn-sm btn-primary" href="?handler=Pdf" data-pdf-download><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
             <button type="button" class="btn btn-sm btn-outline-light" data-print><i class="bi bi-printer me-1"></i>Print</button></span>
     </div>
+    @if (Model.EmailPanel is { } panel && !Oes.Web.Infrastructure.PdfDocument.IsPdf(ViewData)) { <partial name="_DocumentEmail" model="panel" /> }
     <article class="proposal">
         <header class="proposal-head">
             <div>

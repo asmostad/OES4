@@ -30,6 +30,19 @@ public sealed class EmailInput
     public List<Guid> DocumentIds { get; set; } = [];
 }
 
+/// <summary>An email to an address that isn't a contact's (e.g. a supplier), filed on a record.</summary>
+public sealed class AddressEmailInput
+{
+    public required string EntityType { get; set; }
+    public required Guid EntityId { get; set; }
+    public string To { get; set; } = "";
+    public string? Cc { get; set; }
+    public string? Bcc { get; set; }
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public List<Guid> DocumentIds { get; set; } = [];
+}
+
 public sealed class SmsInput
 {
     public string? EntityType { get; set; }
@@ -152,35 +165,65 @@ public sealed class MessagingService(
         var values = await merge.ForAsync(input.EntityType, input.EntityId, to.ContactId, ct);
         var subject = MergeFields.Render(input.Subject.Trim(), values).ReplaceLineEndings(" ");
         var body = MergeFields.Render(input.Body.Trim(), values);
+        var msg = await DeliverEmailAsync(me, to.Address, to.ContactId, subject, body, purpose, template?.Id, input.Cc, input.Bcc, input.DocumentIds,
+            input.EntityType, input.EntityId, ct);
+        await LinkAsync(ItemTypes.Email, msg.Message.Id, input.EntityType, input.EntityId, to.ContactId, ct);
+        await db.SaveChangesAsync(ct);
+        return msg.Result;
+    }
+
+    /// <summary>
+    /// Business email to an address that isn't on a contact (a supplier taking a materials order), filed on the record.
+    /// Same permission, record visibility, opt-out, CC/BCC and attachment rules as any email; no merge fields (there's no contact).
+    /// </summary>
+    public async Task<SendResult> SendToAddressAsync(AddressEmailInput input, CancellationToken ct = default)
+    {
+        await scope.EnsurePermissionAsync(Permissions.EmailSend);
+        var me = user.UserId ?? throw new RecordForbiddenException("Sign in to send email.");
+        await scope.EnsureCanSeeAsync(input.EntityType, input.EntityId);
+        var to = Addresses(input.To, "To") is [var only] ? only : throw new CrmRuleException("Enter one email address to send to.");
+        if (string.IsNullOrWhiteSpace(input.Subject) || input.Subject.Length > 300) throw new CrmRuleException("Add a subject (up to 300 characters).");
+        if (string.IsNullOrWhiteSpace(input.Body) || input.Body.Length > 100_000) throw new CrmRuleException("Write a message.");
+        if (await SuppressedAsync(to, MessagePurposes.Transactional, ct)) throw new CrmRuleException($"Not sent: {to} has unsubscribed.");
+        var msg = await DeliverEmailAsync(me, to, null, input.Subject.Trim().ReplaceLineEndings(" "), input.Body.Trim(), MessagePurposes.Transactional, null,
+            input.Cc, input.Bcc, input.DocumentIds, input.EntityType, input.EntityId, ct);
+        await items.LinkItemAsync(ItemTypes.Email, msg.Message.Id, input.EntityType, input.EntityId, ct);
+        await db.SaveChangesAsync(ct);
+        return msg.Result;
+    }
+
+    private Task<bool> SuppressedAsync(string address, string purpose, CancellationToken ct) =>
+        db.Suppressions.AnyAsync(s => s.Channel == Channels.Email && s.Address == address && s.RemovedAt == null
+                                      && (s.Scope == "all" || purpose == MessagePurposes.Marketing), ct);
+
+    /// <summary>CC/BCC, attachments, the provider call and the stored message, shared by every outbound email. Not saved yet.</summary>
+    private async Task<(EmailMessage Message, SendResult Result)> DeliverEmailAsync(Guid me, string to, Guid? toContactId, string subject, string body,
+        string purpose, Guid? templateId, string? ccRaw, string? bccRaw, List<Guid> documentIds, string? entityType, Guid? entityId, CancellationToken ct)
+    {
         var from = await db.Users.Where(u => u.Id == me).Select(u => new { u.Email, Name = u.FirstName + " " + u.LastName }).FirstAsync(ct);
-
-        var cc = Addresses(input.Cc, "CC").Where(a => a != to.Address).ToList();
-        var bcc = Addresses(input.Bcc, "BCC").Where(a => a != to.Address && !cc.Contains(a)).ToList();
+        var cc = Addresses(ccRaw, "CC").Where(a => a != to).ToList();
+        var bcc = Addresses(bccRaw, "BCC").Where(a => a != to && !cc.Contains(a)).ToList();
         foreach (var extra in cc.Concat(bcc))
-            if (await db.Suppressions.AnyAsync(s => s.Channel == Channels.Email && s.Address == extra && s.RemovedAt == null
-                                                   && (s.Scope == "all" || purpose == MessagePurposes.Marketing), ct))
-                throw new CrmRuleException($"Not sent: {extra} has unsubscribed.");
-        var (files, docs) = await AttachmentsAsync(input.DocumentIds, ct);
+            if (await SuppressedAsync(extra, purpose, ct)) throw new CrmRuleException($"Not sent: {extra} has unsubscribed.");
+        var (files, docs) = await AttachmentsAsync(documentIds, ct);
 
-        var result = await SafeAsync(() => mail.SendAsync(me, new OutgoingEmail(from.Email ?? "", from.Name, [to.Address], cc, subject, ToHtml(body), body,
+        var result = await SafeAsync(() => mail.SendAsync(me, new OutgoingEmail(from.Email ?? "", from.Name, [to], cc, subject, ToHtml(body), body,
             Bcc: bcc, Attachments: files), ct));
         var msg = new EmailMessage
         {
             Direction = Directions.Outbound, FromAddress = from.Email ?? "", Subject = subject, Body = body, SentAt = clock.UtcNow, SentByUserId = me,
             Status = result.Ok ? MessageStatuses.Sent : MessageStatuses.Failed, ProviderMessageId = result.ProviderId, Error = Trim(result.Error, 1000),
-            TemplateId = template?.Id, EntityType = input.EntityType, EntityId = input.EntityId,
+            TemplateId = templateId, EntityType = entityType, EntityId = entityId,
             Recipients =
             [
-                new EmailRecipient { Kind = "to", Address = to.Address, ContactId = to.ContactId },
+                new EmailRecipient { Kind = "to", Address = to, ContactId = toContactId },
                 .. cc.Select(a => new EmailRecipient { Kind = "cc", Address = a }),
                 .. bcc.Select(a => new EmailRecipient { Kind = "bcc", Address = a }),
             ],
             Attachments = docs.Select(d => new EmailAttachment { DocumentId = d.Id, FileName = d.FileName, SizeBytes = d.SizeBytes }).ToList(),
         };
         db.EmailMessages.Add(msg);
-        await LinkAsync(ItemTypes.Email, msg.Id, input.EntityType, input.EntityId, to.ContactId, ct);
-        await db.SaveChangesAsync(ct);
-        return new SendResult(msg.Id, result.Ok, result.Error);
+        return (msg, new SendResult(msg.Id, result.Ok, result.Error));
     }
 
     public const int MaxExtraRecipients = 10;

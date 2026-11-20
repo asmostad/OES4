@@ -1,0 +1,46 @@
+@* "Email this document" on a print view (screen only; never in the PDF). Posts Mail.* to the page's handler. *@
+@model Oes.Web.Infrastructure.DocumentEmailPanel
+@{
+    var m = Model.Mail;
+}
+<details class="no-print proposal-email" data-document-email>
+    <summary class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope me-1"></i>@Model.Title</summary>
+    @if (Model.Recipients is { Count: 0 })
+    {
+        <p class="small text-muted mt-2 mb-0">@(Model.NoRecipients ?? "There's no email address on file.")</p>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="@Model.Handler" class="row g-2 mt-1">
+            <div class="col-md-6"><label class="form-label small mb-0" for="de-to">To</label>
+                @if (Model.Recipients is { } list)
+                {
+                    <select id="de-to" name="Mail.To" class="form-select form-select-sm">
+                        @foreach (var r in list) { var key = $"{r.ContactId}|{r.Address}"; <option value="@key" selected="@(key == m.To)">@r.ContactName &lt;@r.Display&gt;</option> }
+                    </select>
+                }
+                else
+                {
+                    <input id="de-to" name="Mail.To" type="email" value="@m.To" class="form-control form-control-sm" maxlength="320" required placeholder="name@supplier.com">
+                }
+            </div>
+            <div class="col-md-3"><label class="form-label small mb-0" for="de-cc">CC</label>
+                <input id="de-cc" name="Mail.Cc" value="@m.Cc" class="form-control form-control-sm" maxlength="2000"></div>
+            <div class="col-md-3"><label class="form-label small mb-0" for="de-bcc">BCC</label>
+                <input id="de-bcc" name="Mail.Bcc" value="@m.Bcc" class="form-control form-control-sm" maxlength="2000"></div>
+            <div class="col-12"><label class="form-label small mb-0" for="de-subject">Subject</label>
+                <input id="de-subject" name="Mail.Subject" value="@m.Subject" class="form-control form-control-sm" maxlength="300" required></div>
+            <div class="col-12"><label class="form-label small mb-0" for="de-body">Message</label>
+                <textarea id="de-body" name="Mail.Body" class="form-control form-control-sm" rows="5" maxlength="20000" required>@m.Body</textarea>
+                <div class="form-text">Sent from your mailbox with <strong>@Model.AttachmentName</strong> attached. A copy of the PDF is saved on the record.</div></div>
+            @if (Model.OfferMarkOrdered)
+            {
+                <div class="col-md-4 d-flex align-items-center"><div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" name="Mail.MarkOrdered" value="true" id="de-ordered" checked="@m.MarkOrdered">
+                    <label class="form-check-label small" for="de-ordered">Mark as ordered from</label></div></div>
+                <div class="col-md-8"><input name="Mail.Supplier" value="@m.Supplier" class="form-control form-control-sm" maxlength="150" placeholder="Supplier name" aria-label="Supplier"></div>
+            }
+            <div class="col-12"><button type="submit" class="btn btn-sm btn-primary" data-busy-text="Sending…"><i class="bi bi-send me-1"></i>Send</button></div>
+        </form>
+    }
+</details>
