@@ -2,7 +2,7 @@ import type { Href } from 'expo-router';
 
 const ID = '([0-9a-f-]{36})';
 
-/** The app screen for a web link (a notification's): leads, contacts and properties open their screen; tasks and the calendar their tab. */
+/** The app screen for a web link (a notification's): leads, contacts, properties, projects and trades open their screen; tasks and the calendar their tab. */
 export function routeFor(url: unknown): Href | null {
   const u = typeof url === 'string' ? url : '';
   const m = (page: string) => new RegExp(`^/${page}/View/${ID}`, 'i').exec(u)?.[1];
@@ -10,6 +10,10 @@ export function routeFor(url: unknown): Href | null {
   if (lead) return `/opportunity/${lead}`;
   const contact = m('Contacts');
   if (contact) return `/contact/${contact}`;
+  const project = m('Projects');
+  if (project) return `/project/${project}`;
+  const trade = new RegExp(`^/Projects/Trade/${ID}`, 'i').exec(u)?.[1];
+  if (trade) return `/trade/${trade}`;
   const property = m('Properties');
   if (property) return `/property/${property}`;
   if (/^\/Tasks\b/i.test(u)) return '/tasks';

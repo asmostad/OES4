@@ -1,18 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 
 import { LeadActions } from '@/components/LeadActions';
 import { OfflineNote } from '@/components/OfflineNote';
-import { OutboxBanner } from '@/components/OutboxBanner';
-import { Button, Card, Field, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
-import { DocumentItem, Opportunity, TimelineItem } from '@/lib/api';
-import { openDocument } from '@/lib/files';
-import { label, money, size, when } from '@/lib/format';
-import { Outcome, outcomeMessage, useOutbox } from '@/lib/outbox';
-import { useApi } from '@/lib/session';
+import { useRecordFeed } from '@/components/RecordFeed';
+import { Card, Loading, Message, Muted, Screen, styles } from '@/components/ui';
+import { Opportunity } from '@/lib/api';
+import { money } from '@/lib/format';
 import { colors, radius, space } from '@/lib/theme';
 import { useCached } from '@/lib/useCached';
 
@@ -20,85 +16,20 @@ const PHONE_KINDS = ['mobile', 'phone', 'work', 'home', 'office'];
 
 export default function OpportunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api } = useApi();
   // Each part is saved for offline; the lead's own details decide what the screen shows.
   const lead = useCached<Opportunity>(`/api/v1/opportunities/${id}`, "Couldn't load this lead.");
-  const history = useCached<TimelineItem[]>(`/api/v1/records/opportunity/${id}/timeline`, "Couldn't load the timeline.");
-  const files = useCached<DocumentItem[]>(`/api/v1/records/opportunity/${id}/documents?take=30`, "Couldn't load the documents.");
   const opp = lead.data;
-  const timeline = history.data ?? [];
-  const docs = files.data ?? [];
-  const [actionError, setError] = useState<string | null>(null);
-  const error = actionError ?? lead.error;
+  const feed = useRecordFeed('opportunity', id, opp?.number ?? 'a lead', 'Add to this lead');
+  const error = lead.error;
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState<'note' | 'photo' | string | null>(null);
 
   const { reload: reloadLead } = lead;
-  const { reload: reloadHistory } = history;
-  const { reload: reloadFiles } = files;
+  const { reload: reloadFeed } = feed;
   const load = useCallback(async () => {
-    await Promise.all([reloadLead(), reloadHistory(), reloadFiles()]);
-  }, [reloadLead, reloadHistory, reloadFiles]);
-
-  const outbox = useOutbox();
-  const base = `/api/v1/records/opportunity/${id}/`;
-  const waitingHere = outbox.items.filter((i) => i.path.startsWith(base));
-
-  /** Notes and photos go through the outbox, so they're kept and sent later when there's no signal. */
-  function report(outcome: Outcome, sentText: string) {
-    const m = outcomeMessage(outcome, sentText);
-    if (m.kind === 'success') setNotice(m.text);
-    else setError(m.text);
-    return m.kind === 'success';
-  }
-
-  async function addNote() {
-    if (!note.trim()) return;
-    setBusy('note');
-    setError(null);
-    const outcome = await outbox.enqueue({
-      kind: 'note', method: 'POST', path: `${base}notes`, json: { body: note.trim() }, label: `Note on ${opp?.number ?? 'a lead'}`,
-    });
-    if (report(outcome, 'Note added.')) setNote('');
-    if (outcome.status === 'sent') await load();
-    setBusy(null);
-  }
-
-  async function addPhoto(source: 'camera' | 'library') {
-    setError(null);
-    const permission = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return setError(source === 'camera' ? 'Allow camera access in Settings to take photos.' : 'Allow photo access in Settings to add photos.');
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: true, selectionLimit: 10 });
-    if (result.canceled || !result.assets?.length) return;
-    setBusy('photo');
-    let last: Outcome = { status: 'sent' };
-    for (const [i, a] of result.assets.entries()) {
-      const name = a.fileName ?? `photo-${Date.now()}-${i + 1}.jpg`;
-      last = await outbox.enqueue({
-        kind: 'photo', method: 'POST', path: `${base}photos`, file: { uri: a.uri, name, type: a.mimeType ?? 'image/jpeg' },
-        label: `Photo on ${opp?.number ?? 'a lead'}`,
-      });
-      if (last.status === 'failed') break;
-    }
-    report(last, result.assets.length === 1 ? 'Photo added.' : `${result.assets.length} photos added.`);
-    if (last.status === 'sent') await load();
-    setBusy(null);
-  }
-
-  async function open(doc: DocumentItem) {
-    setBusy(doc.id);
-    try {
-      await openDocument(api, doc);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't open the file.");
-    } finally {
-      setBusy(null);
-    }
-  }
+    await Promise.all([reloadLead(), reloadFeed()]);
+  }, [reloadLead, reloadFeed]);
 
   if (!opp) return <Screen>{error ? <Message text={error} /> : <Loading />}</Screen>;
 
@@ -132,70 +63,14 @@ export default function OpportunityScreen() {
         {opp.description && <Text style={[styles.body, { marginTop: space.md }]}>{opp.description}</Text>}
       </Card>
 
-      <Message text={error} />
+      <Message text={actionError} />
       <Message text={notice} kind="success" />
 
       <LeadActions opp={opp} onSent={load} onMessage={(text, kind) => {
-        if (kind === 'success') { setNotice(text); setError(null); } else { setError(text); setNotice(null); }
+        if (kind === 'success') { setNotice(text); setActionError(null); } else { setActionError(text); setNotice(null); }
       }} />
 
-      <SectionTitle>Add to this lead</SectionTitle>
-      <Card>
-        <Field label="Note" value={note} onChangeText={(t) => { setNote(t); setNotice(null); }} multiline placeholder="What happened?"
-          style={{ minHeight: 80, textAlignVertical: 'top' }} />
-        <Button title="Add note" onPress={addNote} busy={busy === 'note'} disabled={!note.trim()} />
-        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
-          <View style={{ flex: 1 }}><Button title="Take photo" kind="secondary" onPress={() => addPhoto('camera')} busy={busy === 'photo'} /></View>
-          <View style={{ flex: 1 }}><Button title="Choose photos" kind="secondary" onPress={() => addPhoto('library')} disabled={busy === 'photo'} /></View>
-        </View>
-      </Card>
-
-      <OutboxBanner />
-      {waitingHere.length > 0 && (
-        <Card>
-          {waitingHere.map((w, i) => (
-            <Row key={w.key} last={i === waitingHere.length - 1}>
-              <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
-                <Ionicons name={w.kind === 'photo' ? 'image-outline' : 'document-text-outline'} size={20} color={w.error ? colors.danger : colors.warning} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.body} numberOfLines={2}>{w.kind === 'note' ? (w.json as { body: string }).body : w.file?.name}</Text>
-                  <Muted>{w.error ? `Couldn’t be sent: ${w.error}` : 'Waiting to send'}</Muted>
-                </View>
-              </View>
-            </Row>
-          ))}
-        </Card>
-      )}
-
-      <SectionTitle>Documents</SectionTitle>
-      <Card>
-        {docs.length === 0 && <Muted>No files yet.</Muted>}
-        {docs.map((d, i) => (
-          <Row key={d.id} last={i === docs.length - 1} onPress={() => open(d)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <Ionicons name={d.contentType === 'application/pdf' ? 'document-text-outline' : d.contentType.startsWith('image/') ? 'image-outline' : 'document-outline'}
-                size={22} color={colors.navy} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.body} numberOfLines={1}>{d.fileName}</Text>
-                <Muted>{[label(d.category), size(d.sizeBytes), when(d.createdAt)].filter(Boolean).join(' · ')}</Muted>
-              </View>
-              {busy === d.id && <Muted>Opening…</Muted>}
-            </View>
-          </Row>
-        ))}
-      </Card>
-
-      <SectionTitle>Timeline</SectionTitle>
-      <Card>
-        {timeline.length === 0 && <Muted>Nothing here yet.</Muted>}
-        {timeline.slice(0, 50).map((t, i) => (
-          <Row key={`${t.itemType}-${t.id}`} last={i === Math.min(timeline.length, 50) - 1}>
-            <Muted>{[label(t.itemType === 'sms' ? 'text' : t.itemType), t.authorName, when(t.at)].filter(Boolean).join(' · ')}</Muted>
-            {t.subject && <Text style={[styles.body, { fontWeight: '600' }]}>{t.subject}</Text>}
-            <Text style={styles.body} numberOfLines={6}>{t.fileName ?? t.text}</Text>
-          </Row>
-        ))}
-      </Card>
+      {feed.view}
     </Screen>
   );
 }

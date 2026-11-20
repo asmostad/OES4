@@ -326,4 +326,68 @@ public sealed class ProductionTests(MySqlFixture fx)
         await settings.SaveWorkflowStageAsync(WorkflowLevels.Trade, null, "Permit pulled", "", "#64748b", 10, true);
         Assert.Contains(await settings.WorkflowStagesAsync(WorkflowLevels.Trade), x => x.Name == "Permit pulled");
     }
+
+    private async Task<HttpClient> ApiAs(AppUser user)
+    {
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = user.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        return api;
+    }
+
+    private static async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+    {
+        Assert.Equal(System.Net.HttpStatusCode.OK, r.StatusCode);
+        return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+    }
+
+    [Fact]
+    public async Task Field_app_lists_jobs_and_moves_trades()
+    {
+        var sold = await SignedEstimateAsync();
+        Guid id, roof;
+        await using (var s = fx.ScopeAs(sold.Tenant, sold.Admin))
+        {
+            var svc = s.Get<ProjectService>();
+            id = await svc.CreateFromEstimateAsync(sold.Estimate);
+            roof = (await svc.GetAsync(id)).Trades.Single(t => t.Type.Code == "roofing").Trade.Id;
+            await svc.UpdateTradeAsync(roof, null, new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 3), "Back gate code 4512");
+        }
+        var api = await ApiAs(sold.Admin);
+
+        var list = (await Json(await api.GetAsync("/api/v1/projects?q=Duction"))).EnumerateArray().ToList();
+        var row = Assert.Single(list);
+        Assert.Equal((id, "Pro Duction", 2), (row.GetProperty("id").GetGuid(), row.GetProperty("contactName").GetString(), row.GetProperty("trades").GetInt32()));
+
+        var schedule = (await Json(await api.GetAsync("/api/v1/trades"))).EnumerateArray().ToList();
+        Assert.Equal(2, schedule.Count);
+        Assert.Equal(roof, schedule[0].GetProperty("id").GetGuid()); // dated work first
+        Assert.Equal("2026-12-03", schedule[0].GetProperty("workDate").GetString());
+
+        var project = await Json(await api.GetAsync($"/api/v1/projects/{id}"));
+        Assert.Equal("Pro Duction", project.GetProperty("contactName").GetString());
+        Assert.Contains("9 Production Pl", project.GetProperty("address").GetString());
+        Assert.Equal(2, project.GetProperty("trades").GetArrayLength());
+        Assert.True(project.GetProperty("canAdvance").GetBoolean());
+
+        var trade = await Json(await api.GetAsync($"/api/v1/trades/{roof}"));
+        Assert.Equal("Back gate code 4512", trade.GetProperty("crewNote").GetString());
+        var stages = trade.GetProperty("stages").EnumerateArray().ToList();
+        Guid StageFor(string role) => stages.Single(x => x.GetProperty("role").GetString() == role).GetProperty("id").GetGuid();
+
+        var moved = await System.Net.Http.Json.HttpClientJsonExtensions.PutAsJsonAsync(api, $"/api/v1/trades/{roof}/stage", new { stageId = StageFor(StageRoles.MaterialsOrdered), note = "Ordered from the truck" });
+        Assert.Equal(System.Net.HttpStatusCode.OK, moved.StatusCode);
+        trade = await Json(await api.GetAsync($"/api/v1/trades/{roof}"));
+        Assert.Equal(StageRoles.MaterialsOrdered, trade.GetProperty("stage").GetProperty("role").GetString());
+        Assert.Equal("Ordered from the truck", trade.GetProperty("history")[0].GetProperty("note").GetString());
+        Assert.Equal(StageRoles.ProductionStart, (await Json(await api.GetAsync($"/api/v1/projects/{id}"))).GetProperty("stage").GetProperty("role").GetString());
+
+        // Another company never sees the job.
+        var (_, stranger) = await fx.CreateTenantAsync();
+        var other = await ApiAs(stranger);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.GetAsync($"/api/v1/projects/{id}")).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.GetAsync($"/api/v1/trades/{roof}")).StatusCode);
+        Assert.Empty((await Json(await other.GetAsync("/api/v1/trades"))).EnumerateArray());
+    }
 }

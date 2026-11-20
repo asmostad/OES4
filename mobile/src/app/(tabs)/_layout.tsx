@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
 import { HeaderButtons } from '@/components/HeaderButtons';
+import { useApi } from '@/lib/session';
 import { colors } from '@/lib/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -11,7 +12,11 @@ function TabIcon({ name, color, size }: { name: IconName; color: ColorValue; siz
 }
 const icon = (name: IconName) => ({ color, size }: { color: ColorValue; size: number }) => TabIcon({ name, color, size });
 
+const JOB_PERMISSIONS = ['workflow.advance', 'projects.edit_own', 'projects.edit_all'];
+
 export default function TabsLayout() {
+  const { me } = useApi();
+  const jobs = me.permissions.some((p) => JOB_PERMISSIONS.includes(p));
   return (
     <Tabs
       screenOptions={{
@@ -27,6 +32,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar-outline') }} />
       <Tabs.Screen name="tasks" options={{ title: 'Tasks', tabBarIcon: icon('checkbox-outline') }} />
       <Tabs.Screen name="leads" options={{ title: 'Leads', tabBarIcon: icon('briefcase-outline') }} />
+      <Tabs.Screen name="jobs" options={{ title: 'Jobs', tabBarIcon: icon('hammer-outline'), href: jobs ? undefined : null }} />
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarIcon: icon('person-circle-outline') }} />
     </Tabs>
   );

@@ -203,6 +203,32 @@ export type PropertyContact = { id: string; name: string; role: string; isPrimar
 export type PropertyDetail = { id: string; address: string; contacts: PropertyContact[]; opportunities: OpportunityBrief[] };
 export type NotificationItem = { id: string; kind: string; title: string; body: string | null; url: string | null; createdAt: string; read: boolean };
 export type Bell = { unread: number; items: NotificationItem[] };
+export type WorkStage = { id: string; name: string; color: string; role: string };
+export type StageHistory = { at: string; from: string | null; to: string; by: string | null; isAutomatic: boolean; note: string | null };
+export type ProjectItem = {
+  id: string; number: string; name: string; stageName: string; stageColor: string; contactName: string; address: string | null;
+  trades: number; tradesComplete: number; isStale: boolean;
+};
+export type ScheduledTrade = {
+  id: string; projectId: string; projectNumber: string; projectName: string; name: string; color: string; stageName: string; stageColor: string;
+  address: string | null; materialDate: string | null; workDate: string | null; isStale: boolean;
+};
+export type TradeSummary = {
+  id: string; name: string; color: string; stageId: string; stageName: string; stageColor: string; materialDate: string | null;
+  workDate: string | null; crewNote: string | null; isStale: boolean; isComplete: boolean;
+};
+export type ProjectDetail = {
+  id: string; number: string; name: string; stage: WorkStage; opportunityId: string; contactId: string; contactName: string;
+  contactMethods: ContactMethod[]; propertyId: string | null; address: string | null; ownerName: string | null; notes: string | null;
+  trades: TradeSummary[]; stages: WorkStage[]; history: StageHistory[]; canAdvance: boolean; isRemoved: boolean;
+};
+export type TradeDetail = {
+  id: string; name: string; color: string; projectId: string; projectNumber: string; projectName: string; stage: WorkStage;
+  description: string | null; materialDate: string | null; workDate: string | null; crewNote: string | null; contactId: string; contactName: string;
+  contactMethods: ContactMethod[]; propertyId: string | null; address: string | null; stages: WorkStage[]; history: StageHistory[];
+  canAdvance: boolean; isRemoved: boolean;
+};
+export type MovePreview = { allowed: boolean; blocker: string | null; automations: string[] };
 export type Disposition = { id: string; name: string; color: string; recycleDays: number | null; isDoNotContact: boolean };
 export type Campaign = { id: string; name: string; mode: string };
 export type QueueCounts = { due: number; beingWorked: number; callBacksLater: number };

@@ -37,6 +37,8 @@ function Navigator() {
         <Stack.Screen name="search" options={{ title: 'Search' }} />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="calls" options={{ title: 'Call list' }} />
+        <Stack.Screen name="project/[id]" options={{ title: 'Project' }} />
+        <Stack.Screen name="trade/[id]" options={{ title: 'Trade' }} />
         <Stack.Screen name="contact/[id]" options={{ title: 'Contact' }} />
         <Stack.Screen name="property/[id]" options={{ title: 'Property' }} />
       </Stack.Protected>
