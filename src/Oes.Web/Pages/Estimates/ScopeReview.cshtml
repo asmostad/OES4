@@ -10,6 +10,8 @@
     var signed = e.Status == EstimateStatuses.Signed;
     var open = i.Status == ScopeImportStatuses.Review && !signed;
     var matched = v.Lines.Count(l => l.PriceListItemId is not null);
+    var toCheck = v.Lines.Count(l => l.PriceListItemId is not null && l.NeedsCheck);
+    var suggested = v.Lines.Count(l => l.PriceListItemId is null && l.SuggestedItemId is not null);
     ViewData["Title"] = $"Carrier scope · {e.Number}";
 }
 <div class="page-header">
@@ -27,7 +29,8 @@
     <i class="bi bi-stars me-1"></i><strong>Read by AI@(i.Carrier is null ? "" : " · " + i.Carrier)@(i.CarrierPriceList is null ? "" : " · price list " + i.CarrierPriceList).</strong>
     @if (open)
     {
-        <text>Check each line against the scope before adding. @matched of @v.Lines.Count lines matched your price list and use your price; the rest come in as custom lines at the carrier's price and need approval.</text>
+        <text>Check each line against the scope before adding. @matched of @v.Lines.Count lines matched your price list and use your price@(toCheck > 0 ? $" ({toCheck} by wording or another activity, marked to check)" : "");
+            the rest come in as custom lines at the carrier's price and need approval@(suggested > 0 ? $", unless you use the closest item suggested for {suggested} of them" : "").</text>
     }
     else
     {
@@ -58,7 +61,28 @@
                             <td class="text-end" style="width:7rem"><input type="number" step="any" min="0" name="Quantity[@l.Index]" value="@l.Quantity.ToString("0.##")" class="form-control form-control-sm text-end" disabled="@(!open)" aria-label="Quantity line @(l.Index + 1)"></td>
                             <td class="small">@l.Unit</td>
                             <td class="text-end">@M(l.CarrierUnitPrice)</td>
-                            <td class="small">@if (l.MatchedDescription is null) { <span class="badge text-bg-light border">Custom line</span> } else { @l.MatchedDescription }</td>
+                            <td class="small">
+                                @if (l.MatchedDescription is not null)
+                                {
+                                    <text>@l.MatchedDescription</text>
+                                    if (l.MatchNote is not null)
+                                    {
+                                        <div class="@(l.NeedsCheck ? "text-warning-emphasis" : "text-muted")" data-match-kind="@l.MatchKind"><i class="bi @(l.NeedsCheck ? "bi-exclamation-triangle" : "bi-info-circle") me-1"></i>@l.MatchNote</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-light border">Custom line</span>
+                                    if (l.SuggestedItemId is not null)
+                                    {
+                                        <div class="form-check mt-1" data-suggestion>
+                                            <input class="form-check-input" type="checkbox" name="UseSuggestion" value="@l.Index" id="sug-@l.Index" disabled="@(!open)">
+                                            <label class="form-check-label" for="sug-@l.Index">Use <strong>@l.SuggestedDescription</strong> · @M(l.SuggestedUnitPrice)/@l.SuggestedUnit</label>
+                                        </div>
+                                        <div class="text-muted">@l.MatchNote</div>
+                                    }
+                                }
+                            </td>
                             <td class="text-end @(diff ? "fw-semibold" : "")">@M(l.OurUnitPrice)</td>
                         </tr>
                     }

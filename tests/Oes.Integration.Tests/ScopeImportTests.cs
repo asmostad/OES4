@@ -90,6 +90,60 @@ public sealed class ScopeImportTests(MySqlFixture fx)
     }
 
     [Fact]
+    public async Task Lines_without_our_codes_match_by_wording_or_get_a_suggestion_to_accept()
+    {
+        var w = await WorldAsync();
+        fx.Ai.Reset();
+        fx.Ai.NextExtraction = ("""
+            {"carrier":"Sample Mutual","lines":[
+              {"category":"RFG","code":"DRPEG","description":"R&R Drip edge","quantity":200,"unit":"LF","unit_price":3.10},
+              {"description":"Laminated shingles - w/out felt","quantity":30,"unit":"SQ","unit_price":250},
+              {"description":"*Drip edge","quantity":180,"unit":"SF","unit_price":1},
+              {"description":"Satellite dish detach","quantity":1,"unit":"EA","unit_price":40}
+            ]}
+            """, "end_turn");
+        await using var s = fx.ScopeAs(w.Tenant, w.Admin);
+        var svc = s.Get<ScopeImportService>();
+        var lines = (await svc.GetAsync(await svc.ExtractAsync(w.Estimate, Pdf(), "scope2.pdf"))).Lines;
+
+        // A code we don't have, but our wording, at another activity: taken, marked to check.
+        Assert.Equal((ScopeMatchKinds.Activity, 2.35m, true), (lines[0].MatchKind, lines[0].OurUnitPrice, lines[0].NeedsCheck));
+        Assert.Contains("Replace version", lines[0].MatchNote);
+        // Two of three words shared: only suggested.
+        Assert.Equal((null, "Laminated shingles", 285m), (lines[1].PriceListItemId, lines[1].SuggestedDescription, lines[1].SuggestedUnitPrice));
+        Assert.Contains("67%", lines[1].MatchNote);
+        // Our wording but a different unit: never taken by itself.
+        Assert.Equal((null, "Drip edge", "LF"), (lines[2].PriceListItemId, lines[2].SuggestedDescription, lines[2].SuggestedUnit));
+        Assert.Contains("carrier's line is in SF", lines[2].MatchNote);
+        Assert.Equal((null, null, null), (lines[3].PriceListItemId, lines[3].SuggestedItemId, lines[3].MatchKind)); // nothing like it
+
+        // Accept the shingle suggestion; the unit mismatch stays a custom line.
+        var importId = (await svc.ForEstimateAsync(w.Estimate)).Single().Id;
+        await svc.ApplyAsync(importId, [0, 1, 2], new Dictionary<int, decimal>(), "Supplement", useSuggestion: [1]);
+        var db = s.Get<OesDbContext>();
+        var section = await db.EstimateSections.SingleAsync(x => x.EstimateId == w.Estimate && x.Name == "Supplement");
+        var added = await db.EstimateLines.Where(l => l.SectionId == section.Id).OrderBy(l => l.Sort).ToListAsync();
+        Assert.Equal([(LineKinds.PriceBook, 2.35m), (LineKinds.PriceBook, 285m), (LineKinds.Misc, 1m)], added.Select(l => (l.Kind, l.UnitPrice)));
+
+        // The review page marks the check and offers the suggestion.
+        fx.Ai.Reset();
+        fx.Ai.NextExtraction = ("""{"lines":[{"description":"Laminated shingles - w/out felt","quantity":30,"unit":"SQ","unit_price":250},{"category":"RFG","code":"DRPEG","description":"R&R Drip edge","quantity":200,"unit":"LF"}]}""", "end_turn");
+        var again = await svc.ExtractAsync(w.Estimate, Pdf(), "scope3.pdf");
+        var web = fx.App.Browser();
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = w.Admin.Email!, ["Password"] = MySqlFixture.Password,
+            ["__RequestVerificationToken"] = System.Text.RegularExpressions.Regex.Match(await web.GetStringAsync("/Account/Login"),
+                "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value,
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync($"/Estimates/ScopeReview/{again}");
+        Assert.Contains("name=\"UseSuggestion\" value=\"0\"", page);
+        Assert.Contains("data-match-kind=\"activity\"", page);
+        Assert.Contains("1 by wording or another activity, marked to check", page);
+    }
+
+    [Fact]
     public async Task Supplement_compare_pairs_items_and_totals_the_difference()
     {
         var w = await WorldAsync();

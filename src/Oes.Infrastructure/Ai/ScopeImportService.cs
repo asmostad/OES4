@@ -15,7 +15,13 @@ namespace Oes.Infrastructure.Ai;
 /// <summary>One line read from a carrier scope, with its match on the estimate's price list (if any).</summary>
 public sealed record ScopeLine(
     int Index, string? Category, string? Code, string Activity, string Description, decimal Quantity, string Unit,
-    decimal? CarrierUnitPrice, Guid? PriceListItemId, string? MatchedDescription, decimal? OurUnitPrice);
+    decimal? CarrierUnitPrice, Guid? PriceListItemId, string? MatchedDescription, decimal? OurUnitPrice,
+    string? MatchKind = null, string? MatchNote = null, Guid? SuggestedItemId = null, string? SuggestedDescription = null,
+    decimal? SuggestedUnitPrice = null, string? SuggestedUnit = null)
+{
+    /// <summary>Matched by something other than the item code or exact wording, so worth a look.</summary>
+    public bool NeedsCheck => MatchKind is ScopeMatchKinds.Close or ScopeMatchKinds.Shortened or ScopeMatchKinds.Activity;
+}
 
 public sealed record ScopeImportView(ScopeImport Import, Estimate Estimate, List<ScopeLine> Lines);
 
@@ -168,27 +174,31 @@ public sealed class ScopeImportService(
             var price = D("unit_price") is { } p && p >= 0 && p < 1_000_000 ? Math.Round(p, 2) : (decimal?)null;
             var activity = S("activity") is { } a && Activities.All.Contains(a) ? a : Activities.None;
             list.Add(new ScopeLine(list.Count, S("category")?.ToUpperInvariant(), S("code")?.ToUpperInvariant(), activity,
-                description.Length <= 300 ? description : description[..300], Math.Round(q, 2), (S("unit") ?? "EA").ToUpperInvariant() is var u && u.Length <= 10 ? u : "EA",
+                description.Length <= 300 ? description : description[..300], Math.Round(q, 2), (S("unit") ?? "").ToUpperInvariant() is var u && u.Length <= 10 ? u : "",
                 price, null, null, null));
         }
         return list;
     }
 
-    /// <summary>Matches lines to the estimate's price list by category code + item code + activity.</summary>
+    /// <summary>Matches lines to the estimate's price list (see <see cref="ScopeMatcher"/>).</summary>
     private async Task<List<ScopeLine>> MatchAsync(Estimate est, List<ScopeLine> lines, CancellationToken ct)
     {
         if (est.PriceListId is not { } listId) return lines;
-        var codes = lines.Where(l => l.Code is not null).Select(l => l.Code!).Distinct().ToList();
-        var candidates = await (from pli in db.PriceListItems where pli.PriceListId == listId
-                                join ci in db.CatalogItems on pli.CatalogItemId equals ci.Id
-                                join cat in db.CatalogCategories on ci.CategoryId equals cat.Id
-                                where codes.Contains(ci.Code)
-                                select new { pli.Id, Category = cat.Code, ci.Code, pli.Activity, ci.Description, pli.UnitPrice }).ToListAsync(ct);
+        var book = await (from pli in db.PriceListItems where pli.PriceListId == listId
+                          join ci in db.CatalogItems on pli.CatalogItemId equals ci.Id
+                          join cat in db.CatalogCategories on ci.CategoryId equals cat.Id
+                          where ci.IsActive
+                          select new PriceBookEntry(pli.Id, cat.Code, ci.Code, pli.Activity, ci.Description, ci.Unit, pli.UnitPrice)).ToListAsync(ct);
+        var matcher = new ScopeMatcher(book);
         return lines.Select(l =>
         {
-            var m = candidates.FirstOrDefault(c => c.Code == l.Code && (l.Category is null || c.Category == l.Category) && c.Activity == l.Activity)
-                    ?? (l.Activity == Activities.None ? candidates.FirstOrDefault(c => c.Code == l.Code && (l.Category is null || c.Category == l.Category)) : null);
-            return m is null ? l : l with { PriceListItemId = m.Id, MatchedDescription = m.Description, OurUnitPrice = m.UnitPrice };
+            var m = matcher.Match(l.Category, l.Code, l.Activity, l.Description, l.Unit);
+            return l with
+            {
+                PriceListItemId = m.Match?.Id, MatchedDescription = m.Match?.Description, OurUnitPrice = m.Match?.UnitPrice,
+                MatchKind = m.Kind, MatchNote = m.Note, SuggestedItemId = m.Suggestion?.Id, SuggestedDescription = m.Suggestion?.Description,
+                SuggestedUnitPrice = m.Suggestion?.UnitPrice, SuggestedUnit = m.Suggestion?.Unit,
+            };
         }).ToList();
     }
 
@@ -207,7 +217,8 @@ public sealed class ScopeImportService(
     }
 
     /// <summary>Adds the chosen lines (with any corrected quantities) to the estimate as a new section.</summary>
-    public async Task<int> ApplyAsync(Guid importId, IReadOnlyCollection<int> include, IReadOnlyDictionary<int, decimal> quantities, string sectionName, CancellationToken ct = default)
+    public async Task<int> ApplyAsync(Guid importId, IReadOnlyCollection<int> include, IReadOnlyDictionary<int, decimal> quantities, string sectionName,
+        IReadOnlyCollection<int>? useSuggestion = null, CancellationToken ct = default)
     {
         var view = await GetAsync(importId, ct);
         if (view.Import.Status != ScopeImportStatuses.Review) throw new CrmRuleException("This scope was already added or discarded.");
@@ -220,9 +231,10 @@ public sealed class ScopeImportService(
         foreach (var l in chosen)
         {
             var qty = quantities.TryGetValue(l.Index, out var q) && q > 0 ? q : l.Quantity;
-            if (l.PriceListItemId is { } pli) await estimates.AddPriceBookLineAsync(view.Estimate.Id, sectionId, pli, qty, ct);
+            var item = l.PriceListItemId ?? (useSuggestion?.Contains(l.Index) == true ? l.SuggestedItemId : null);
+            if (item is { } pli) await estimates.AddPriceBookLineAsync(view.Estimate.Id, sectionId, pli, qty, ct);
             else await estimates.AddMiscLineAsync(view.Estimate.Id, sectionId,
-                l.Code is null ? l.Description : $"{l.Description} ({l.Category} {l.Code})", qty, l.Unit, l.CarrierUnitPrice ?? 0, false, ct);
+                l.Code is null ? l.Description : $"{l.Description} ({l.Category} {l.Code})", qty, l.Unit is { Length: > 0 } u ? u : "EA", l.CarrierUnitPrice ?? 0, false, ct);
         }
         var import = await db.ScopeImports.FirstAsync(x => x.Id == importId, ct);
         import.Status = ScopeImportStatuses.Imported;

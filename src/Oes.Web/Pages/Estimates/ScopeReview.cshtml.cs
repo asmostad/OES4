@@ -11,6 +11,8 @@ public class ScopeReviewModel(ScopeImportService imports) : CrmPageModel
     [BindProperty] public List<int> Include { get; set; } = [];
     [BindProperty] public Dictionary<int, decimal> Quantity { get; set; } = [];
     [BindProperty] public string? SectionName { get; set; }
+    /// <summary>Unmatched lines to add as the suggested price list item instead of a custom line.</summary>
+    [BindProperty] public List<int> UseSuggestion { get; set; } = [];
 
     public ScopeImportView View { get; private set; } = null!;
 
@@ -19,7 +21,7 @@ public class ScopeReviewModel(ScopeImportService imports) : CrmPageModel
     public Task<IActionResult> OnPostAsync() => Guard(async () =>
     {
         View = await imports.GetAsync(Id);
-        var added = await imports.ApplyAsync(Id, Include, Quantity, SectionName ?? "");
+        var added = await imports.ApplyAsync(Id, Include, Quantity, SectionName ?? "", UseSuggestion);
         Flash($"Added {added} line{(added == 1 ? "" : "s")} from the carrier scope. Custom lines need approval as usual.");
         return Redirect($"/Estimates/View/{View.Estimate.Id}");
     }, Page);
