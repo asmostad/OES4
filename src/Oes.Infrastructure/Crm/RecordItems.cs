@@ -214,7 +214,7 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
     }
 
     /// <summary>A stored file that can be attached to an email from a record.</summary>
-    public sealed record AttachableDocument(Guid Id, string FileName, long SizeBytes, string? CategoryKey, DateTime CreatedAt);
+    public sealed record AttachableDocument(Guid Id, string FileName, long SizeBytes, string? CategoryKey, DateTime CreatedAt, string ContentType = "");
 
     /// <summary>
     /// Files on this record and the records under it (an opportunity's estimates, say), newest first, that this user
@@ -228,13 +228,13 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
                           join d in db.Documents on l.ItemId equals d.Id
                           where d.ArchivedAt == null
                           orderby d.CreatedAt descending
-                          select new { d.Id, d.FileName, d.SizeBytes, d.CategoryKey, d.CreatedAt, d.EntityType, d.EntityId }).Take(take * 2).ToListAsync(ct);
+                          select new { d.Id, d.FileName, d.SizeBytes, d.CategoryKey, d.CreatedAt, d.EntityType, d.EntityId, d.ContentType }).Take(take * 2).ToListAsync(ct);
         var visible = new Dictionary<(string, Guid), bool>();
         var list = new List<AttachableDocument>();
         foreach (var r in rows.DistinctBy(r => r.Id))
         {
             if (!visible.TryGetValue((r.EntityType, r.EntityId), out var ok)) visible[(r.EntityType, r.EntityId)] = ok = await scope.CanSeeAsync(r.EntityType, r.EntityId);
-            if (ok) list.Add(new AttachableDocument(r.Id, r.FileName, r.SizeBytes, r.CategoryKey, r.CreatedAt));
+            if (ok) list.Add(new AttachableDocument(r.Id, r.FileName, r.SizeBytes, r.CategoryKey, r.CreatedAt, r.ContentType));
             if (list.Count == take) break;
         }
         return list;

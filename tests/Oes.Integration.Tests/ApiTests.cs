@@ -151,6 +151,20 @@ public sealed class ApiTests(MySqlFixture fx)
         Assert.Contains(timeline, i => i.GetProperty("fileName").GetString() == "roof.jpg");
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/records/bogus/{mine}/timeline")).StatusCode);
 
+        // Files: listed with their category, downloaded as stored; someone else's file is a 404.
+        var files = (await Json(await c.GetAsync($"/api/v1/records/opportunity/{mine}/documents"))).EnumerateArray().ToList();
+        var roof = files.Single(f => f.GetProperty("fileName").GetString() == "roof.jpg");
+        Assert.Equal(("image/jpeg", "photos", 4L), (roof.GetProperty("contentType").GetString(), roof.GetProperty("category").GetString(), roof.GetProperty("sizeBytes").GetInt64()));
+        var download = await c.GetAsync($"/api/v1/documents/{roof.GetProperty("id").GetGuid()}");
+        Assert.Equal("image/jpeg", download.Content.Headers.ContentType?.MediaType);
+        Assert.Equal([0xFF, 0xD8, 0xFF, 0xE0], await download.Content.ReadAsByteArrayAsync());
+        Assert.Equal("roof.jpg", download.Content.Headers.ContentDisposition?.FileName);
+        Guid hiddenFile;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+            hiddenFile = await s.Get<RecordItems>().UploadAsync(EntityTypes.Opportunity, theirs, new MemoryStream("%PDF-1.7"u8.ToArray()), "theirs.pdf", "application/pdf", "proposal");
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/documents/{hiddenFile}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/records/opportunity/{theirs}/documents")).StatusCode);
+
         var day = await Json(await c.GetAsync("/api/v1/my-day"));
         Assert.True(day.TryGetProperty("appointments", out _));
         Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/api/v1/appointments?from=2026-01-01&to=2026-12-31")).StatusCode);

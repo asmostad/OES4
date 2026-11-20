@@ -15,6 +15,7 @@ public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary)
 public sealed record OpportunityDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome,
     decimal? ExpectedValue, string? OwnerName, Guid ContactId, string ContactName, IReadOnlyList<ContactMethodDto> ContactMethods,
     Guid? PropertyId, string? Address, string? Description, bool CanEdit);
+public sealed record DocumentDto(Guid Id, string FileName, string ContentType, long SizeBytes, string? Category, DateTime CreatedAt);
 public sealed record TimelineDto(string ItemType, Guid Id, DateTime At, string? AuthorName, string Text, string EntityType, Guid EntityId,
     string? FileName, string? Subject, string? Direction);
 
@@ -86,6 +87,27 @@ public sealed class MobileController(WorkService work, OpportunityService opport
     {
         if (!EntityTypes.All.Contains(entityType)) return NotFound();
         return StatusCode(StatusCodes.Status201Created, new CreatedResponse(await items.AddNoteAsync(entityType, id, body.Body ?? "", ct)));
+    }
+
+    /// <summary>
+    /// Files on the record and the records under it (an opportunity's estimates, a project's work orders), newest first,
+    /// only ones this user can open. Saved PDFs carry their category: proposal, signed_proposal, change_order,
+    /// order_sheet, work_order. Download with <c>GET documents/{id}</c>.
+    /// </summary>
+    [HttpGet("records/{entityType}/{id:guid}/documents")]
+    public async Task<ActionResult<List<DocumentDto>>> Documents(string entityType, Guid id, int take = 50, CancellationToken ct = default)
+    {
+        if (!EntityTypes.All.Contains(entityType)) return NotFound();
+        return (await items.AttachableDocumentsAsync(entityType, id, Math.Clamp(take, 1, 200), ct))
+            .Select(d => new DocumentDto(d.Id, d.FileName, d.ContentType, d.SizeBytes, d.CategoryKey, d.CreatedAt)).ToList();
+    }
+
+    /// <summary>A stored file's content, through the same visibility check as the web download.</summary>
+    [HttpGet("documents/{id:guid}")]
+    public async Task<IActionResult> Download(Guid id, CancellationToken ct)
+    {
+        var (doc, content) = await items.OpenDocumentAsync(id, ct);
+        return File(content, string.IsNullOrEmpty(doc.ContentType) ? "application/octet-stream" : doc.ContentType, doc.FileName);
     }
 
     /// <summary>A photo (or PDF) from the field, filed on the record and everything above it.</summary>
