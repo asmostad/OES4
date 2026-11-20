@@ -78,6 +78,21 @@ public class ProposalModel(EstimateService estimates, OesDbContext db, ITenantCo
     });
 
     /// <summary>
+    /// For the field app, at api/v1/estimate-versions/{id}/proposal?handler=Copy (bearer tokens only work under /api):
+    /// the saved PDF of the version as it stands now, made and saved first if there isn't one yet. Answers {documentId}.
+    /// </summary>
+    public Task<IActionResult> OnGetCopyAsync() => Guard(async () =>
+    {
+        await LoadAsync();
+        if (EstimateService.CurrentCopy(Version) is { } saved) return new JsonResult(new { documentId = saved });
+        ViewData[PdfDocument.ViewDataKey] = true;
+        return new PdfPageResult(FileName, Footer, $"/Estimates/Proposal/{Id}")
+        {
+            Respond = async pdf => new JsonResult(new { documentId = await estimates.SaveVersionCopyAsync(Id, pdf) }),
+        };
+    });
+
+    /// <summary>
     /// Emails the version's saved PDF to the chosen contact address. With no saved copy yet, renders and saves it first.
     /// </summary>
     public Task<IActionResult> OnPostEmailAsync() => Guard(async () =>

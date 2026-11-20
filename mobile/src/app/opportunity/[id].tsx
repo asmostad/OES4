@@ -6,9 +6,11 @@ import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import { LeadActions } from '@/components/LeadActions';
 import { OfflineNote } from '@/components/OfflineNote';
 import { useRecordFeed } from '@/components/RecordFeed';
-import { Card, Loading, Message, Muted, Screen, styles } from '@/components/ui';
-import { Opportunity } from '@/lib/api';
+import { EstimateList } from '@/components/Records';
+import { Card, Loading, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
+import { EstimateItem, Opportunity } from '@/lib/api';
 import { money } from '@/lib/format';
+import { useApi } from '@/lib/session';
 import { colors, radius, space } from '@/lib/theme';
 import { useCached } from '@/lib/useCached';
 
@@ -20,6 +22,9 @@ export default function OpportunityScreen() {
   const lead = useCached<Opportunity>(`/api/v1/opportunities/${id}`, "Couldn't load this lead.");
   const opp = lead.data;
   const feed = useRecordFeed('opportunity', id, opp?.number ?? 'a lead', 'Add to this lead');
+  const estimates = useCached<EstimateItem[]>(`/api/v1/estimates?opportunityId=${id}`, "Couldn't load the estimates.");
+  const { me } = useApi();
+  const canEstimate = me.permissions.includes('estimates.create') || me.permissions.includes('estimates.manage');
   const error = lead.error;
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -27,9 +32,10 @@ export default function OpportunityScreen() {
 
   const { reload: reloadLead } = lead;
   const { reload: reloadFeed } = feed;
+  const { reload: reloadEstimates } = estimates;
   const load = useCallback(async () => {
-    await Promise.all([reloadLead(), reloadFeed()]);
-  }, [reloadLead, reloadFeed]);
+    await Promise.all([reloadLead(), reloadFeed(), reloadEstimates()]);
+  }, [reloadLead, reloadFeed, reloadEstimates]);
 
   if (!opp) return <Screen>{error ? <Message text={error} /> : <Loading />}</Screen>;
 
@@ -69,6 +75,13 @@ export default function OpportunityScreen() {
       <LeadActions opp={opp} onSent={load} onMessage={(text, kind) => {
         if (kind === 'success') { setNotice(text); setActionError(null); } else { setActionError(text); setNotice(null); }
       }} />
+
+      {estimates.data && (estimates.data.length > 0 || canEstimate) && (
+        <>
+          <SectionTitle>Estimates</SectionTitle>
+          <EstimateList estimates={estimates.data} empty="No estimates yet. Build one on the web." />
+        </>
+      )}
 
       {feed.view}
     </Screen>

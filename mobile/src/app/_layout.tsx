@@ -41,6 +41,7 @@ function Navigator() {
         <Stack.Screen name="trade/[id]" options={{ title: 'Trade' }} />
         <Stack.Screen name="compose" options={{ title: 'Send', presentation: 'modal' }} />
         <Stack.Screen name="message/[channel]/[id]" options={{ title: 'Message' }} />
+        <Stack.Screen name="estimate/[id]" options={{ title: 'Estimate' }} />
         <Stack.Screen name="contact/[id]" options={{ title: 'Contact' }} />
         <Stack.Screen name="property/[id]" options={{ title: 'Property' }} />
       </Stack.Protected>

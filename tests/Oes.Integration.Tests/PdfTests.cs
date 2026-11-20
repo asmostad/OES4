@@ -276,6 +276,96 @@ public sealed class PdfTests(MySqlFixture fx)
         Assert.Contains("Signed PDF", view);
     }
 
+    [Fact]
+    public async Task Field_app_reads_issues_and_signs_estimates_and_gets_each_pdf()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        Guid estimateId, oppId, product;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var contactId = await s.Get<ContactService>().CreateAsync(new ContactInput { FirstName = "Fay", LastName = "Field" });
+            oppId = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = contactId });
+            var est = s.Get<EstimateService>();
+            estimateId = await est.CreateAsync(new NewEstimateInput { OpportunityId = oppId, Method = EstimateMethods.LineItem });
+            product = await s.Get<CatalogService>().SaveProductAsync(null, new ProductInput { Sku = "SQ", Name = "Roof per square", Unit = "SQ", DefaultPrice = 400m });
+            await est.AddProductLineAsync(estimateId, (await est.GetAsync(estimateId)).Sections.Single().Section.Id, product, 20);
+        }
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = admin.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+        Task<HttpResponseMessage> Post(string url, object body)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            return api.SendAsync(req);
+        }
+
+        // The opportunity's estimates, then one in full.
+        var list = await Json(await api.GetAsync($"/api/v1/estimates?opportunityId={oppId}"));
+        Assert.Equal(estimateId, list.EnumerateArray().Single().GetProperty("id").GetGuid());
+        var detail = await Json(await api.GetAsync($"/api/v1/estimates/{estimateId}"));
+        Assert.Equal(8000m, detail.GetProperty("subtotal").GetDecimal());
+        Assert.Equal("Fay Field", detail.GetProperty("contactName").GetString());
+        Assert.Equal(20m, detail.GetProperty("sections")[0].GetProperty("lines")[0].GetProperty("qty").GetDecimal());
+        Assert.True(detail.GetProperty("canEdit").GetBoolean());
+        Assert.Empty(detail.GetProperty("versions").EnumerateArray());
+
+        // Issue, then get the proposal PDF: made and saved once, the same copy after that.
+        var versionId = (await Json(await Post($"/api/v1/estimates/{estimateId}/issue", new { }))).GetProperty("versionId").GetGuid();
+        fx.Pdf.Reset();
+        var copy = (await Json(await api.GetAsync($"/api/v1/estimate-versions/{versionId}/proposal?handler=Copy"))).GetProperty("documentId").GetGuid();
+        Assert.Contains("Fay Field", fx.Pdf.LastHtml);
+        fx.Pdf.Reset();
+        Assert.Equal(copy, (await Json(await api.GetAsync($"/api/v1/estimate-versions/{versionId}/proposal?handler=Copy"))).GetProperty("documentId").GetGuid());
+        Assert.Null(fx.Pdf.LastHtml);
+        Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(await api.GetByteArrayAsync($"/api/v1/documents/{copy}"), 0, 5));
+        Assert.True((await Json(await api.GetAsync($"/api/v1/estimates/{estimateId}"))).GetProperty("versions")[0].GetProperty("hasPdf").GetBoolean());
+
+        // A rule refusal reads as a message; signing makes a second, signed copy and wins the opportunity.
+        var unnamed = await Post($"/api/v1/estimate-versions/{versionId}/sign", new { signerName = "" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unnamed.StatusCode);
+        Assert.Contains("Enter who signed.", await unnamed.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.NoContent, (await Post($"/api/v1/estimate-versions/{versionId}/sign", new { signerName = "Fay Field" })).StatusCode);
+        var signed = await Json(await api.GetAsync($"/api/v1/estimates/{estimateId}"));
+        Assert.Equal("signed", signed.GetProperty("status").GetString());
+        Assert.False(signed.GetProperty("versions")[0].GetProperty("hasPdf").GetBoolean()); // the signed copy isn't made yet
+        var signedCopy = (await Json(await api.GetAsync($"/api/v1/estimate-versions/{versionId}/proposal?handler=Copy"))).GetProperty("documentId").GetGuid();
+        Assert.NotEqual(copy, signedCopy);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            Assert.Equal("signed_proposal", (await db.Documents.SingleAsync(d => d.Id == signedCopy)).CategoryKey);
+            Assert.Equal(Outcomes.Won, (await db.Opportunities.SingleAsync(o => o.Id == oppId)).Outcome);
+        }
+
+        // No browser on the server: a clear refusal, not a redirect to the web page.
+        Guid second;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var est = s.Get<EstimateService>();
+            second = await est.CreateAsync(new NewEstimateInput { OpportunityId = oppId, Method = EstimateMethods.LineItem });
+            await est.AddProductLineAsync(second, (await est.GetAsync(second)).Sections.Single().Section.Id, product, 2);
+        }
+        var v2 = (await Json(await Post($"/api/v1/estimates/{second}/issue", new { }))).GetProperty("versionId").GetGuid();
+        fx.Pdf.Unavailable = true;
+        try
+        {
+            var refused = await api.GetAsync($"/api/v1/estimate-versions/{v2}/proposal?handler=Copy");
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            Assert.Contains("no Edge or Chrome browser", await refused.Content.ReadAsStringAsync());
+        }
+        finally { fx.Pdf.Unavailable = false; }
+
+        // Bearer tokens still don't open web pages outside /api.
+        Assert.NotEqual(HttpStatusCode.OK, (await api.GetAsync($"/Estimates/Proposal/{versionId}")).StatusCode);
+    }
+
     [Theory]
     [InlineData("E-2026-12-v1", "E-2026-12-v1.pdf")]
     [InlineData("P-2026-3 change order 2", "P-2026-3-change-order-2.pdf")]

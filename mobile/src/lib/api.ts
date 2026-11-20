@@ -245,3 +245,23 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type EstimateItem = {
+  id: string; number: string; name: string; status: string; total: number; opportunityId: string; contactName: string; address: string | null;
+  ownerName: string | null; latestVersionNo: number; pendingApprovals: number; updatedAt: string;
+};
+export type EstimateLine = {
+  id: string; kind: string; code: string | null; description: string; qty: number; unit: string; unitPrice: number; amount: number;
+  approvalStatus: 'none' | 'pending' | 'approved' | 'rejected' | string; notes: string | null;
+};
+export type EstimateSection = { id: string; name: string; tradeName: string | null; tradeColor: string | null; scopeOfWork: string | null; subtotal: number; lines: EstimateLine[] };
+export type EstimateVersion = {
+  id: string; versionNo: number; status: 'issued' | 'signed' | 'declined' | 'superseded' | string; total: number; issuedAt: string; issuedBy: string | null;
+  revisionReason: string | null; signerName: string | null; signedAt: string | null; hasPdf: boolean;
+};
+export type EstimateDetail = {
+  id: string; number: string; name: string; status: 'draft' | 'issued' | 'signed' | 'declined' | 'shelved' | string; method: string;
+  opportunityId: string; opportunityName: string; contactId: string; contactName: string; address: string | null; ownerName: string | null;
+  claimNumber: string | null; priceListName: string | null; expiresOn: string | null;
+  subtotal: number; overheadPct: number; overhead: number; profitPct: number; profit: number; taxRate: number; tax: number; total: number;
+  pendingApprovals: number; rejectedLines: number; canEdit: boolean; isArchived: boolean; sections: EstimateSection[]; versions: EstimateVersion[];
+};

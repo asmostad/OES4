@@ -35,6 +35,10 @@ export function when(utc: string): string {
 export const money = (n: number | null | undefined) =>
   n == null ? '' : `$${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 
+/** Dollars and cents, for prices and line amounts. */
+export const cents = (n: number | null | undefined) =>
+  n == null ? '' : `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+
 export function size(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

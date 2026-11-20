@@ -25,6 +25,16 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
     /// </summary>
     public Func<Task<string>>? WithoutPdf { get; init; }
 
+    /// <summary>
+    /// For the field app (no flash messages or redirects): hands the PDF to this and runs the result it returns.
+    /// When no PDF can be made, or a rule refuses it, answers 422 with the reason instead.
+    /// </summary>
+    public Func<byte[], Task<IActionResult>>? Respond { get; init; }
+
+    private static Task Refuse(ActionContext context, string message) =>
+        new ObjectResult(new ProblemDetails { Status = StatusCodes.Status422UnprocessableEntity, Title = "Request refused", Detail = message })
+            { StatusCode = StatusCodes.Status422UnprocessableEntity }.ExecuteResultAsync(context);
+
     private static void Flash(HttpContext http, string message, string type)
     {
         var tempData = http.RequestServices.GetRequiredService<ITempDataDictionaryFactory>().GetTempData(http);
@@ -46,6 +56,7 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
         try { pdf = await http.RequestServices.GetRequiredService<IPdfRenderer>().RenderAsync(html, footer, http.RequestAborted); }
         catch (PdfUnavailableException ex)
         {
+            if (Respond is not null) { await Refuse(context, ex.Message); return; }
             if (WithoutPdf is not null)
             {
                 try { Flash(http, $"{await WithoutPdf()} No PDF was attached: {ex.Message}", "warning"); }
@@ -53,6 +64,18 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
             }
             else Flash(http, ex.Message, "danger");
             await new LocalRedirectResult(printUrl).ExecuteResultAsync(context);
+            return;
+        }
+        if (Respond is not null)
+        {
+            IActionResult result;
+            try { result = await Respond(pdf); }
+            catch (Exception ex) when (ex is Oes.Infrastructure.Crm.CrmRuleException or Oes.Infrastructure.Crm.RecordForbiddenException)
+            {
+                await Refuse(context, ex.Message);
+                return;
+            }
+            await result.ExecuteResultAsync(context);
             return;
         }
         if (Deliver is not null)
