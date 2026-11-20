@@ -10,7 +10,7 @@ public sealed class PdfOptions
 {
     public const string Section = "Pdf";
 
-    /// <summary>The installed browser to use: "msedge" or "chrome". Blank tries Edge, then Chrome.</summary>
+    /// <summary>The installed browser to use: "msedge" or "chrome". Blank tries Edge then Chrome on Windows, Chrome then Edge elsewhere (Edge can hang starting on Linux).</summary>
     public string? Channel { get; set; }
 
     /// <summary>A Chromium-based browser's executable, instead of an installed channel.</summary>
@@ -68,6 +68,9 @@ public sealed class PlaywrightPdfRenderer(IOptions<PdfOptions> options, ILogger<
         + $"<span>{WebUtility.HtmlEncode(text ?? "")}</span>"
         + "<span>Page <span class=\"pageNumber\"></span> of <span class=\"totalPages\"></span></span></div>";
 
+    /// <summary>Installed browsers to try, in order: Edge first on Windows (it ships there), Chrome first elsewhere.</summary>
+    internal static string?[] DefaultChannels => OperatingSystem.IsWindows() ? ["msedge", "chrome"] : ["chrome", "msedge"];
+
     private async Task<IBrowser> BrowserAsync(CancellationToken ct)
     {
         if (browser is { IsConnected: true } ready) return ready;
@@ -78,7 +81,7 @@ public sealed class PlaywrightPdfRenderer(IOptions<PdfOptions> options, ILogger<
             if (browser is not null) { try { await browser.DisposeAsync(); } catch (PlaywrightException) { } }
             playwright ??= await Playwright.CreateAsync();
             string?[] attempts = !string.IsNullOrWhiteSpace(o.ExecutablePath) ? [null]
-                : !string.IsNullOrWhiteSpace(o.Channel) ? [o.Channel] : ["msedge", "chrome"];
+                : !string.IsNullOrWhiteSpace(o.Channel) ? [o.Channel] : DefaultChannels;
             Exception? last = null;
             foreach (var channel in attempts)
             {
@@ -93,7 +96,7 @@ public sealed class PlaywrightPdfRenderer(IOptions<PdfOptions> options, ILogger<
                     log.LogInformation("PDF renderer started {Browser} {Version}", channel ?? o.ExecutablePath, browser.Version);
                     return browser;
                 }
-                catch (PlaywrightException ex) { last = ex; }
+                catch (Exception ex) when (ex is PlaywrightException or TimeoutException) { last = ex; } // try the next browser
             }
             log.LogError(last, "No browser could be started for PDFs");
             throw new PdfUnavailableException("PDFs can't be made on this server: no Edge or Chrome browser was found. Set Pdf:ExecutablePath, or print from the browser instead.", last);
