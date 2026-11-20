@@ -213,6 +213,33 @@ public sealed class RecordItems(OesDbContext db, RecordScope scope, IFileStore f
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>A stored file that can be attached to an email from a record.</summary>
+    public sealed record AttachableDocument(Guid Id, string FileName, long SizeBytes, string? CategoryKey, DateTime CreatedAt);
+
+    /// <summary>
+    /// Files on this record and the records under it (an opportunity's estimates, say), newest first, that this user
+    /// can open: the files the email form offers to attach.
+    /// </summary>
+    public async Task<List<AttachableDocument>> AttachableDocumentsAsync(string entityType, Guid entityId, int take = 30, CancellationToken ct = default)
+    {
+        await scope.EnsureCanSeeAsync(entityType, entityId);
+        var rows = await (from l in db.RecordLinks
+                          where l.EntityType == entityType && l.EntityId == entityId && l.ItemType == ItemTypes.Document
+                          join d in db.Documents on l.ItemId equals d.Id
+                          where d.ArchivedAt == null
+                          orderby d.CreatedAt descending
+                          select new { d.Id, d.FileName, d.SizeBytes, d.CategoryKey, d.CreatedAt, d.EntityType, d.EntityId }).Take(take * 2).ToListAsync(ct);
+        var visible = new Dictionary<(string, Guid), bool>();
+        var list = new List<AttachableDocument>();
+        foreach (var r in rows.DistinctBy(r => r.Id))
+        {
+            if (!visible.TryGetValue((r.EntityType, r.EntityId), out var ok)) visible[(r.EntityType, r.EntityId)] = ok = await scope.CanSeeAsync(r.EntityType, r.EntityId);
+            if (ok) list.Add(new AttachableDocument(r.Id, r.FileName, r.SizeBytes, r.CategoryKey, r.CreatedAt));
+            if (list.Count == take) break;
+        }
+        return list;
+    }
+
     public async Task<List<TimelineItem>> TimelineAsync(string entityType, Guid entityId, TimelineScope range, string? itemType = null,
         int take = 200, CancellationToken ct = default)
     {

@@ -37,6 +37,19 @@
                         <div class="col-6"><input name="email.Bcc" class="form-control form-control-sm" placeholder="BCC (optional)" maxlength="2000" aria-label="BCC"></div>
                         <div class="col-12"><input name="email.Subject" class="form-control form-control-sm" placeholder="Subject" required maxlength="300" aria-label="Subject" data-template-subject></div>
                         <div class="col-12"><textarea name="email.Body" class="form-control form-control-sm" rows="5" placeholder="Message" required maxlength="100000" aria-label="Message" data-template-body></textarea></div>
+                        @if (Model.Files.Count > 0)
+                        {
+                            <div class="col-12"><details class="small" data-attach-files>
+                                <summary class="text-muted"><i class="bi bi-paperclip"></i> Attach files from this record (up to 10, 20 MB in all)</summary>
+                                <div class="mt-1" style="max-height:12rem;overflow-y:auto">
+                                    @foreach (var f in Model.Files)
+                                    {
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" name="email.DocumentIds" value="@f.Id" id="att-@key-@(f.Id.ToString("N")[..8])">
+                                            <label class="form-check-label" for="att-@key-@(f.Id.ToString("N")[..8])">@f.FileName <span class="text-muted">· @Fmt.Size(f.SizeBytes)@(f.CategoryKey is null ? "" : " · " + Fmt.Cap(f.CategoryKey))</span></label></div>
+                                    }
+                                </div>
+                            </details></div>
+                        }
                         <div class="col-12 d-flex align-items-center"><span class="form-text mt-0">Sent from your mailbox. {{merge.fields}} are filled in.</span>
                             <button class="btn btn-sm btn-primary ms-auto" type="submit"><i class="bi bi-send me-1"></i>Send</button></div>
                     </form>

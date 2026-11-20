@@ -18,10 +18,13 @@ public sealed class ComposeModel
     public bool CanEmail { get; init; }
     public bool CanSms { get; init; }
     public bool TextingReady { get; init; }
+    /// <summary>Files on the record (and under it) the email can attach.</summary>
+    public List<Oes.Infrastructure.Crm.RecordItems.AttachableDocument> Files { get; init; } = [];
 }
 
 /// <summary>Email / text compose card for a record: <c>@await Component.InvokeAsync("RecordMessaging", new { entityType, entityId })</c>.</summary>
-public sealed class RecordMessagingViewComponent(MessagingService messaging, TemplateService templates, ConsentService consent, ICurrentUser user) : ViewComponent
+public sealed class RecordMessagingViewComponent(MessagingService messaging, TemplateService templates, ConsentService consent, ICurrentUser user,
+    Oes.Infrastructure.Crm.RecordItems items) : ViewComponent
 {
     public async Task<IViewComponentResult> InvokeAsync(string entityType, Guid entityId)
     {
@@ -39,6 +42,7 @@ public sealed class RecordMessagingViewComponent(MessagingService messaging, Tem
             EmailTemplates = await templates.ListAsync(Channels.Email, activeOnly: true),
             SmsTemplates = await templates.ListAsync(Channels.Sms, activeOnly: true),
             CanEmail = canEmail, CanSms = canSms, TextingReady = await messaging.PhoneNumberAsync() is not null,
+            Files = canEmail ? await items.AttachableDocumentsAsync(entityType, entityId) : [],
         });
     }
 }

@@ -86,7 +86,29 @@ public sealed class MessagingTests(MySqlFixture fx)
             Assert.Equal(doc, item.Message.Attachments.Single().DocumentId);
             var view = await messaging.GetAsync(ItemTypes.Email, sent);
             Assert.Equal(("mia@example.com", "adjuster@example.com", "office@example.com", 1), (view.Counterparty, view.Cc, view.Bcc, view.Attachments.Count));
+            Assert.Equal([doc], (await s.Get<RecordItems>().AttachableDocumentsAsync(EntityTypes.Opportunity, w.Opportunity)).Select(d => d.Id));
         }
+
+        // The record's email form offers the record's files; ticking one attaches it.
+        var web = fx.App.Browser();
+        string Token(string html) => System.Text.RegularExpressions.Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = w.Rep.Email!, ["Password"] = MySqlFixture.Password, ["__RequestVerificationToken"] = Token(await web.GetStringAsync("/Account/Login")),
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync($"/Opportunities/View/{w.Opportunity}");
+        Assert.Contains($"name=\"email.DocumentIds\" value=\"{doc}\"", page);
+        Assert.DoesNotContain(hidden.ToString(), page);
+        var post = await web.PostAsync("/Messages/Send?handler=Email", new FormUrlEncodedContent(
+        [
+            new("email.EntityType", EntityTypes.Opportunity), new("email.EntityId", w.Opportunity.ToString()), new("email.ContactId", w.Contact.ToString()),
+            new("email.To", "mia@example.com"), new("email.Subject", "From the form"), new("email.Body", "See attached."),
+            new("email.DocumentIds", doc.ToString()), new("returnUrl", $"/Opportunities/View/{w.Opportunity}"), new("__RequestVerificationToken", Token(page)),
+        ]));
+        Assert.Equal(HttpStatusCode.Redirect, post.StatusCode);
+        await using (var s = fx.ScopeAs(w.Tenant, w.Rep))
+            Assert.Equal(doc, (await s.Get<OesDbContext>().EmailMessages.Include(x => x.Attachments).SingleAsync(x => x.Subject == "From the form")).Attachments.Single().DocumentId);
     }
     private static string CompanyNumber(World w) => "+1531555" + w.Mobile[^4..];
 
