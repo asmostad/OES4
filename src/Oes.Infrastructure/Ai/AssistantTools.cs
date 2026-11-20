@@ -63,6 +63,19 @@ public sealed class AssistantTools(
 
     public sealed record ToolOutcome(string Content, bool IsError, string Status, string Summary);
 
+    /// <summary>What the chat shows while a tool runs.</summary>
+    public static string Label(string? tool) => tool switch
+    {
+        "search_records" => "Searching records",
+        "get_record" => "Reading a record",
+        "search_knowledge" => "Checking the knowledge base",
+        "list_my_tasks" => "Checking your tasks",
+        "my_schedule" => "Checking your schedule",
+        "pipeline_summary" => "Looking at the pipeline",
+        "create_task" => "Creating a task",
+        _ => "Looking something up",
+    };
+
     public async Task<ToolOutcome> RunAsync(string name, JsonElement input, CancellationToken ct)
     {
         try

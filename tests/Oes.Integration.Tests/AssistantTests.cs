@@ -142,4 +142,57 @@ public sealed class AssistantTests(MySqlFixture fx)
         Assert.Equal("tool_use", AnthropicAiClient.WireName("ToolUse"));
         Assert.Equal("end_turn", AnthropicAiClient.WireName("end_turn"));
     }
+
+    [Fact]
+    public async Task Answers_stream_text_and_lookups_and_are_stored_the_same_way()
+    {
+        var w = await WorldAsync();
+        fx.Ai.Reset(
+            _ => new AiResponse([new AiThinking("", "sig-a"), new AiText("Let me check."), new AiToolUse("toolu_s1", "search_records", System.Text.Json.JsonSerializer.SerializeToElement(new { query = "Ann" }))],
+                "tool_use", SmallUsage, "claude-opus-5-5"),
+            Says("You have Ann Visible."));
+        var events = new List<AssistantEvent>();
+        Guid convo;
+        string answer;
+        await using (var s = fx.ScopeAs(w.Tenant, w.RepA))
+        {
+            var assistant = s.Get<AssistantService>();
+            convo = await assistant.StartAsync(null, null);
+            answer = await assistant.SendAsync(convo, "Which Ann do I have?", e => { events.Add(e); return Task.CompletedTask; });
+        }
+        Assert.Equal("Let me check.\n\nYou have Ann Visible.", answer);
+        Assert.Equal(["thinking", "text", "tool", "thinking", "text", "text"], events.Select(e => e.Type));
+        Assert.Equal("search_records", events[2].Value);
+        Assert.Equal(answer, string.Concat(events.Where(e => e.Type == AssistantEvent.Text).Select(e => e.Value))); // what streamed is what's kept
+        await using (var s = fx.ScopeAs(w.Tenant, w.RepA))
+            Assert.Equal(answer.Split("\n\n"), (await s.Get<AssistantService>().GetAsync(convo)).Lines.Where(l => l.Role == "assistant" && l.Text.Length > 0).Select(l => l.Text));
+
+        // The page streams the same as server-sent events, starting a conversation when there isn't one.
+        fx.Ai.Reset(Calls("search_knowledge", new { query = "warranty" }), Says("Nothing on file about that."));
+        var web = fx.App.Browser();
+        string Token(string html) => System.Text.RegularExpressions.Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = w.RepA.Email!, ["Password"] = MySqlFixture.Password, ["__RequestVerificationToken"] = Token(await web.GetStringAsync("/Account/Login")),
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        var page = await web.GetStringAsync("/Assistant");
+        Assert.Contains("data-assistant-stream=\"/Assistant?handler=Stream\"", page);
+        var res = await web.PostAsync("/Assistant?handler=Stream", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["message"] = "What's our warranty?", ["__RequestVerificationToken"] = Token(page),
+        }));
+        Assert.Equal("text/event-stream", res.Content.Headers.ContentType?.MediaType);
+        var sse = await res.Content.ReadAsStringAsync();
+        Assert.Matches("^event: start\ndata: [{]\"conversation\":\"[0-9a-f-]{36}\"[}]\n\n", sse);
+        Assert.Contains("event: tool\ndata: {\"tool\":\"search_knowledge\",\"label\":\"Checking the knowledge base\"}", sse);
+        Assert.Contains("event: text\ndata: {\"text\":\"Nothing on file about that.\"}", sse);
+        Assert.Matches("event: done\ndata: [{]\"conversation\":\"[0-9a-f-]{36}\",\"url\":\"/Assistant[?]c=[0-9a-f-]{36}\"[}]\n\n$", sse);
+
+        var empty = await (await web.PostAsync("/Assistant?handler=Stream", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["message"] = " ", ["__RequestVerificationToken"] = Token(page),
+        }))).Content.ReadAsStringAsync();
+        Assert.Contains("event: error\ndata: {\"message\":\"Type a message.\"}", empty);
+    }
 }

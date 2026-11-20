@@ -46,7 +46,7 @@
             <div class="card-body assistant-lines">
                 @if (c is null || c.Lines.Count == 0)
                 {
-                    <div class="text-muted small">
+                    <div class="text-muted small assistant-empty">
                         <p class="mb-2">Try:</p>
                         <ul class="mb-0">
                             @if (c?.RecordLabel is not null) { <li>What's the latest on this job, and what should happen next?</li> }
@@ -75,7 +75,7 @@
                 }
             </div>
             <div class="card-footer">
-                <form method="post" asp-page-handler="Send" class="d-flex gap-2">
+                <form method="post" asp-page-handler="Send" class="d-flex gap-2" data-assistant-stream="@Url.Page("/Assistant/Index", "Stream")">
                     @if (c is not null) { <input type="hidden" name="c" value="@c.Conversation.Id"> }
                     <textarea name="message" class="form-control" rows="2" maxlength="8000" required placeholder="Ask a question…" aria-label="Message" disabled="@(!Model.Connected)"></textarea>
                     <button class="btn btn-primary align-self-end" type="submit" disabled="@(!Model.Connected)" data-busy-text="Thinking…"><i class="bi bi-send"></i></button>

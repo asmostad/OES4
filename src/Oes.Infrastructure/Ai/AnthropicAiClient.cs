@@ -50,7 +50,35 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
 
     public async Task<AiResponse> CreateAsync(AiRequest request, CancellationToken ct = default)
     {
-        var parameters = new MessageCreateParams
+        BetaMessage response = await Client.Beta.Messages.Create(Params(request), ct);
+
+        var blocks = new List<AiBlock>();
+        foreach (var b in response.Content)
+        {
+            if (b.TryPickText(out var text)) blocks.Add(new AiText(text.Text));
+            else if (b.TryPickThinking(out var thinking)) blocks.Add(new AiThinking(thinking.Thinking, thinking.Signature));
+            else if (b.TryPickRedactedThinking(out var redacted)) blocks.Add(new AiRedactedThinking(redacted.Data));
+            else if (b.TryPickToolUse(out var tool)) blocks.Add(new AiToolUse(tool.ID, tool.Name, JsonSerializer.SerializeToElement(tool.Input)));
+            else if (b.TryPickFallback(out var fallback)) blocks.Add(new AiFallback(JsonSerializer.Serialize(fallback.RawData)));
+        }
+        var u = response.Usage;
+        var model = ModelName(response.Model.ToString());
+        return new AiResponse(StreamAccumulator.BeforeFallback(blocks), WireName(response.StopReason?.ToString() ?? "end_turn"),
+            new AiUsage(u.InputTokens, u.OutputTokens, u.CacheReadInputTokens ?? 0, u.CacheCreationInputTokens ?? 0),
+            model.Contains('-') ? model : _o.Model);
+    }
+
+    /// <summary>The same request streamed: text reaches <paramref name="onDelta"/> as it's written; the full message is rebuilt from the events.</summary>
+    public async Task<AiResponse> CreateStreamingAsync(AiRequest request, Func<AiStreamDelta, Task> onDelta, CancellationToken ct = default)
+    {
+        var acc = new StreamAccumulator(_o.Model);
+        await foreach (var e in Client.Beta.Messages.CreateStreaming(Params(request), ct).WithCancellation(ct))
+            await acc.AddAsync(e, onDelta);
+        return acc.Build();
+    }
+
+    private MessageCreateParams Params(AiRequest request) =>
+        new()
         {
             Model = _o.Model,
             MaxTokens = request.MaxTokens,
@@ -62,25 +90,14 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
             Tools = request.Tools.Select(ToTool).ToList(),
             Messages = request.Messages.Select(ToParam).ToList(),
         };
-        BetaMessage response = await Client.Beta.Messages.Create(parameters, ct);
-
-        var blocks = new List<AiBlock>();
-        foreach (var b in response.Content)
-        {
-            if (b.TryPickText(out var text)) blocks.Add(new AiText(text.Text));
-            else if (b.TryPickThinking(out var thinking)) blocks.Add(new AiThinking(thinking.Thinking, thinking.Signature));
-            else if (b.TryPickRedactedThinking(out var redacted)) blocks.Add(new AiRedactedThinking(redacted.Data));
-            else if (b.TryPickToolUse(out var tool)) blocks.Add(new AiToolUse(tool.ID, tool.Name, JsonSerializer.SerializeToElement(tool.Input)));
-        }
-        var u = response.Usage;
-        var model = response.Model.ToString();
-        return new AiResponse(blocks, WireName(response.StopReason?.ToString() ?? "end_turn"),
-            new AiUsage(u.InputTokens, u.OutputTokens, u.CacheReadInputTokens ?? 0, u.CacheCreationInputTokens ?? 0),
-            model.Contains('-') ? model : _o.Model);
-    }
 
     /// <summary>"tool_use" whether the SDK hands back the wire value or a C# enum name ("ToolUse").</summary>
-    public static string WireName(string value) =>
+    public static string WireName(string raw) => WireNameCore(raw.Trim().Trim('"'));
+
+    /// <summary>A model name as text, whether the SDK gives it bare or as its JSON form (quoted).</summary>
+    public static string ModelName(string raw) => raw.Trim().Trim('"');
+
+    private static string WireNameCore(string value) =>
         value.Contains('_') || value.All(c => !char.IsUpper(c))
             ? value.ToLowerInvariant()
             : string.Concat(value.Select((c, i) => i > 0 && char.IsUpper(c) ? "_" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
@@ -113,7 +130,7 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
         var text = string.Concat(response.Content.Select(b => b.TryPickText(out var t) ? t.Text : ""));
         var stop = WireName(response.StopReason?.ToString() ?? "end_turn");
         var u = response.Usage;
-        var model = response.Model.ToString();
+        var model = ModelName(response.Model.ToString());
         return new AiExtractResponse(stop is "refusal" or "max_tokens" || text.Length == 0 ? null : text, stop,
             new AiUsage(u.InputTokens, u.OutputTokens, u.CacheReadInputTokens ?? 0, u.CacheCreationInputTokens ?? 0),
             model.Contains('-') ? model : _o.Model);
@@ -144,6 +161,10 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
         };
     }
 
+    /// <summary>A stored fallback block, back to its request form unchanged.</summary>
+    public static BetaFallbackBlockParam FallbackParam(AiFallback f) =>
+        BetaFallbackBlockParam.FromRawUnchecked(JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(f.Json)!);
+
     private static BetaMessageParam ToParam(AiMessage m)
     {
         var content = new List<BetaContentBlockParam>();
@@ -163,6 +184,7 @@ public sealed class AnthropicAiClient(IOptions<AiOptions> options) : IAiClient
                     });
                     break;
                 case AiToolResult r: content.Add(new BetaToolResultBlockParam { ToolUseID = r.ToolUseId, Content = r.Content, IsError = r.IsError }); break;
+                case AiFallback f: content.Add(FallbackParam(f)); break;
             }
         }
         return m.Role == AiMessage.Assistant ? new BetaAssistantMessageParam { Content = content } : new BetaUserMessageParam { Content = content };

@@ -396,6 +396,107 @@
         update();
     });
 
+    // ---------------- Assistant: stream the answer as it's written ----------------
+    // The form still posts normally without this; with it, the reply arrives as server-sent events.
+    // Model output is untrusted: it only ever goes in through textContent, never as HTML.
+    document.querySelectorAll('form[data-assistant-stream]').forEach(function (form) {
+        const lines = document.querySelector('.assistant-lines');
+        if (!lines || !window.fetch || !window.TextDecoder) return;
+        form.addEventListener('submit', function (e) {
+            const box = form.querySelector('textarea[name="message"]');
+            const text = box ? box.value.trim() : '';
+            if (!text) return;
+            e.preventDefault();
+            const button = e.submitter || form.querySelector('button[type="submit"]');
+            const data = new FormData(form);
+            if (button) button.disabled = true;
+            lines.querySelectorAll('.assistant-empty').forEach(function (x) { x.remove(); });
+            lines.appendChild(line('user', text));
+            const reply = line('assistant', '');
+            const bubble = reply.querySelector('.assistant-bubble');
+            const tools = reply.querySelector('.assistant-tools');
+            bubble.textContent = 'Thinking…';
+            bubble.classList.add('text-muted');
+            lines.appendChild(reply);
+            lines.scrollTop = lines.scrollHeight;
+            if (box) box.value = '';
+            let started = false;
+            let finished = false;
+
+            function fail(message) {
+                finished = true;
+                bubble.classList.remove('text-muted');
+                const note = document.createElement('div');
+                note.className = 'text-danger small mt-1';
+                note.textContent = message;
+                reply.appendChild(note);
+                if (!started) bubble.remove();
+                if (button) button.disabled = false;
+                if (box && !box.value) box.value = text;
+            }
+
+            function handle(type, payload) {
+                if (type === 'text') {
+                    if (!started) { started = true; bubble.textContent = ''; bubble.classList.remove('text-muted'); }
+                    bubble.textContent += payload.text || '';
+                } else if (type === 'tool') {
+                    const b = document.createElement('span');
+                    b.className = 'badge bg-secondary-subtle text-secondary me-1';
+                    b.textContent = payload.label || 'Looking something up';
+                    tools.appendChild(b);
+                } else if (type === 'done') {
+                    finished = true;
+                    window.location.assign(payload.url);
+                } else if (type === 'error') {
+                    fail(payload.message || 'The message could not be sent.');
+                }
+                lines.scrollTop = lines.scrollHeight;
+            }
+
+            fetch(form.getAttribute('data-assistant-stream'), { method: 'POST', body: data, credentials: 'same-origin' })
+                .then(function (res) {
+                    if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    function pump() {
+                        return reader.read().then(function (r) {
+                            if (r.done) { if (!finished) fail('The answer stopped early. Reload to see what was saved.'); return; }
+                            buffer += decoder.decode(r.value, { stream: true });
+                            let cut;
+                            while ((cut = buffer.indexOf('\n\n')) >= 0) {
+                                const chunk = buffer.slice(0, cut);
+                                buffer = buffer.slice(cut + 2);
+                                let type = 'message';
+                                let json = '';
+                                chunk.split('\n').forEach(function (l) {
+                                    if (l.indexOf('event: ') === 0) type = l.slice(7);
+                                    else if (l.indexOf('data: ') === 0) json += l.slice(6);
+                                });
+                                try { handle(type, json ? JSON.parse(json) : {}); } catch (err) { /* ignore a malformed event */ }
+                            }
+                            return pump();
+                        });
+                    }
+                    return pump();
+                })
+                .catch(function () { if (!finished) fail('The assistant could not be reached. Try again.'); });
+        });
+
+        function line(role, text) {
+            const div = document.createElement('div');
+            div.className = 'assistant-line assistant-' + role;
+            const t = document.createElement('div');
+            t.className = 'assistant-tools';
+            const b = document.createElement('div');
+            b.className = 'assistant-bubble pre-wrap';
+            b.textContent = text;
+            div.appendChild(t);
+            div.appendChild(b);
+            return div;
+        }
+    });
+
     function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function store(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
 })();

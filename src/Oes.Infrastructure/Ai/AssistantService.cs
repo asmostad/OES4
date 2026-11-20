@@ -143,8 +143,32 @@ public sealed class AssistantService(
     /// Sends the user's message and runs the tool loop to an answer. Returns the answer text
     /// (or why it stopped). Every message is stored before the next call, so nothing is lost on failure.
     /// </summary>
-    public async Task<string> SendAsync(Guid conversationId, string text, CancellationToken ct = default)
+    public async Task<string> SendAsync(Guid conversationId, string text, CancellationToken ct = default) => await SendAsync(conversationId, text, null, ct);
+
+    /// <summary>
+    /// <see cref="SendAsync(Guid, string, CancellationToken)"/>, streamed: <paramref name="onEvent"/> hears the answer's
+    /// text as it's written, each lookup as it starts, and any closing note (cut off, limit reached), so a page can show
+    /// them live. The answer is stored exactly as without streaming.
+    /// </summary>
+    public async Task<string> SendAsync(Guid conversationId, string text, Func<AssistantEvent, Task>? onEvent, CancellationToken ct = default)
     {
+        // What the page hears: text as it's written (a new block after earlier text starts with a blank line,
+        // matching how the stored answer joins them), "thinking", and each lookup.
+        var anyText = false;
+        async Task OnDelta(AiStreamDelta d)
+        {
+            if (onEvent is null) return;
+            if (d.Kind == AiDeltaKinds.Thinking) await onEvent(new AssistantEvent(AssistantEvent.Thinking));
+            else if (d.Kind == AiDeltaKinds.TextStart && anyText) await onEvent(new AssistantEvent(AssistantEvent.Text, "\n\n"));
+            else if (d.Kind == AiDeltaKinds.Text && d.Text is { Length: > 0 } t) { anyText = true; await onEvent(new AssistantEvent(AssistantEvent.Text, t)); }
+        }
+        async Task Note(List<string> answer, string note)
+        {
+            answer.Add(note);
+            await OnDelta(new AiStreamDelta(AiDeltaKinds.TextStart));
+            await OnDelta(new AiStreamDelta(AiDeltaKinds.Text, note));
+        }
+
         var c = await OwnAsync(conversationId, ct);
         var me = c.UserId;
         text = (text ?? "").Trim();
@@ -176,27 +200,28 @@ public sealed class AssistantService(
         var answer = new List<string>();
         for (var round = 0; ; round++)
         {
-            if (await meter.OverBudgetAsync(me, today, ct) is { } stop) { answer.Add(stop); break; }
+            if (await meter.OverBudgetAsync(me, today, ct) is { } stop) { await Note(answer, stop); break; }
             AiResponse response;
             try
             {
-                response = await ai.CreateAsync(new AiRequest(system, Merge(messages), AssistantTools.Definitions), ct);
+                var request = new AiRequest(system, Merge(messages), AssistantTools.Definitions);
+                response = onEvent is null ? await ai.CreateAsync(request, ct) : await ai.CreateStreamingAsync(request, OnDelta, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 log.LogError(ex, "Assistant call failed for conversation {ConversationId}", c.Id);
-                answer.Add("The assistant couldn't be reached. Try again in a minute.");
+                await Note(answer, "The assistant couldn't be reached. Try again in a minute.");
                 break;
             }
             c.CostUsd += await meter.RecordAsync(me, today, response.Usage, ct);
             await AppendAsync(AiMessage.Assistant, response.Content);
             answer.AddRange(response.Content.OfType<AiText>().Select(t => t.Text).Where(t => t.Length > 0));
 
-            if (response.StopReason == "refusal") { answer.Add("I can't help with that request."); break; }
+            if (response.StopReason == "refusal") { await Note(answer, "I can't help with that request."); break; }
             var uses = response.Content.OfType<AiToolUse>().ToList();
             if (response.StopReason != "tool_use" || uses.Count == 0)
             {
-                if (response.StopReason == "max_tokens") answer.Add("(The answer was cut off. Ask me to continue.)");
+                if (response.StopReason == "max_tokens") await Note(answer, "(The answer was cut off. Ask me to continue.)");
                 break;
             }
 
@@ -205,6 +230,7 @@ public sealed class AssistantService(
             var limitHit = round >= _o.MaxToolRounds;
             foreach (var use in uses)
             {
+                if (onEvent is not null && !limitHit) await onEvent(new AssistantEvent(AssistantEvent.Tool, use.Name));
                 AssistantTools.ToolOutcome outcome = limitHit
                     ? new("Tool limit reached for this message. Answer with what you have.", true, "error", "tool limit")
                     : await tools.RunAsync(use.Name, use.Input, ct);
@@ -216,7 +242,7 @@ public sealed class AssistantService(
                 });
             }
             await AppendAsync(AiMessage.User, results);
-            if (round > _o.MaxToolRounds) { answer.Add("(I stopped after too many lookups. Try a narrower question.)"); break; }
+            if (round > _o.MaxToolRounds) { await Note(answer, "(I stopped after too many lookups. Try a narrower question.)"); break; }
         }
         await db.SaveChangesAsync(ct);
         return string.Join("\n\n", answer);
@@ -248,6 +274,14 @@ public sealed class AssistantService(
     }
 }
 
+/// <summary>Something a streamed answer reports as it happens: a piece of text, the model thinking, or a lookup (Value = the text, or the tool's name).</summary>
+public sealed record AssistantEvent(string Type, string? Value = null)
+{
+    public const string Text = "text";
+    public const string Thinking = "thinking";
+    public const string Tool = "tool";
+}
+
 /// <summary>Stores conversation blocks as JSON exactly as they were, so they replay unchanged.</summary>
 public static class BlockJson
 {
@@ -262,6 +296,7 @@ public static class BlockJson
                 AiRedactedThinking r => new JsonObject { ["t"] = "redacted", ["data"] = r.Data },
                 AiToolUse u => new JsonObject { ["t"] = "tool_use", ["id"] = u.Id, ["name"] = u.Name, ["input"] = JsonNode.Parse(u.Input.GetRawText()) },
                 AiToolResult r => new JsonObject { ["t"] = "tool_result", ["id"] = r.ToolUseId, ["content"] = r.Content, ["error"] = r.IsError },
+                AiFallback f => new JsonObject { ["t"] = "fallback", ["raw"] = f.Json },
                 _ => throw new InvalidOperationException("Unknown block."),
             });
         return arr.ToJsonString();
@@ -279,6 +314,7 @@ public static class BlockJson
                 "thinking" => new AiThinking((string)o["thinking"]!, (string)o["signature"]!),
                 "redacted" => new AiRedactedThinking((string)o["data"]!),
                 "tool_use" => new AiToolUse((string)o["id"]!, (string)o["name"]!, JsonSerializer.SerializeToElement(o["input"])),
+                "fallback" => new AiFallback((string)o["raw"]!),
                 _ => new AiToolResult((string)o["id"]!, (string)o["content"]!, (bool)o["error"]!),
             });
         }

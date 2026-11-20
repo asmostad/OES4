@@ -7,7 +7,10 @@ using Oes.Web.Infrastructure;
 
 namespace Oes.Web.Pages.Assistant;
 
-/// <summary>Chat with the assistant. Answers can take a little while: the form posts and the page reloads with the reply.</summary>
+/// <summary>
+/// Chat with the assistant. With script on, the answer streams in as it's written (Stream handler, server-sent
+/// events); without it, the form posts (Send) and the page reloads with the reply.
+/// </summary>
 [HasPermission(Permissions.AiAssistant)]
 public class IndexModel(AssistantService assistant, TenantTime time) : CrmPageModel
 {
@@ -40,6 +43,38 @@ public class IndexModel(AssistantService assistant, TenantTime time) : CrmPageMo
         await assistant.SendAsync(id, message);
         return RedirectToPage(new { c = id });
     }, () => RedirectToPage(new { c = ConversationId }));
+
+    /// <summary>
+    /// The same as Send, streamed as server-sent events: start (the conversation id), text pieces, thinking,
+    /// tool (a label while a lookup runs), then done (where to go) or error (why it couldn't send).
+    /// </summary>
+    public async Task<IActionResult> OnPostStreamAsync(string message)
+    {
+        var ct = HttpContext.RequestAborted;
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no";
+        HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()?.DisableBuffering();
+        async Task Send(string type, object data)
+        {
+            await Response.WriteAsync($"event: {type}\ndata: {System.Text.Json.JsonSerializer.Serialize(data)}\n\n", ct);
+            await Response.Body.FlushAsync(ct);
+        }
+        try
+        {
+            if (string.IsNullOrWhiteSpace(message)) throw new CrmRuleException("Type a message."); // before starting a conversation
+            var id = ConversationId ?? await assistant.StartAsync(null, null);
+            await Send("start", new { conversation = id });
+            await assistant.SendAsync(id, message, e => e.Type == AssistantEvent.Tool
+                ? Send(e.Type, new { tool = e.Value, label = AssistantTools.Label(e.Value) })
+                : Send(e.Type, new { text = e.Value }), ct);
+            await Send("done", new { conversation = id, url = $"/Assistant?c={id}" });
+        }
+        catch (CrmRuleException ex) { await Send("error", new { message = ex.Message }); }
+        catch (RecordForbiddenException ex) { await Send("error", new { message = ex.Message }); }
+        catch (RecordNotFoundException) { await Send("error", new { message = "That conversation wasn't found." }); }
+        return new EmptyResult();
+    }
 
     public Task<IActionResult> OnPostDeleteAsync() => Guard(async () =>
     {
