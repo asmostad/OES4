@@ -188,4 +188,64 @@ public sealed class SubcontractorTests(MySqlFixture fx)
         Assert.Equal(HttpStatusCode.NotFound, bad.StatusCode);
         Assert.Contains("isn't available", await bad.Content.ReadAsStringAsync());
     }
+
+    [Fact]
+    public async Task Issuing_from_the_page_saves_the_pdf_and_emails_it_to_the_sub()
+    {
+        var subEmail = $"crew{Guid.NewGuid():N}@topcrew.example.com";
+        var x = await SetupAsync(subEmail);
+        Guid woId;
+        await using (var s = fx.ScopeAs(x.Tenant, x.Admin))
+        {
+            var wos = s.Get<WorkOrderService>();
+            woId = await wos.CreateAsync(x.Trade, x.Sub, new DateOnly(2026, 12, 3), "7:30 am", "Dumpster in driveway");
+            await wos.AddLineAsync(woId, null, "Tear-off & install", 25, "SQ", 90m);
+        }
+        var web = fx.App.Browser();
+        string Token(string html) => System.Text.RegularExpressions.Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        await web.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = x.Admin.Email!, ["Password"] = MySqlFixture.Password, ["__RequestVerificationToken"] = Token(await web.GetStringAsync("/Account/Login")),
+        }));
+        await web.GetAsync("/Account/SelectTenant");
+        async Task<string> Issue()
+        {
+            var page = await web.GetStringAsync($"/WorkOrders/View/{woId}");
+            Assert.Contains($"action=\"/WorkOrders/Print/{woId}?handler=Issue\"", page);
+            var r = await web.PostAsync($"/WorkOrders/Print/{woId}?handler=Issue", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = Token(page) }));
+            Assert.Equal($"/WorkOrders/View/{woId}", r.Headers.Location?.OriginalString);
+            return await web.GetStringAsync($"/WorkOrders/View/{woId}");
+        }
+        string[] MailTo() => Directory.GetFiles(Path.Combine(fx.FilesRoot, "mail"), "*.html").Where(f => File.ReadAllText(f).Contains(subEmail)).ToArray();
+
+        // Issued with the PDF: saved on the work order and attached to the sub's email.
+        var after = await Issue();
+        Assert.Contains($"Issued and emailed to {subEmail}. The PDF is saved on the work order.", after);
+        Assert.Contains("data-issued-pdf", after);
+        Assert.Contains("Dumpster in driveway", fx.Pdf.LastHtml);
+        Guid pdfId;
+        await using (var s = fx.ScopeAs(x.Tenant, x.Admin))
+        {
+            var wo = await s.Get<OesDbContext>().WorkOrders.SingleAsync(w => w.Id == woId);
+            Assert.Equal(WorkOrderStatuses.Issued, wo.Status);
+            pdfId = wo.PdfDocumentId!.Value;
+            var doc = await s.Get<OesDbContext>().Documents.SingleAsync(d => d.Id == pdfId);
+            Assert.Equal(("work_order", $"{wo.Number}.pdf"), (doc.CategoryKey, doc.FileName));
+            var mail = Assert.Single(MailTo());
+            Assert.Contains("The work order is attached as a PDF.", File.ReadAllText(mail));
+            Assert.Equal("%PDF-1.7 stand-in", File.ReadAllText(mail[..^5] + $"-1-{wo.Number}.pdf"));
+            await s.Get<WorkOrderService>().ReviseAsync(woId); // back to draft to issue again
+        }
+
+        // No browser on the server: still issued and emailed, without the attachment.
+        fx.Pdf.Unavailable = true;
+        try
+        {
+            Assert.Contains("No PDF was attached", await Issue());
+            await using var s = fx.ScopeAs(x.Tenant, x.Admin);
+            Assert.Null((await s.Get<OesDbContext>().WorkOrders.SingleAsync(w => w.Id == woId)).PdfDocumentId);
+            Assert.Equal(2, MailTo().Length);
+        }
+        finally { fx.Pdf.Unavailable = false; }
+    }
 }

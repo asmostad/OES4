@@ -26,7 +26,8 @@
 
 <div class="record-toolbar">
     <a class="btn btn-sm btn-outline-secondary" href="/WorkOrders/Print/@w.Id"><i class="bi bi-printer me-1"></i>Print / PDF</a>
-    @if (edit && d.IsDraft) { <form method="post" asp-page-handler="Issue" class="d-inline"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-send me-1"></i>Issue to sub</button></form> }
+    @if (edit && d.IsDraft) { <form method="post" asp-page="/WorkOrders/Print" asp-route-id="@w.Id" asp-page-handler="Issue" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" data-busy-text="Issuing…"><i class="bi bi-send me-1"></i>Issue to sub</button></form> }
+    @if (w.PdfDocumentId is { } issuedPdf) { <a class="btn btn-sm btn-outline-secondary" href="/Records/Items?handler=Download&id=@issuedPdf" data-issued-pdf><i class="bi bi-file-earmark-pdf me-1"></i>PDF as issued</a> }
     @if (edit && w.Status == WorkOrderStatuses.Issued)
     {
         <form method="post" asp-page-handler="NewLink" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Send a new link? The current link will stop working."><i class="bi bi-link-45deg me-1"></i>New portal link</button></form>

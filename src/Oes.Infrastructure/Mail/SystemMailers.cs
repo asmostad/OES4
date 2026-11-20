@@ -47,6 +47,13 @@ public sealed class SesSystemMailer(IAmazonSimpleEmailServiceV2 ses, IOptions<Sy
                         Html = new Content { Data = email.HtmlBody, Charset = "UTF-8" },
                         Text = email.TextBody is null ? null : new Content { Data = email.TextBody, Charset = "UTF-8" },
                     },
+                    Attachments = email.Attachments is { Count: > 0 } files
+                        ? files.Select(f => new Amazon.SimpleEmailV2.Model.Attachment
+                        {
+                            FileName = f.FileName, ContentType = f.ContentType, RawContent = new MemoryStream(f.Content),
+                            ContentDisposition = AttachmentContentDisposition.ATTACHMENT, ContentTransferEncoding = AttachmentContentTransferEncoding.BASE64,
+                        }).ToList()
+                        : null,
                 },
             },
         };
@@ -62,9 +69,15 @@ public sealed class PickupSystemMailer(IOptions<SystemMailOptions> options, ILog
     {
         var dir = Path.GetFullPath(options.Value.PickupDirectory);
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.html");
-        var html = $"<!-- To: {System.Net.WebUtility.HtmlEncode(email.To)} -->\n<!-- Subject: {System.Net.WebUtility.HtmlEncode(email.Subject)} -->\n{email.HtmlBody}";
+        var id = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
+        var path = Path.Combine(dir, id + ".html");
+        var files = email.Attachments ?? [];
+        var html = $"<!-- To: {System.Net.WebUtility.HtmlEncode(email.To)} -->\n<!-- Subject: {System.Net.WebUtility.HtmlEncode(email.Subject)} -->\n"
+                   + string.Concat(files.Select((f, i) => $"<!-- Attachment: {System.Net.WebUtility.HtmlEncode(f.FileName)} -> {id}-{i + 1}-{Communication.DevMailProvider.SafeName(f.FileName)} -->\n"))
+                   + email.HtmlBody;
         await File.WriteAllTextAsync(path, html, ct);
+        var n = 0;
+        foreach (var f in files) await File.WriteAllBytesAsync(Path.Combine(dir, $"{id}-{++n}-{Communication.DevMailProvider.SafeName(f.FileName)}"), f.Content, ct);
         log.LogInformation("System email {Subject} written to {Path}", email.Subject, path);
     }
 }

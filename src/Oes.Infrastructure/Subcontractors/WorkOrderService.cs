@@ -157,7 +157,18 @@ public sealed class WorkOrderService(
     }
 
     /// <summary>Issues the work order: creates a fresh portal link and emails it to the sub when they have an email.</summary>
+    /// <summary>Issues the work order and emails the sub the portal link (no PDF attached: see <see cref="MarkIssuedAsync"/>).</summary>
     public async Task<IssueResult> IssueAsync(Guid id, CancellationToken ct = default)
+    {
+        await MarkIssuedAsync(id, ct);
+        return await SendIssuedAsync(id, null, ct);
+    }
+
+    /// <summary>
+    /// The first half of issuing: checks and freezes the work order as issued, without emailing. The web page then
+    /// renders its PDF (now showing it as issued) and calls <see cref="SendIssuedAsync"/>.
+    /// </summary>
+    public async Task MarkIssuedAsync(Guid id, CancellationToken ct = default)
     {
         var wo = await EditableAsync(id, draftOnly: true, ct);
         if (!await db.WorkOrderLines.AnyAsync(l => l.WorkOrderId == id, ct)) throw new CrmRuleException("Add at least one line before issuing.");
@@ -166,9 +177,27 @@ public sealed class WorkOrderService(
         wo.IssuedAt = clock.UtcNow;
         wo.AcceptStatus = AcceptStatuses.Pending;
         wo.AcceptedName = null; wo.AcceptedAt = null; wo.DeclineReason = null;
+        wo.PdfDocumentId = null; // a re-issue gets a new copy
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// The second half: saves the issued PDF on the work order (when there is one) and emails the sub the portal
+    /// link with it attached.
+    /// </summary>
+    public async Task<IssueResult> SendIssuedAsync(Guid id, byte[]? pdf, CancellationToken ct = default)
+    {
+        var wo = await EditableAsync(id, draftOnly: false, ct);
+        if (wo.Status != WorkOrderStatuses.Issued) throw new CrmRuleException("Only issued work orders can be sent.");
+        if (pdf is not null)
+        {
+            using var stream = new MemoryStream(pdf);
+            wo.PdfDocumentId = await items.UploadAsync(EntityTypes.WorkOrder, id, stream, $"{wo.Number}.pdf", "application/pdf", "work_order", ct);
+            await db.SaveChangesAsync(ct);
+        }
         var result = await SendLinkAsync(wo, ct);
-        await items.LogAsync(EntityTypes.WorkOrder, id, "work_order.issued", $"Issued {wo.Amount:C2}{(result.Emailed ? " and emailed to " + result.EmailedTo : " (no email on file: share the link)")}", ct);
+        await items.LogAsync(EntityTypes.WorkOrder, id, "work_order.issued",
+            $"Issued {wo.Amount:C2}{(result.Emailed ? " and emailed to " + result.EmailedTo + (wo.PdfDocumentId is null ? "" : " with the PDF") : " (no email on file: share the link)")}", ct);
         await db.SaveChangesAsync(ct);
         return result;
     }
@@ -195,10 +224,22 @@ public sealed class WorkOrderService(
         if (email is null) return new IssueResult(link, false, null);
         var company = await db.Tenants.Where(t => t.Id == wo.TenantId).Select(t => t.Name).FirstAsync(ct);
         var enc = HtmlEncoder.Default;
+        List<MailAttachment>? files = null;
+        if (wo.PdfDocumentId is { } docId)
+        {
+            var (doc, content) = await items.OpenDocumentAsync(docId, ct);
+            await using (content)
+            {
+                using var buffer = new MemoryStream();
+                await content.CopyToAsync(buffer, ct);
+                files = [new MailAttachment(doc.FileName, doc.ContentType, buffer.ToArray())];
+            }
+        }
         await mailer.SendAsync(new SystemEmail(email, $"Work order {wo.Number} from {company}",
             $"<p>{enc.Encode(company)} sent you work order <strong>{enc.Encode(wo.Number)}</strong> for {wo.WorkDate:dddd, MMMM d}.</p>" +
+            (files is null ? "" : "<p>The work order is attached as a PDF.</p>") +
             $"<p><a href=\"{enc.Encode(link)}\">View, accept or decline the work order</a></p>" +
-            "<p>This link is just for you. It expires in 60 days and stops working if a new link is sent.</p>", link), ct);
+            "<p>This link is just for you. It expires in 60 days and stops working if a new link is sent.</p>", link, files), ct);
         return new IssueResult(link, true, email);
     }
 

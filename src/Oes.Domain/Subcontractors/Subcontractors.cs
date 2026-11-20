@@ -98,6 +98,8 @@ public class WorkOrder : TenantEntity
     public string? ArrivalTime { get; set; }
     public string? Instructions { get; set; }
     public DateTime? IssuedAt { get; set; }
+    /// <summary>The PDF as last issued, saved on the work order and attached to the email to the sub.</summary>
+    public Guid? PdfDocumentId { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? CompletionNote { get; set; }
     public DateTime? PaidAt { get; set; }

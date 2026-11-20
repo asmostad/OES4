@@ -41,7 +41,7 @@ public interface IFileStore
     Task<bool> ExistsAsync(string key, CancellationToken ct = default);
 }
 
-public sealed record SystemEmail(string To, string Subject, string HtmlBody, string? TextBody = null);
+public sealed record SystemEmail(string To, string Subject, string HtmlBody, string? TextBody = null, IReadOnlyList<MailAttachment>? Attachments = null);
 
 /// <summary>
 /// Platform email (invites, password resets, staff notices) from our own domain via SES.

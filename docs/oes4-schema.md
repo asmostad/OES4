@@ -155,7 +155,7 @@ The **standalone Measurements page** works on these tables directly. Jobs and es
 | `subcontractors` | TenantId, ContactId (organization contact), Specialties, Status, InsuranceExpiresOn (cached), Notes | Reuses contacts for name, phone and email |
 | `subcontractor_documents` | SubcontractorId, DocTypeKey, DocumentId, ExpiresOn | Expiring-insurance alerts; optional scheduling block |
 | `subcontractor_rates` | SubcontractorId, Basis (driver/catalog_item), DriverKey, CatalogItemId, Activity, RateBasis (labor_only/installed), Rate, EffectiveFrom, EffectiveTo | Effective-dated, never edited in place |
-| `work_orders` | TenantId, Number, ProjectTradeId, SubcontractorId, Status (draft/issued/completed/closed/paid/cancelled), AcceptStatus, AcceptedName/At, OriginalAmount, AuthorizedAmount, FinalAmount, WorkDate, ArrivalTime, IssuedAt, PdfDocumentId | |
+| `work_orders` | TenantId, Number, ProjectTradeId, SubcontractorId, Status (draft/issued/completed/closed/paid/cancelled), AcceptStatus, AcceptedName/At, OriginalAmount, AuthorizedAmount, FinalAmount, WorkDate, ArrivalTime, IssuedAt, PdfDocumentId | PdfDocumentId built 2026-11-19 (the PDF as last issued, emailed to the sub). |
 | `work_order_lines` | WorkOrderId, EstimateVersionLineId, Description, Qty, Unit, Rate, Amount, IsIncluded | |
 | `work_order_requests` | WorkOrderId, **Kind (change/pay/date)**, Status (pending/approved/declined), Amount, ProposedDate, Description, SubmittedAt, DecidedBy/At, Note | One table for the three request types |
 | `work_order_request_photos` | RequestId, DocumentId | |

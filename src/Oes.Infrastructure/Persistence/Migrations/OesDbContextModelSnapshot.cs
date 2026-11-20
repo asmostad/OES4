@@ -5168,6 +5168,9 @@ namespace Oes.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<byte[]>("PdfDocumentId")
+                        .HasColumnType("binary(16)");
+
                     b.Property<byte[]>("ProjectId")
                         .IsRequired()
                         .HasColumnType("binary(16)");

@@ -19,6 +19,12 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
     /// </summary>
     public Func<byte[], Task<string>>? Deliver { get; init; }
 
+    /// <summary>
+    /// With <see cref="Deliver"/>: what to do when no PDF can be made (no browser on the server), for steps that must
+    /// still happen (a work order's email goes out without the attachment). Its message is shown with the reason.
+    /// </summary>
+    public Func<Task<string>>? WithoutPdf { get; init; }
+
     private static void Flash(HttpContext http, string message, string type)
     {
         var tempData = http.RequestServices.GetRequiredService<ITempDataDictionaryFactory>().GetTempData(http);
@@ -40,7 +46,12 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
         try { pdf = await http.RequestServices.GetRequiredService<IPdfRenderer>().RenderAsync(html, footer, http.RequestAborted); }
         catch (PdfUnavailableException ex)
         {
-            Flash(http, ex.Message, "danger");
+            if (WithoutPdf is not null)
+            {
+                try { Flash(http, $"{await WithoutPdf()} No PDF was attached: {ex.Message}", "warning"); }
+                catch (Exception inner) when (inner is Oes.Infrastructure.Crm.CrmRuleException or Oes.Infrastructure.Crm.RecordForbiddenException) { Flash(http, inner.Message, "danger"); }
+            }
+            else Flash(http, ex.Message, "danger");
             await new LocalRedirectResult(printUrl).ExecuteResultAsync(context);
             return;
         }
