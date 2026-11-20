@@ -203,3 +203,12 @@ export type PropertyContact = { id: string; name: string; role: string; isPrimar
 export type PropertyDetail = { id: string; address: string; contacts: PropertyContact[]; opportunities: OpportunityBrief[] };
 export type NotificationItem = { id: string; kind: string; title: string; body: string | null; url: string | null; createdAt: string; read: boolean };
 export type Bell = { unread: number; items: NotificationItem[] };
+export type Disposition = { id: string; name: string; color: string; recycleDays: number | null; isDoNotContact: boolean };
+export type Campaign = { id: string; name: string; mode: string };
+export type QueueCounts = { due: number; beingWorked: number; callBacksLater: number };
+export type CallRow = { at: string; disposition: string; color: string; by: string | null; note: string | null };
+export type ProspectCard = {
+  id: string; number: string; name: string; stageName: string; stageColor: string; contactId: string; contactName: string;
+  methods: ContactMethod[]; propertyId: string | null; address: string | null; ownerName: string | null; stormName: string | null;
+  attempts: number; lastDisposition: string | null; calls: CallRow[]; lockedBy: string | null; canEdit: boolean;
+};

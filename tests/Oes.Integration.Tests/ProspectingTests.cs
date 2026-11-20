@@ -181,6 +181,12 @@ public sealed class ProspectingTests(MySqlFixture fx)
         api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
         var claimed = await api.PostAsync("/api/v1/prospecting/next", null);
         Assert.Equal(other, (await claimed.Content.ReadFromJsonAsync<NextLeadDto>())!.OpportunityId); // the web lock on Hal is the same user's
+        var card = await (await api.GetAsync($"/api/v1/prospecting/{lead}")).Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal("Gwen Caller", card.GetProperty("contactName").GetString());
+        Assert.Equal("Left voicemail", card.GetProperty("lastDisposition").GetString());
+        Assert.Equal("VM 1", card.GetProperty("calls")[0].GetProperty("note").GetString());
+        Assert.True(card.GetProperty("canEdit").GetBoolean());
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await api.GetAsync($"/api/v1/prospecting/{Guid.NewGuid()}")).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.NoContent,
             (await api.PostAsJsonAsync($"/api/v1/prospecting/{other}/disposition", new { dispositionId = voicemail, note = "VM" })).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.NoContent, (await api.PostAsync("/api/v1/prospecting/next", null)).StatusCode);

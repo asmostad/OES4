@@ -6,6 +6,7 @@ import { OfflineNote } from '@/components/OfflineNote';
 import { Button, Card, Loading, Message, Muted, Row, Screen, styles } from '@/components/ui';
 import { OpportunityRow, Paged } from '@/lib/api';
 import { money } from '@/lib/format';
+import { useApi } from '@/lib/session';
 import { useCached } from '@/lib/useCached';
 import { colors, radius, space } from '@/lib/theme';
 
@@ -15,6 +16,8 @@ export default function Leads() {
   const [search, setSearch] = useState('');
   const [mine, setMine] = useState(true);
   const [pulling, setPulling] = useState(false);
+  const { me } = useApi();
+  const canCall = me.permissions.includes('leads.prospect');
 
   // Search as you type, after a short pause.
   useEffect(() => {
@@ -32,7 +35,10 @@ export default function Leads() {
   return (
     <Screen refreshing={pulling} onRefresh={async () => { setPulling(true); await load(); setPulling(false); }}>
       <OfflineNote offline={leads.offline} savedAt={leads.savedAt} />
-      <Button title="New lead" onPress={() => router.push('/new-lead')} />
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <View style={{ flex: 1 }}><Button title="New lead" onPress={() => router.push('/new-lead')} /></View>
+        {canCall && <View style={{ flex: 1 }}><Button title="Call list" kind="secondary" onPress={() => router.push('/calls')} /></View>}
+      </View>
       <TextInput value={q} onChangeText={setQ} placeholder="Search name, number, address, phone" placeholderTextColor={colors.muted}
         autoCorrect={false} clearButtonMode="while-editing" style={[styles.input]} accessibilityLabel="Search leads" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>

@@ -94,6 +94,10 @@ public sealed class OpportunitiesApiController(OpportunityService opportunities)
 public sealed record DispositionRequest(Guid DispositionId, string? Note, DateOnly? CallBackOn);
 public sealed record DispositionItem(Guid Id, string Name, string Color, int? RecycleDays, bool IsDoNotContact);
 public sealed record NextLead(Guid OpportunityId);
+public sealed record CallDto(DateTime At, string Disposition, string Color, string? By, string? Note);
+public sealed record ProspectCardDto(Guid Id, string Number, string Name, string StageName, string StageColor, Guid ContactId, string ContactName,
+    List<ContactMethodDto> Methods, Guid? PropertyId, string? Address, string? OwnerName, string? StormName, int Attempts,
+    string? LastDisposition, List<CallDto> Calls, string? LockedBy, bool CanEdit);
 
 /// <summary>
 /// The prospecting call list for the mobile app: claim the next lead (locked to the caller),
@@ -115,6 +119,18 @@ public sealed class ProspectingApiController(ProspectingService prospecting) : C
     [HttpPost("next")]
     public async Task<IActionResult> Next(Guid? stageId, string? source, Guid? stormId, bool mine = false, Guid? campaignId = null, [FromQuery] Guid[]? skip = null, CancellationToken ct = default) =>
         await prospecting.NextAsync(new ProspectFilter(stageId, source, stormId, mine, campaignId), skip ?? [], ct) is { } id ? Ok(new NextLead(id)) : NoContent();
+
+    /// <summary>The lead on the caller's screen: who to call, the address, and the last calls.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ProspectCardDto> Card(Guid id, CancellationToken ct)
+    {
+        var c = await prospecting.CardAsync(id, ct);
+        var o = c.Opportunity;
+        return new ProspectCardDto(o.Id, o.Number, o.Name, c.Stage.Name, c.Stage.Color, c.Contact.Id, c.Contact.DisplayName,
+            c.Methods.Select(m => new ContactMethodDto(m.Kind, m.Value, m.IsPrimary)).ToList(), c.Property?.Id, c.Property?.SingleLine,
+            c.OwnerName, c.StormName, o.ContactAttempts, c.LastDisposition?.Name,
+            c.Calls.Select(x => new CallDto(x.At, x.Disposition, x.Color, x.By, x.Note)).ToList(), c.LockedBy, c.CanEdit);
+    }
 
     [HttpPost("{id:guid}/disposition")]
     public async Task<IActionResult> Disposition(Guid id, DispositionRequest body, CancellationToken ct)
