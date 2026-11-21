@@ -1,9 +1,22 @@
 # Pich field app
 
-The phone app for reps and field crews: today's appointments and tasks, tasks, leads, and on a lead: call, text,
-email, directions, notes, photos, documents (saved proposal and work order PDFs) and the timeline. It's an
-[Expo](https://expo.dev) app (React Native, SDK 58, Expo Router) that talks to the Pich API (`/api/v1`) with the same
-record scope and permissions as the web.
+The phone app for reps, project managers and field crews. It's an [Expo](https://expo.dev) app (React Native, SDK 58,
+Expo Router) that talks to the Pich API (`/api/v1`) with the same record scope and permissions as the web. What it does:
+
+- **Today, Calendar, Tasks:** appointments (open one to get directions, mark it done, move it or cancel it), overdue
+  and due tasks (tick, add, edit), and texts from unknown numbers for whoever handles them.
+- **Leads:** search, New lead, the call list, and storm **canvassing** (houses in a storm's ZIP codes with no lead yet,
+  nearest first). A lead has call, text, email and directions, stage changes, tasks, appointments, notes, photos,
+  documents, the timeline, its claim, its estimates (open the proposal PDF, issue, record signed or declined) and
+  "Ask the assistant".
+- **Jobs:** the schedule of trades and projects; move stages, work orders (mark done), change orders (add one on site,
+  get the customer's approval, open the PDF).
+- **Contacts and properties:** edit a name, phone or email; a property's people, leads and **measurements** (take a
+  new version on site).
+- **Texts and email** from the company's number and mailbox, so they land on the record; the **assistant**; your
+  **booking hours**; notifications; search.
+
+Building estimates, itemizing change orders, issuing work orders, settings and reports stay on the web.
 
 No Mac is needed: develop on Windows, try it on an iPhone or Android phone with the free **Expo Go** app, and build
 the store apps in Expo's cloud (EAS Build).
@@ -35,8 +48,14 @@ CI runs both on every push.
 
 ## How it's built
 
-- `src/app/`: screens (Expo Router). `sign-in`, the tabs (`index` = Today, `calendar`, `tasks`, `leads`, `account`) and
-  `opportunity/[id]`. Signed-out users only see sign-in (`Stack.Protected`).
+- `src/app/`: screens (Expo Router). `sign-in`, the tabs (`index` = Today, `calendar`, `tasks`, `leads`, `jobs`,
+  `account`) and a screen per record (`opportunity/[id]`, `contact/[id]`, `project/[id]`, `estimate/[id]`, …), with
+  forms as modals (`compose`, `measure`, `new-lead`, `edit-*`). Every screen is registered in `_layout.tsx`.
+  Signed-out users only see sign-in (`Stack.Protected`).
+- `src/components/`: shared pieces: `ui.tsx` (cards, buttons, fields, chips), `RecordFeed.tsx` (notes, photos,
+  documents and timeline for any record), `Records.tsx` (lists of leads, estimates, claims, work orders),
+  `StageMover.tsx`.
+- `src/lib/routes.ts`: maps a web link (a notification's) to the app screen.
 - `src/lib/api.ts`: the API client and response types. Access tokens last 30 minutes and are refreshed with the
   30-day refresh token; when that's refused too, the app signs out.
 - `src/lib/storage.ts`: tokens in the phone's secure storage (Keychain / Keystore). `storage.web.ts` is the browser
@@ -44,10 +63,24 @@ CI runs both on every push.
 - `src/lib/files.ts`: opens a document by downloading it with the token and showing it in the phone's viewer.
 - `src/lib/theme.ts`: Pich colors.
 
-## Not yet
+## Building for phones and the stores
 
-- Store builds: needs an Expo account, an Apple Developer account and a Google Play developer account. The bundle id
-  `com.pich.field` in `app.json` is a placeholder until the real one is chosen.
+`eas.json` has three build profiles, all built in Expo's cloud (no Mac needed):
+
+- `development`: a build of this app with the developer menu (`expo-dev-client`), installed on your own phones. Needed
+  for push notifications and anything Expo Go can't run.
+- `preview`: a normal build shared with testers (internal distribution, or TestFlight).
+- `production`: the store build; the build number goes up by itself.
+
+What has to exist first (your accounts; nothing here creates them):
+
+1. An Expo account, then `npx eas-cli login` and `npx eas-cli init` in `mobile/` (adds the project id to `app.json`).
+2. The real bundle id in place of the placeholder `com.pich.field` in `app.json` (iOS `bundleIdentifier`, Android
+   `package`). It can't change after the first store release.
+3. An Apple Developer account (for iOS) and a Google Play developer account (for Android).
+
+Then: `npx eas-cli build --profile development --platform ios` (or `preview`, `production`), and
+`npx eas-cli submit --platform ios` to send a production build to App Store Connect.
 
 ## Offline
 
