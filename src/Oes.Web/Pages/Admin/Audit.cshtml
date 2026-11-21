@@ -1,0 +1,50 @@
+@page
+@model Oes.Web.Pages.Admin.AuditModel
+@{
+    ViewData["Title"] = "Audit Log";
+}
+<div class="page-header">
+    <div>
+        <h1>Audit Log</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Audit Log</li></ol></nav>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        <select name="action" class="form-select form-select-sm" data-autosubmit>
+            <option value="">All actions</option>
+            @foreach (var a in Model.Actions)
+            {
+                <option value="@a" selected="@(a == Model.Action)">@a</option>
+            }
+        </select>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead><tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Record</th><th>Details</th><th>IP</th></tr></thead>
+            <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="6"><div class="empty-state"><i class="bi bi-journal-check"></i><h5>No entries</h5></div></td></tr>
+                }
+                @foreach (var r in Model.Rows)
+                {
+                    <tr>
+                        <td class="text-nowrap">@r.At.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(r.User ?? "System")</td>
+                        <td><code>@r.Action</code></td>
+                        <td>@r.EntityType</td>
+                        <td>@r.Summary</td>
+                        <td class="text-muted small">@r.Ip</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between mt-3">
+    @if (Model.PageNumber > 1) { <a class="btn btn-sm btn-outline-secondary" href="?action=@Model.Action&p=@(Model.PageNumber - 1)">&larr; Newer</a> } else { <span></span> }
+    @if (Model.HasMore) { <a class="btn btn-sm btn-outline-secondary" href="?action=@Model.Action&p=@(Model.PageNumber + 1)">Older &rarr;</a> }
+</div>

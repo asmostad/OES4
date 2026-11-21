@@ -1,0 +1,123 @@
+@page
+@model Oes.Web.Pages.Admin.UsersModel
+@using Oes.Domain.Tenancy
+@{
+    ViewData["Title"] = "Users";
+    var showInvite = ViewData["ShowInvite"] is true;
+}
+<div class="page-header">
+    <div>
+        <h1>Users</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Users</li></ol></nav>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#inviteForm" aria-expanded="@(showInvite ? "true" : "false")">
+        <i class="bi bi-person-plus me-1"></i> Invite user
+    </button>
+</div>
+
+<div class="collapse @(showInvite ? "show" : "")" id="inviteForm">
+    <div class="card mb-4">
+        <div class="card-header">Invite a user</div>
+        <div class="card-body">
+            <form method="post" asp-page-handler="Invite">
+                <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label asp-for="Invite.Email" class="form-label"></label>
+                        <input asp-for="Invite.Email" class="form-control">
+                        <span asp-validation-for="Invite.Email" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="Invite.FirstName" class="form-label"></label>
+                        <input asp-for="Invite.FirstName" class="form-control">
+                        <span asp-validation-for="Invite.FirstName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="Invite.LastName" class="form-label"></label>
+                        <input asp-for="Invite.LastName" class="form-control">
+                        <span asp-validation-for="Invite.LastName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label d-block">Roles</label>
+                        @foreach (var r in Model.Roles)
+                        {
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="Invite.RoleIds" value="@r.Id" id="inv-@r.Id"
+                                       checked="@Model.Invite.RoleIds.Contains(r.Id)">
+                                <label class="form-check-label" for="inv-@r.Id">@r.Name</label>
+                            </div>
+                        }
+                        <span asp-validation-for="Invite.RoleIds" class="text-danger small d-block"></span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Send invitation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead>
+                <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th>Last sign-in</th><th class="text-end">Actions</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Members)
+                {
+                    var isMe = m.UserId == Model.MyUserId;
+                    <tr>
+                        <td class="fw-medium">@m.FullName @if (isMe) { <span class="badge bg-secondary-subtle text-secondary ms-1">You</span> }</td>
+                        <td>@m.Email</td>
+                        <td>@string.Join(", ", m.RoleNames)</td>
+                        <td>
+                            @if (m.Status == MembershipStatus.Disabled) { <span class="badge bg-danger-subtle text-danger">Disabled</span> }
+                            else if (!m.HasPassword) { <span class="badge bg-warning-subtle text-warning">Invited</span> }
+                            else { <span class="badge bg-success-subtle text-success">Active</span> }
+                        </td>
+                        <td class="text-muted">@(m.LastSignInAt?.ToString("MMM d, yyyy") ?? "Never")</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#roles-@m.MembershipId">
+                                <i class="bi bi-shield-lock"></i> Roles
+                            </button>
+                            @if (!isMe)
+                            {
+                                <form method="post" asp-page-handler="Status" class="d-inline">
+                                    <input type="hidden" name="membershipId" value="@m.MembershipId">
+                                    @if (m.Status == MembershipStatus.Disabled)
+                                    {
+                                        <input type="hidden" name="status" value="@MembershipStatus.Active">
+                                        <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-person-check"></i> Enable</button>
+                                    }
+                                    else
+                                    {
+                                        <input type="hidden" name="status" value="@MembershipStatus.Disabled">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-person-slash"></i> Disable</button>
+                                    }
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="roles-@m.MembershipId">
+                        <td colspan="6" class="bg-light">
+                            <form method="post" asp-page-handler="Roles" class="d-flex flex-wrap align-items-center gap-3">
+                                <input type="hidden" name="membershipId" value="@m.MembershipId">
+                                @foreach (var r in Model.Roles)
+                                {
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="roleIds" value="@r.Id" id="r-@m.MembershipId-@r.Id"
+                                               checked="@m.RoleIds.Contains(r.Id)">
+                                        <label class="form-check-label" for="r-@m.MembershipId-@r.Id">@r.Name</label>
+                                    </div>
+                                }
+                                <button class="btn btn-sm btn-primary ms-auto" type="submit">Save roles</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

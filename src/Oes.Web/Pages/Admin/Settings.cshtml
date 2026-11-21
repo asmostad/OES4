@@ -1,0 +1,56 @@
+@page
+@model Oes.Web.Pages.Admin.SettingsModel
+@using Oes.Infrastructure.Admin
+@{
+    ViewData["Title"] = "Settings";
+}
+<div class="page-header">
+    <div>
+        <h1>Settings</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Settings</li></ol></nav>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xl-7">
+        <div class="card">
+            <div class="card-header">Company</div>
+            <div class="card-body">
+                <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+                <form method="post" class="row g-3">
+                    <div class="col-md-7"><label class="form-label" asp-for="Input.Name">Company name</label>
+                        <input asp-for="Input.Name" class="form-control" maxlength="150" required></div>
+                    <div class="col-md-5"><label class="form-label" asp-for="Input.TimeZone">Time zone</label>
+                        <select asp-for="Input.TimeZone" class="form-select">
+                            @foreach (var (id, label) in SettingsService.TimeZones) { <option value="@id">@label</option> }
+                        </select></div>
+                    <div class="col-12"><label class="form-label" asp-for="Input.PostalAddress">Mailing address</label>
+                        <textarea asp-for="Input.PostalAddress" class="form-control" rows="2" maxlength="300" placeholder="123 Main St, Lincoln, NE 68502"></textarea>
+                        <div class="form-text">Printed at the bottom of every marketing email, as the law requires. A PO box is fine.</div></div>
+                    <div class="col-12"><button class="btn btn-primary" type="submit">Save settings</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Estimates &amp; proposals</div>
+            <div class="card-body">
+                <p class="small text-muted">Copied onto each new estimate, where they can still be changed. Estimates already started keep what they have.</p>
+                <form method="post" asp-page-handler="Estimates" class="row g-3">
+                    <div class="col-12"><label class="form-label" for="e-terms">Terms and conditions</label>
+                        <textarea id="e-terms" name="Estimates.Terms" class="form-control" rows="6" maxlength="20000" placeholder="Payment schedule, warranty, cancellation…">@Model.Estimates.Terms</textarea></div>
+                    <div class="col-12"><label class="form-label" for="e-ins-terms">Terms for insurance work <span class="text-muted small">(optional)</span></label>
+                        <textarea id="e-ins-terms" name="Estimates.InsuranceTerms" class="form-control" rows="4" maxlength="20000" placeholder="Leave blank to use the terms above">@Model.Estimates.InsuranceTerms</textarea></div>
+                    <div class="col-sm-6 col-lg-3"><label class="form-label" for="e-days">Valid for (days)</label>
+                        <input id="e-days" type="number" min="1" max="365" name="Estimates.ValidDays" value="@Model.Estimates.ValidDays" class="form-control" required></div>
+                    <div class="col-sm-6 col-lg-3"><label class="form-label" for="e-tax">Sales tax %</label>
+                        <input id="e-tax" type="number" min="0" max="30" step="0.001" name="Estimates.TaxRate" value="@Model.Estimates.TaxRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required></div>
+                    <div class="col-sm-6 col-lg-3"><label class="form-label" for="e-oh">Insurance overhead %</label>
+                        <input id="e-oh" type="number" min="0" max="100" step="0.01" name="Estimates.InsuranceOverheadPct" value="@Model.Estimates.InsuranceOverheadPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required></div>
+                    <div class="col-sm-6 col-lg-3"><label class="form-label" for="e-profit">Insurance profit %</label>
+                        <input id="e-profit" type="number" min="0" max="100" step="0.01" name="Estimates.InsuranceProfitPct" value="@Model.Estimates.InsuranceProfitPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required></div>
+                    <div class="col-12"><button class="btn btn-primary" type="submit">Save estimate defaults</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

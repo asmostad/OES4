@@ -1,0 +1,64 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Measurements.PropertyModel
+@using Oes.Infrastructure.Measurements
+@{
+    var p = Model.Data.Property;
+    ViewData["Title"] = $"Measurements · {p.Line1}";
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Property,
+        Title = "Measurements",
+        Subtitle = $"{p.SingleLine} · {Model.Data.Structures.Count} structure{(Model.Data.Structures.Count == 1 ? "" : "s")}",
+        Parents = [new Crumb(RecordLevel.Property, p.Line1, $"/Properties/View/{p.Id}")],
+    };
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<p class="text-muted small mt-3">Each structure is measured per trade. Saving new numbers creates a new version and keeps the old ones (and the report file) for reference. Estimates will pick the version they use.</p>
+
+<div class="row g-3">
+    @foreach (var s in Model.Data.Structures)
+    {
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header d-flex align-items-center"><i class="bi bi-house me-2 text-level-property"></i>@s.Name</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var t in Model.Data.Trades)
+                    {
+                        var cur = Model.Data.Current.FirstOrDefault(c => c.StructureId == s.Id && c.TradeTypeId == t.Id);
+                        <li class="list-group-item d-flex align-items-center gap-3">
+                            <span class="trade-dot" style="--trade-color:@t.Color"><i class="bi @t.Icon"></i></span>
+                            <div class="flex-grow-1">
+                                <div class="fw-medium">@t.Name</div>
+                                @if (cur is null)
+                                {
+                                    <div class="small text-muted">Not measured</div>
+                                }
+                                else
+                                {
+                                    <div class="small"><a href="/Measurements/Set/@cur.Id">@cur.Headline</a></div>
+                                    <div class="small text-muted">v@(cur.VersionNo)@(cur.VersionCount > 1 ? $" of {cur.VersionCount}" : "") · @MeasurementService.SourceLabel(cur.Source) · @cur.MeasuredOn?.ToString("MMM d, yyyy")</div>
+                                }
+                            </div>
+                            @if (Model.CanMeasure)
+                            {
+                                <a class="btn btn-sm @(cur is null ? "btn-outline-primary" : "btn-outline-secondary") text-nowrap"
+                                   href="/Measurements/Edit?propertyId=@p.Id&structureId=@s.Id&tradeTypeId=@t.Id">@(cur is null ? "Measure" : "New version")</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="card mt-3" style="max-width:520px">
+    <div class="card-body">
+        <form method="post" asp-page-handler="AddStructure" class="d-flex gap-2">
+            <input name="name" class="form-control form-control-sm" placeholder="Add a structure: Detached garage, Shed, Building B…" maxlength="100" required aria-label="Structure name">
+            <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-plus-lg"></i> Add</button>
+        </form>
+    </div>
+</div>

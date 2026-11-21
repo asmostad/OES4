@@ -1,0 +1,106 @@
+@page "{id:guid?}"
+@model Oes.Web.Pages.Claims.EditModel
+@using Oes.Domain.Insurance
+@using Oes.Infrastructure.Insurance
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "Start claim" : "Edit claim";
+    var i = Model.Input;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Opportunities/View/@Model.OpportunityId">@Model.OpportunityTitle</a></li>
+            <li class="breadcrumb-item active">Claim</li>
+        </ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <input type="hidden" asp-for="OpportunityId">
+    @if (isNew)
+    {
+        <div class="alert alert-info small"><i class="bi bi-info-circle me-1"></i>Everything here can stay blank until the homeowner files. Adding a claim number marks the claim as filed.</div>
+    }
+    <div class="row g-3">
+        <div class="col-xl-7">
+            <div class="card mb-3 record-header level-claim">
+                <div class="card-header"><i class="bi bi-shield-check text-level-claim me-2"></i>Claim</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="carrier">Carrier</label>
+                            <select id="carrier" name="Input.CarrierChoice" class="form-select">
+                                <option value="">Not known yet</option>
+                                @foreach (var c in Model.Carriers) { <option value="@CarrierService.ChoiceFor(c)" selected="@(i.CarrierChoice == CarrierService.ChoiceFor(c))">@c.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="status">Status</label>
+                            <select id="status" name="Input.Status" class="form-select">
+                                @foreach (var s in ClaimStatuses.All) { <option value="@s" selected="@(i.Status == s)">@ClaimService.Label(s)</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label" for="cn">Claim number</label><input id="cn" name="Input.ClaimNumber" value="@i.ClaimNumber" class="form-control" maxlength="60"></div>
+                        <div class="col-md-6"><label class="form-label" for="pn">Policy number</label><input id="pn" name="Input.PolicyNumber" value="@i.PolicyNumber" class="form-control" maxlength="60"></div>
+                        <div class="col-md-4"><label class="form-label" for="dol">Date of loss</label><input id="dol" type="date" name="Input.DateOfLoss" value="@i.DateOfLoss?.ToString("yyyy-MM-dd")" class="form-control"></div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="peril">Peril</label>
+                            <select id="peril" name="Input.PerilKey" class="form-select">
+                                <option value="">—</option>
+                                @foreach (var p in Model.Perils) { <option value="@p.Value" selected="@(i.PerilKey == p.Value)">@p.Label</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="storm">Storm</label>
+                            <select id="storm" name="Input.StormEventId" class="form-select">
+                                <option value="">—</option>
+                                @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(i.StormEventId == s.Id)">@s.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-4"><label class="form-label" for="filed">Filed on</label><input id="filed" type="date" name="Input.FiledOn" value="@i.FiledOn?.ToString("yyyy-MM-dd")" class="form-control"></div>
+                        <div class="col-md-4"><label class="form-label" for="insp">Adjuster inspection</label><input id="insp" type="date" name="Input.InspectionOn" value="@i.InspectionOn?.ToString("yyyy-MM-dd")" class="form-control"></div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="ded">Deductible</label>
+                            <div class="input-group"><span class="input-group-text">$</span><input id="ded" type="number" min="0" step="0.01" name="Input.Deductible" value="@i.Deductible" class="form-control"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="appr">Approved (RCV)</label>
+                            <div class="input-group"><span class="input-group-text">$</span><input id="appr" type="number" min="0" step="0.01" name="Input.ApprovedAmount" value="@i.ApprovedAmount" class="form-control"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5">
+            <div class="card mb-3">
+                <div class="card-header"><i class="bi bi-person-badge me-2"></i>Adjusters</div>
+                <div class="card-body">
+                    <label class="form-label" for="adj">Field adjuster</label>
+                    <div class="typeahead mb-3" data-typeahead="/api/v1/lookup/people">
+                        <input type="hidden" name="Input.AdjusterContactId" value="@i.AdjusterContactId" data-typeahead-value>
+                        <input id="adj" name="AdjusterLabel" value="@Model.AdjusterLabel" class="form-control" autocomplete="off" placeholder="Search contacts…" data-typeahead-input>
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <label class="form-label" for="desk">Desk adjuster</label>
+                    <div class="typeahead" data-typeahead="/api/v1/lookup/people">
+                        <input type="hidden" name="Input.DeskAdjusterContactId" value="@i.DeskAdjusterContactId" data-typeahead-value>
+                        <input id="desk" name="DeskAdjusterLabel" value="@Model.DeskAdjusterLabel" class="form-control" autocomplete="off" placeholder="Search contacts…" data-typeahead-input>
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <div class="form-text">Add adjusters as contacts first (ideally under their carrier's organization) so you can reuse them across claims.</div>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">Notes</div>
+                <div class="card-body"><textarea name="Input.Notes" class="form-control" rows="4" maxlength="5000" aria-label="Notes">@i.Notes</textarea></div>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@(isNew ? "Start claim" : "Save")</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? $"/Opportunities/View/{Model.OpportunityId}" : $"/Claims/View/{Model.Id}")">Cancel</a>
+    </div>
+</form>

@@ -1,0 +1,94 @@
+@page "{id:guid?}"
+@model Oes.Web.Pages.Campaigns.EditModel
+@using Oes.Domain.Crm
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New campaign" : "Edit campaign";
+    var c = Model.Input.Criteria;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Campaigns">Lead Campaigns</a></li>
+            <li class="breadcrumb-item active">@(isNew ? "New" : Model.Input.Name)</li></ol></nav>
+    </div>
+</div>
+
+<form method="post" class="row g-3" style="max-width:900px">
+    <div asp-validation-summary="ModelOnly" class="text-danger col-12"></div>
+    <div class="col-md-8">
+        <label class="form-label" for="c-name">Name</label>
+        <input id="c-name" name="Input.Name" value="@Model.Input.Name" class="form-control" maxlength="100" required placeholder="e.g. June 12 hail, 68516">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="c-mode">Kind</label>
+        <select id="c-mode" name="Input.Mode" class="form-select" disabled="@(!isNew)">
+            <option value="@CampaignModes.Static" selected="@(Model.Input.Mode == CampaignModes.Static)">Fixed list (tracks progress)</option>
+            <option value="@CampaignModes.Dynamic" selected="@(Model.Input.Mode == CampaignModes.Dynamic)">Live filters (always current)</option>
+        </select>
+        @if (!isNew) { <input type="hidden" name="Input.Mode" value="@Model.Input.Mode"> }
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="c-desc">Description <span class="text-muted small">(optional)</span></label>
+        <input id="c-desc" name="Input.Description" value="@Model.Input.Description" class="form-control" maxlength="500">
+    </div>
+
+    <div class="col-12"><h2 class="h6 mt-2 mb-0">Which open leads</h2>
+        <div class="small text-muted">A fixed list takes the leads that match when you create it; add newer matches from the campaign page. Live filters always take whatever matches now.</div></div>
+    <div class="col-md-4">
+        <label class="form-label small" for="c-stage">Stage</label>
+        <select id="c-stage" name="Input.Criteria.StageId" class="form-select form-select-sm">
+            <option value="">Any open stage</option>
+            @foreach (var s in Model.Stages.Where(s => s.Outcome == Outcomes.Open)) { <option value="@s.Id" selected="@(c.StageId == s.Id)">@s.Name</option> }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label small" for="c-source">Lead source</label>
+        <select id="c-source" name="Input.Criteria.SourceKey" class="form-select form-select-sm">
+            <option value="">Any source</option>
+            @foreach (var s in Model.Sources) { <option value="@s.Value" selected="@(c.SourceKey == s.Value)">@s.Label</option> }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label small" for="c-storm">Storm</label>
+        <select id="c-storm" name="Input.Criteria.StormId" class="form-select form-select-sm">
+            <option value="">Any storm</option>
+            @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(c.StormId == s.Id)">@s.Name (@s.EventDate.ToString("MMM d, yyyy"))</option> }
+        </select>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label small" for="c-zips">Property ZIP codes</label>
+        <input id="c-zips" name="Zips" value="@Model.Zips" class="form-control form-control-sm" placeholder="68516, 68512 (blank = anywhere)">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small" for="c-max">At most this many attempts</label>
+        <input id="c-max" type="number" min="0" name="Input.Criteria.MaxAttempts" value="@c.MaxAttempts" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="Input.Criteria.UnassignedOnly" value="true" id="c-unassigned" checked="@c.UnassignedOnly">
+            <label class="form-check-label small" for="c-unassigned">Unassigned leads only</label></div>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small" for="c-from">Created from</label>
+        <input id="c-from" type="date" name="Input.Criteria.CreatedFrom" value="@c.CreatedFrom?.ToString("yyyy-MM-dd")" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small" for="c-to">Created to</label>
+        <input id="c-to" type="date" name="Input.Criteria.CreatedTo" value="@c.CreatedTo?.ToString("yyyy-MM-dd")" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-6 d-flex align-items-end">
+        @if (!isNew)
+        {
+            <div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="Input.IsActive" value="true" id="c-active" checked="@Model.Input.IsActive">
+                <label class="form-check-label small" for="c-active">On (shown to reps in Prospecting)</label></div>
+        }
+        else { <input type="hidden" name="Input.IsActive" value="true"> }
+    </div>
+
+    <div class="col-12 d-flex align-items-center gap-2">
+        <button type="submit" class="btn btn-primary">@(isNew ? "Create campaign" : "Save")</button>
+        <button type="submit" class="btn btn-outline-secondary" asp-page-handler="Preview">Count matching leads</button>
+        @if (Model.Preview is { } n) { <span class="small"><strong>@n</strong> open lead@(n == 1 ? "" : "s") match right now.</span> }
+        <a class="btn btn-link" href="@(isNew ? "/Campaigns" : $"/Campaigns/View/{Model.Id}")">Cancel</a>
+    </div>
+</form>

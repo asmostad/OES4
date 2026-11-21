@@ -1,0 +1,86 @@
+@page
+@model Oes.Web.Pages.Assistant.IndexModel
+@{
+    ViewData["Title"] = Model.Current?.Conversation.Title ?? "Assistant";
+    var c = Model.Current;
+}
+<div class="page-header">
+    <div>
+        <h1>Assistant</h1>
+        <p class="page-subtitle">Ask about your leads, jobs, tasks and schedule. It only sees what you can see, and it can't send messages or change records.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Assistant"><i class="bi bi-plus-lg me-1"></i> New conversation</a>
+</div>
+
+@if (!Model.Connected)
+{
+    <div class="alert alert-light border"><i class="bi bi-plug me-1"></i>The assistant isn't connected yet. An administrator needs to add the AI API key in the server settings.</div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-3">
+        <div class="card">
+            <div class="card-header">Conversations</div>
+            <div class="list-group list-group-flush small assistant-list">
+                @foreach (var x in Model.Conversations)
+                {
+                    <a class="list-group-item list-group-item-action @(x.Id == c?.Conversation.Id ? "active" : "")" href="/Assistant?c=@x.Id">
+                        <div class="text-truncate">@x.Title</div>
+                    </a>
+                }
+                @if (Model.Conversations.Count == 0) { <div class="list-group-item text-muted">None yet.</div> }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-9">
+        <div class="card assistant-chat">
+            @if (c is not null)
+            {
+                <div class="card-header d-flex align-items-center gap-2">
+                    <span class="fw-medium text-truncate">@c.Conversation.Title</span>
+                    @if (c.RecordLabel is not null) { <a class="small" href="@c.RecordUrl"><i class="bi bi-link-45deg"></i>@c.RecordLabel</a> }
+                    <form method="post" asp-page-handler="Delete" class="ms-auto"><input type="hidden" name="c" value="@c.Conversation.Id">
+                        <button class="btn btn-sm btn-link text-danger p-0" type="submit" data-confirm="Delete this conversation?">Delete</button></form>
+                </div>
+            }
+            <div class="card-body assistant-lines">
+                @if (c is null || c.Lines.Count == 0)
+                {
+                    <div class="text-muted small assistant-empty">
+                        <p class="mb-2">Try:</p>
+                        <ul class="mb-0">
+                            @if (c?.RecordLabel is not null) { <li>What's the latest on this job, and what should happen next?</li> }
+                            <li>What's on my plate today?</li>
+                            <li>Find the Smith opportunity and summarize the notes.</li>
+                            <li>Which deals are worth the most right now?</li>
+                            <li>Remind me to call the adjuster on Friday.</li>
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    @for (var i = 0; i < c.Lines.Count; i++)
+                    {
+                        var line = c.Lines[i];
+                        <div class="assistant-line assistant-@line.Role">
+                            @if (line.Tools.Count > 0)
+                            {
+                                <div class="assistant-tools">@foreach (var t in line.Tools.Distinct()) { <span class="badge bg-secondary-subtle text-secondary me-1"><i class="bi bi-search me-1"></i>@t.Replace('_', ' ')</span> }</div>
+                            }
+                            @* Model output is untrusted: always encoded, never rendered as HTML. *@
+                            @if (line.Text.Length > 0) { <div class="assistant-bubble pre-wrap">@line.Text</div> }
+                            <div class="assistant-time">@Model.LineLocal[i].ToString("MMM d, h:mm tt")</div>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="card-footer">
+                <form method="post" asp-page-handler="Send" class="d-flex gap-2" data-assistant-stream="@Url.Page("/Assistant/Index", "Stream")">
+                    @if (c is not null) { <input type="hidden" name="c" value="@c.Conversation.Id"> }
+                    <textarea name="message" class="form-control" rows="2" maxlength="8000" required placeholder="Ask a question…" aria-label="Message" disabled="@(!Model.Connected)"></textarea>
+                    <button class="btn btn-primary align-self-end" type="submit" disabled="@(!Model.Connected)" data-busy-text="Thinking…"><i class="bi bi-send"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

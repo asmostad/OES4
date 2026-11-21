@@ -1,0 +1,61 @@
+@page
+@model Oes.Web.Pages.Blasts.ViewModel
+@using Oes.Domain.Communication
+@{
+    var b = Model.Blast;
+    ViewData["Title"] = b.Name;
+    var done = b.SentCount + b.FailedCount;
+    var pct = b.Total == 0 ? 0 : (int)Math.Round(100.0 * done / b.Total);
+}
+<div class="page-header">
+    <div>
+        <h1>@b.Name</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Blasts">Email Blasts</a></li><li class="breadcrumb-item active">@Fmt.Cap(b.Status)</li></ol></nav>
+    </div>
+    @if (b.Status is BlastStatuses.Scheduled or BlastStatuses.Sending)
+    {
+        <form method="post" asp-page-handler="Cancel"><input type="hidden" name="Id" value="@b.Id">
+            <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Stop sending this blast?">Cancel blast</button></form>
+    }
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (label, value, color) in new[] { ("Will get it", b.Total, "primary"), ("Sent", b.SentCount, "success"), ("Left out", b.SkippedCount, "secondary"), ("Failed", b.FailedCount, "danger") })
+    {
+        <div class="col-6 col-xl-3"><div class="card stat-card"><div class="card-body"><div class="stat-value text-@color">@value</div><div class="stat-label">@label</div></div></div></div>
+    }
+</div>
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex small mb-1"><span>@Fmt.Cap(b.Status)@(Model.ScheduledLocal is { } s ? $" · {(b.Status == BlastStatuses.Scheduled ? "starts" : "started")} {s:MMM d, h:mm tt}" : "")</span>
+            <span class="ms-auto">@pct%</span></div>
+        <progress class="w-100 blast-progress" max="100" value="@pct" aria-label="Progress">@pct%</progress>
+        <div class="form-text">Sends @b.ThrottlePerMinute a minute. The page doesn't refresh on its own.</div>
+        <hr>
+        <div class="fw-medium">@b.Subject</div>
+        <div class="small pre-wrap text-muted mt-1">@b.Body</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center">Recipients
+        <div class="btn-group btn-group-sm ms-auto">
+            @foreach (var (key, label) in new[] { ("", "All"), (BlastRecipientStatuses.Sent, "Sent"), (BlastRecipientStatuses.Pending, "Waiting"), (BlastRecipientStatuses.Skipped, "Left out"), (BlastRecipientStatuses.Failed, "Failed") })
+            {
+                <a class="btn @((Model.Status ?? "") == key ? "btn-secondary" : "btn-outline-secondary")" href="?id=@b.Id&amp;status=@key">@label</a>
+            }
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Contact</th><th>Address</th><th>Status</th><th>Note</th></tr></thead>
+            <tbody>
+                @foreach (var r in Model.Recipients)
+                {
+                    <tr><td><a href="/Contacts/View/@r.ContactId">@r.ContactName</a></td><td>@r.Address</td><td>@Fmt.Cap(r.Status)</td><td class="small text-muted">@r.Error</td></tr>
+                }
+                @if (Model.Recipients.Count == 0) { <tr><td colspan="4" class="text-muted small">None.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

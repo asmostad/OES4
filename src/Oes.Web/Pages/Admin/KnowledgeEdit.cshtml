@@ -1,0 +1,41 @@
+@page "{id:guid?}"
+@model Oes.Web.Pages.Admin.KnowledgeEditModel
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New article" : Model.Input.Title;
+}
+<div class="page-header">
+    <div>
+        <h1>@(isNew ? "New article" : Model.Input.Title)</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item"><a href="/Admin/Knowledge">AI Knowledge Base</a></li>
+            <li class="breadcrumb-item active">@(isNew ? "New" : "Edit")</li>
+        </ol></nav>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="row g-3" style="max-width:960px">
+    <div asp-validation-summary="ModelOnly" class="text-danger col-12"></div>
+    <div class="col-md-8"><label class="form-label" for="k-title">Title</label>
+        <input id="k-title" name="Input.Title" value="@Model.Input.Title" class="form-control" maxlength="200" placeholder="e.g. Workmanship warranty"></div>
+    <div class="col-md-4"><label class="form-label" for="k-cat">Category <span class="text-muted small">(optional)</span></label>
+        <input id="k-cat" name="Input.Category" value="@Model.Input.Category" list="k-cats" class="form-control" maxlength="60" placeholder="e.g. Warranties">
+        <datalist id="k-cats">@foreach (var c in Model.Categories) { <option value="@c"></option> }</datalist></div>
+    <div class="col-12"><label class="form-label" for="k-body">Text</label>
+        <textarea id="k-body" name="Input.Body" class="form-control font-monospace small" rows="18" maxlength="100000"
+                  placeholder="# Workmanship warranty&#10;&#10;We warrant our installation work for …">@Model.Input.Body</textarea>
+        <div class="form-text">Plain text or Markdown, up to 100,000 characters. Or fill it from a file (PDF, .txt or .md; a scanned PDF has no text to read): <input type="file" name="File" accept=".pdf,.txt,.md,.markdown" class="form-control form-control-sm d-inline-block w-auto ms-1" aria-label="PDF, text or Markdown file"></div></div>
+    <div class="col-12"><div class="form-check">
+        <input class="form-check-input" type="checkbox" name="Input.IsActive" value="true" id="k-active" checked="@Model.Input.IsActive">
+        <label class="form-check-label" for="k-active">On (the assistant can search it)</label></div>
+        <input type="hidden" name="Input.IsActive" value="false"></div>
+    <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save article</button>
+        <a class="btn btn-outline-secondary" href="/Admin/Knowledge">Cancel</a>
+        @if (!isNew)
+        {
+            <button type="submit" asp-page-handler="Delete" class="btn btn-outline-danger ms-auto" formnovalidate data-confirm="Delete this article? This can't be undone.">Delete</button>
+        }
+    </div>
+</form>

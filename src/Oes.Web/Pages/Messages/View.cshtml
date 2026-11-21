@@ -1,0 +1,32 @@
+@page
+@model Oes.Web.Pages.Messages.ViewModel
+@using Oes.Domain.Communication
+@{
+    var m = Model.Message;
+    var inbound = m.Direction == Directions.Inbound;
+    ViewData["Title"] = m.Subject ?? (inbound ? "Text received" : "Text sent");
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <p class="page-subtitle">
+            @(m.Channel == "email" ? "Email" : "Text") @(inbound ? "from" : "to") @m.Counterparty
+            @if (!inbound && m.SenderName is not null) { <span>· sent by @m.SenderName</span> }
+            · @Model.LocalAt.ToString("MMM d, yyyy h:mm tt")
+            @if (m.Cc is not null) { <br><span>CC @m.Cc</span> }
+            @if (m.Bcc is not null) { <br><span>BCC @m.Bcc</span> }
+        </p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="@Model.Back"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+@if (m.Status == MessageStatuses.Failed)
+{
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>Not delivered: @m.Error</div>
+}
+<div class="card">
+    <div class="card-body"><div class="pre-wrap message-body">@m.Body</div></div>
+    @if (m.Attachments.Count > 0)
+    {
+        <div class="card-footer small">@foreach (var f in m.Attachments) { <a class="me-3" href="/Records/Items?handler=Download&id=@f.DocumentId"><i class="bi bi-paperclip"></i>@f.FileName</a> }</div>
+    }
+</div>

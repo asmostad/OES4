@@ -1,0 +1,75 @@
+@page
+@model Oes.Web.Pages.Admin.SuppressionsModel
+@using Oes.Domain.Communication
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Suppressions";
+    var sms = Model.Channel == Channels.Sms;
+    string Reason(string r) => r switch
+    {
+        SuppressionReasons.Stop => "Texted STOP",
+        SuppressionReasons.Unsubscribe => "Unsubscribed",
+        SuppressionReasons.Complaint => "Marked as spam",
+        SuppressionReasons.Bounce => "Bounced",
+        _ => "Added by staff",
+    };
+}
+<div class="page-header">
+    <div>
+        <h1>Suppressions</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Suppressions</li></ol></nav>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <a class="btn @(!sms ? "btn-secondary" : "btn-outline-secondary")" href="?channel=email">Email</a>
+        <a class="btn @(sms ? "btn-secondary" : "btn-outline-secondary")" href="?channel=sms">Texts</a>
+    </div>
+</div>
+<div class="alert alert-light border small"><i class="bi bi-info-circle me-1"></i>
+    Addresses here are never sent @(sms ? "texts" : "email") (or never sent marketing, when the block is marketing only), whoever they belong to.
+    People's own opt-outs can only be undone by them.</div>
+<div class="row g-3">
+    <div class="col-xl-8">
+        <form method="get" class="mb-2 d-flex gap-2"><input type="hidden" name="channel" value="@Model.Channel">
+            <input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="Search" aria-label="Search"><button class="btn btn-sm btn-outline-secondary" type="submit">Search</button></form>
+        <div class="card">
+            @if (Model.Rows.Count == 0) { <div class="empty-state"><i class="bi bi-envelope-check"></i><h5>Nothing blocked</h5></div> }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mb-0 align-middle">
+                        <thead><tr><th>@(sms ? "Number" : "Address")</th><th>Blocks</th><th>Why</th><th>Since</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.Rows)
+                            {
+                                <tr>
+                                    <td class="fw-medium">@(sms ? ContactValue.FormatPhone(r.Address, r.Address) : r.Address)</td>
+                                    <td>@(r.Scope == "marketing" ? "Marketing" : "Everything")</td>
+                                    <td>@Reason(r.Reason)</td>
+                                    <td class="text-nowrap small">@r.At.ToString("MMM d, yyyy")</td>
+                                    <td class="text-end">@if (r.Reason is SuppressionReasons.Manual or SuppressionReasons.Bounce)
+                                        {
+                                            <form method="post" asp-page-handler="Remove" class="d-inline"><input type="hidden" name="id" value="@r.Id"><input type="hidden" name="channel" value="@Model.Channel">
+                                                <button class="btn btn-link btn-sm p-0" type="submit" data-confirm="Unblock this address?">Unblock</button></form>
+                                        }</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">Block @(sms ? "a number" : "an address")</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Add" class="row g-2">
+                    <input type="hidden" name="channel" value="@Model.Channel">
+                    <div class="col-12"><input name="address" class="form-control form-control-sm" required maxlength="320" placeholder="@(sms ? "(402) 555-0100" : "name@example.com")" aria-label="Address"></div>
+                    <div class="col-12"><select name="scope" class="form-select form-select-sm" aria-label="What to block"><option value="marketing">Marketing only</option><option value="all">Everything</option></select></div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Block</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

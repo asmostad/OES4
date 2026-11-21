@@ -1,0 +1,96 @@
+@page "{id:guid?}"
+@model Oes.Web.Pages.Admin.TakeoffRuleModel
+@using Oes.Domain.Estimating
+@{
+    var i = Model.Input;
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New takeoff rule" : i.Name;
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    string N(decimal? d) => d?.ToString("0.######", inv) ?? "";
+}
+<div class="page-header">
+    <div>
+        <h1>@(isNew ? "New takeoff rule" : i.Name)</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item"><a href="/Admin/Takeoff?trade=@Model.TradeType.Code">Takeoff Rules · @Model.TradeType.Name</a></li>
+            <li class="breadcrumb-item active">@(isNew ? "New" : "Edit")</li>
+        </ol></nav>
+    </div>
+</div>
+
+<form method="post" class="row g-3" style="max-width:960px">
+    <div asp-validation-summary="ModelOnly" class="text-danger col-12"></div>
+    <input type="hidden" name="Input.TradeTypeId" value="@i.TradeTypeId">
+    <div class="col-md-6"><label class="form-label" for="r-name">Name</label>
+        <input id="r-name" name="Input.Name" value="@i.Name" class="form-control" maxlength="150" required placeholder="e.g. Ridge cap"></div>
+    <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="Input.IsActive" value="true" id="r-active" checked="@i.IsActive"><label class="form-check-label" for="r-active">Active</label></div></div>
+
+    <div class="col-12"><h2 class="h6 mb-0">Product</h2></div>
+    <div class="col-md-6"><label class="form-label small" for="r-slot">Slot <span class="text-muted">(the rep picks the product on each job)</span></label>
+        <input id="r-slot" name="Input.Slot" value="@i.Slot" list="r-slots" class="form-control form-control-sm" maxlength="50" placeholder="e.g. ridge_cap">
+        <datalist id="r-slots">@foreach (var s in Model.Slots) { <option value="@s"></option> }</datalist></div>
+    <div class="col-md-6"><label class="form-label small" for="r-product">…or always this product</label>
+        <select id="r-product" name="Input.ProductId" class="form-select form-select-sm">
+            <option value="">—</option>
+            @foreach (var p in Model.Products) { <option value="@p.Id" selected="@(i.ProductId == p.Id)">@p.Sku · @p.Name (@p.Unit)</option> }
+        </select>
+        <div class="form-text">A slot wins when both are set.</div></div>
+    <div class="col-12"><label class="form-label small" for="r-desc">Line description <span class="text-muted">(blank = the product's name)</span></label>
+        <input id="r-desc" name="Input.Description" value="@i.Description" class="form-control form-control-sm" maxlength="500"></div>
+
+    <div class="col-12"><h2 class="h6 mb-0">Quantity</h2></div>
+    <div class="col-md-5"><label class="form-label small" for="r-driver">Based on</label>
+        <select id="r-driver" name="Input.Driver" class="form-select form-select-sm">
+            @foreach (var d in Model.Drivers) { <option value="@d.Key" selected="@(i.Driver == d.Key)">@d.Label@(d.Unit.Length > 0 ? $" ({d.Unit})" : "")</option> }
+        </select></div>
+    <div class="col-md-2"><label class="form-label small" for="r-mult">× Multiplier</label>
+        <input id="r-mult" type="number" step="0.000001" min="0" name="Input.Multiplier" value="@N(i.Multiplier)" class="form-control form-control-sm" required></div>
+    <div class="col-md-2"><label class="form-label small" for="r-waste">+ Waste %</label>
+        <input id="r-waste" type="number" step="0.001" min="0" max="100" name="Input.WastePercent" value="@N(i.WastePercent)" class="form-control form-control-sm" required></div>
+    <div class="col-md-3 d-flex align-items-end"><div class="form-check mb-1">
+        <input class="form-check-input" type="checkbox" name="Input.UseSuggestedWaste" value="true" id="r-sw" checked="@i.UseSuggestedWaste"><label class="form-check-label small" for="r-sw">Use the measured waste when there is one</label></div></div>
+    <div class="col-md-3"><label class="form-label small" for="r-round">Round</label>
+        <select id="r-round" name="Input.RoundMode" class="form-select form-select-sm">
+            @foreach (var m in TakeoffRounding.All) { <option value="@m" selected="@(i.RoundMode == m)">@(m == TakeoffRounding.None ? "Don't round" : Fmt.Cap(m))</option> }
+        </select></div>
+    <div class="col-md-3"><label class="form-label small" for="r-to">to a multiple of</label>
+        <input id="r-to" type="number" step="0.0001" min="0" name="Input.RoundTo" value="@N(i.RoundTo)" class="form-control form-control-sm" required></div>
+    <div class="col-md-3"><label class="form-label small" for="r-min">Minimum</label>
+        <input id="r-min" type="number" step="0.001" min="0" name="Input.MinQty" value="@N(i.MinQty)" class="form-control form-control-sm" required></div>
+    <div class="col-md-3"><label class="form-label small" for="r-max">Maximum <span class="text-muted">(optional)</span></label>
+        <input id="r-max" type="number" step="0.001" min="0" name="Input.MaxQty" value="@N(i.MaxQty)" class="form-control form-control-sm"></div>
+
+    <div class="col-12"><h2 class="h6 mb-0">Only when</h2><div class="small text-muted">Both conditions must hold. Leave a measurement blank to skip it.</div></div>
+    @foreach (var (n, field, op, value) in new[] { (1, i.Cond1Field, i.Cond1Op, i.Cond1Value), (2, i.Cond2Field, i.Cond2Op, i.Cond2Value) })
+    {
+        <div class="col-md-6"><select name="Input.Cond@(n)Field" class="form-select form-select-sm" aria-label="Condition @n measurement">
+            <option value="">—</option>
+            @foreach (var d in Model.Drivers.Where(d => d.Key != "flat")) { <option value="@d.Key" selected="@(field == d.Key)">@d.Label</option> }
+        </select></div>
+        <div class="col-md-2"><select name="Input.Cond@(n)Op" class="form-select form-select-sm" aria-label="Condition @n comparison">
+            @foreach (var (key, label) in TakeoffOps.All) { <option value="@key" selected="@(op == key)">@label</option> }
+        </select></div>
+        <div class="col-md-4"><input type="number" step="0.001" name="Input.Cond@(n)Value" value="@N(value)" class="form-control form-control-sm" aria-label="Condition @n value"></div>
+    }
+    <div class="col-md-4"><label class="form-label small" for="r-opt">Option key <span class="text-muted">(rep can switch it off)</span></label>
+        <input id="r-opt" name="Input.OptionKey" value="@i.OptionKey" class="form-control form-control-sm" maxlength="50" placeholder="e.g. ice_water"></div>
+    <div class="col-md-5"><label class="form-label small" for="r-optl">Option label</label>
+        <input id="r-optl" name="Input.OptionLabel" value="@i.OptionLabel" class="form-control form-control-sm" maxlength="150" placeholder="e.g. Ice & water shield"></div>
+    <div class="col-md-3 d-flex align-items-end"><div class="form-check mb-1">
+        <input class="form-check-input" type="checkbox" name="Input.OptionDefaultOn" value="true" id="r-on" checked="@i.OptionDefaultOn"><label class="form-check-label small" for="r-on">On by default</label></div></div>
+
+    <div class="col-12"><h2 class="h6 mb-0">Scope of work</h2></div>
+    <div class="col-12"><label class="form-label small" for="r-scope">Wording <span class="text-muted">(optional; one item in the section's scope of work when this rule adds a line)</span></label>
+        <textarea id="r-scope" name="Input.ScopeText" class="form-control form-control-sm" rows="2" maxlength="1000" placeholder="e.g. Install {product} over {total_area_squares} squares of roof.">@i.ScopeText</textarea>
+        <div class="form-text">Fill-ins: @(string.Join(", ", Oes.Infrastructure.Estimating.TakeoffEngine.ScopeFields.Select(f => $"{{{f.Key}}} {f.Label}"))),
+            or any measurement: @(string.Join(", ", Model.Drivers.Where(d => d.Key != "flat").Select(d => $"{{{d.Key}}}"))).</div></div>
+
+    <div class="col-12"><label class="form-label small" for="r-notes">Notes <span class="text-muted">(where the numbers come from)</span></label>
+        <input id="r-notes" name="Input.Notes" value="@i.Notes" class="form-control form-control-sm" maxlength="500"></div>
+    <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save rule</button>
+        <a class="btn btn-outline-secondary" href="/Admin/Takeoff?trade=@Model.TradeType.Code">Cancel</a>
+    </div>
+</form>

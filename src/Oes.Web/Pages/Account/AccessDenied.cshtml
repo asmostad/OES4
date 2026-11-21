@@ -1,0 +1,9 @@
+@page
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Access denied";
+    var message = TempData["LoginError"] as string ?? "You don't have permission to view that page.";
+}
+<h4>Access denied</h4>
+<p class="subtitle">@message</p>
+<a class="btn btn-login" href="/"><i class="bi bi-arrow-left me-1"></i> Back</a>

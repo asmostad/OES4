@@ -1,0 +1,88 @@
+@page
+@model Oes.Web.Pages.Availability.IndexModel
+@{
+    ViewData["Title"] = "Weekly hours";
+    string V(TimeOnly? t) => t?.ToString("HH:mm") ?? "";
+}
+<div class="page-header">
+    <div>
+        <h1>Weekly hours</h1>
+        <p class="page-subtitle">When people can book you online, in the company's time zone. Anything already on your calendar is blocked out automatically.</p>
+    </div>
+    @if (Model.CanManage)
+    {
+        <form method="get"><select name="user" class="form-select form-select-sm" data-autosubmit aria-label="Whose hours">
+            @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Target.ToString())">@u.Label</option> }
+        </select></form>
+    }
+</div>
+<div class="row"><div class="col-xl-7">
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+            <form method="post">
+                <input type="hidden" name="user" value="@Model.UserId">
+                <table class="table table-sm align-middle mb-3 hours-table">
+                    <thead><tr><th>Day</th><th>From</th><th>To</th><th class="text-muted fw-normal">and from</th><th class="text-muted fw-normal">to</th></tr></thead>
+                    <tbody>
+                        @for (var d = 0; d < 7; d++)
+                        {
+                            <tr>
+                                <td class="fw-medium">@Oes.Web.Pages.Availability.IndexModel.Days[d]</td>
+                                @for (var n = 0; n < 2; n++)
+                                {
+                                    var i = d * 2 + n;
+                                    <td><input type="time" name="Start[@i]" value="@V(Model.Start.ElementAtOrDefault(i))" class="form-control form-control-sm" aria-label="Start"></td>
+                                    <td><input type="time" name="End[@i]" value="@V(Model.End.ElementAtOrDefault(i))" class="form-control form-control-sm" aria-label="End"></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="form-text mb-2">Leave a day blank to be unavailable. The second pair is for split days (say, a lunch break).</div>
+                <button class="btn btn-primary" type="submit">Save hours</button>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="col-xl-5">
+    <div class="card">
+        <div class="card-header"><i class="bi bi-calendar2-week me-2"></i>Busy calendars</div>
+        <ul class="list-group list-group-flush">
+            @if (Model.Calendars.Count == 0) { <li class="list-group-item small text-muted">None yet. Add your Google, Outlook or iCloud calendar so your other plans block online booking.</li> }
+            @foreach (var row in Model.Calendars)
+            {
+                var c = row.Calendar;
+                <li class="list-group-item">
+                    <div class="d-flex align-items-start gap-2">
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">@c.Label <span class="small text-muted">· @c.Host</span></div>
+                            <div class="small text-muted">@c.BlockCount busy time@(c.BlockCount == 1 ? "" : "s") in the next 90 days@(row.LastFetchedLocal is { } f ? $" · read {f:MMM d, h:mm tt}" : "")</div>
+                            @if (c.LastError is not null) { <div class="small text-danger">@c.LastError</div> }
+                        </div>
+                        <form method="post" asp-page-handler="RefreshCalendar"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="user" value="@Model.UserId">
+                            <button class="btn btn-sm btn-link p-0" type="submit" title="Read it now"><i class="bi bi-arrow-clockwise"></i></button></form>
+                        <form method="post" asp-page-handler="DeleteCalendar"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="user" value="@Model.UserId">
+                            <button class="btn btn-sm btn-link p-0 text-danger" type="submit" title="Remove" data-confirm="Remove this calendar?"><i class="bi bi-trash"></i></button></form>
+                    </div>
+                    <form method="post" asp-page-handler="ShowCalendar" class="mt-1">
+                        <input type="hidden" name="id" value="@c.Id"><input type="hidden" name="user" value="@Model.UserId"><input type="hidden" name="show" value="@(c.ShowOnCalendar ? "false" : "true")">
+                        <button class="btn btn-sm btn-link p-0 small" type="submit">@(c.ShowOnCalendar ? "Hide busy times from the Pich calendar" : "Show busy times on the Pich calendar")</button>
+                    </form>
+                </li>
+            }
+        </ul>
+        <div class="card-body border-top">
+            <form method="post" asp-page-handler="AddCalendar" class="d-flex flex-column gap-2">
+                <input type="hidden" name="user" value="@Model.UserId">
+                <input name="url" class="form-control form-control-sm" placeholder="https://… or webcal://… (.ics link)" required maxlength="2000" aria-label="Calendar link" autocomplete="off">
+                <div class="d-flex gap-2">
+                    <input name="label" class="form-control form-control-sm" placeholder="Name (e.g. Personal)" maxlength="100" aria-label="Name">
+                    <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">Add calendar</button>
+                </div>
+            </form>
+            <div class="form-text">Use the calendar's secret or private address in iCal format (Google: Settings › your calendar › "Secret address in iCal format"; Outlook: Publish calendar › ICS).
+                Pich keeps only when you're busy, never what the events are, and reads it every 15 minutes.</div>
+        </div>
+    </div>
+</div></div>

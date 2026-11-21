@@ -1,0 +1,44 @@
+@model Oes.Web.ViewComponents.ConsentModel
+@using Oes.Domain.Communication
+@using Oes.Domain.Crm
+@{
+    var self = Context.Request.Path + Context.Request.QueryString;
+    var key = Model.ContactId.ToString("N")[..8];
+    string Badge(string s) => s switch
+    {
+        ConsentStatuses.OptedIn => "bg-success-subtle text-success",
+        ConsentStatuses.OptedOut => "bg-danger-subtle text-danger",
+        _ => "bg-secondary-subtle text-secondary",
+    };
+    string Label(string s) => s switch { ConsentStatuses.OptedIn => "Opted in", ConsentStatuses.OptedOut => "Opted out", _ => "Not asked" };
+}
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center"><i class="bi bi-shield-check me-2"></i>Messaging consent
+        <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#consent-@key">Record</button></div>
+    <div class="collapse" id="consent-@key"><div class="card-body border-bottom bg-light">
+        <form method="post" asp-antiforgery="true" action="/Messages/Send?handler=Consent" class="row g-2">
+            <input type="hidden" name="contactId" value="@Model.ContactId"><input type="hidden" name="returnUrl" value="@self">
+            <div class="col-6"><select name="channel" class="form-select form-select-sm" aria-label="Channel"><option value="sms">Texts</option><option value="email">Email</option></select></div>
+            <div class="col-6"><select name="purpose" class="form-select form-select-sm" aria-label="Purpose"><option value="transactional">About their job</option><option value="marketing">Marketing</option></select></div>
+            <div class="col-6"><select name="status" class="form-select form-select-sm" aria-label="Status"><option value="opted_in">Opted in</option><option value="opted_out">Opted out</option></select></div>
+            <div class="col-6"><select name="source" class="form-select form-select-sm" aria-label="How"><option value="verbal">Told us verbally</option><option value="written">In writing / signed</option><option value="web_form">Web form</option><option value="other">Other</option></select></div>
+            <div class="col-12"><input name="evidence" class="form-control form-control-sm" maxlength="1000" placeholder="Details (when, where, who heard it)" aria-label="Details"></div>
+            <div class="col-12 text-end"><button class="btn btn-sm btn-primary" type="submit">Save</button></div>
+        </form>
+    </div></div>
+    <ul class="list-group list-group-flush small">
+        @foreach (var s in Model.States)
+        {
+            <li class="list-group-item d-flex align-items-center gap-2">
+                <span>@(s.Channel == Channels.Sms ? "Texts" : "Email") · @(s.Purpose == MessagePurposes.Marketing ? "marketing" : "about their job")</span>
+                <span class="badge @Badge(s.Status) ms-auto" title="@(s.At is null ? "" : $"{Fmt.Cap(s.Source)}{(s.RecordedBy is null ? "" : " · " + s.RecordedBy)}")">@Label(s.Status)</span>
+            </li>
+        }
+        @foreach (var x in Model.Suppressions)
+        {
+            <li class="list-group-item text-danger"><i class="bi bi-slash-circle me-1"></i>
+                @(x.Channel == Channels.Sms ? ContactValue.FormatPhone(x.Address, x.Address) : x.Address) is blocked (@(x.Reason == SuppressionReasons.Stop ? "texted STOP" : Fmt.Cap(x.Reason)))</li>
+        }
+    </ul>
+    <div class="card-footer small text-muted">Texts need an opt-in. Email is allowed unless they opt out.</div>
+</div>

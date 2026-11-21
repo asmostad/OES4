@@ -1,0 +1,124 @@
+@page
+@model Oes.Web.Pages.Measurements.EditModel
+@using Oes.Domain.Measurements
+@using Oes.Infrastructure.Measurements
+@{
+    ViewData["Title"] = $"{Model.Trade.Name} · {Model.Structure.Name}";
+    var surfaces = MeasurementModes.Surfaces(Model.Trade.MeasurementMode);
+    var isElevation = Model.Trade.MeasurementMode == MeasurementModes.Elevation;
+    string Val(string surface, string field) =>
+        Model.Input.Values.TryGetValue($"{surface}|{field}", out var v) && v is not null ? v.Value.ToString("0.####") : "";
+    var nextVersion = (Model.Current?.VersionNo ?? 0) + 1;
+}
+<div class="page-header">
+    <div>
+        <h1>@Model.Trade.Name measurements <span class="text-muted fs-5">· @Model.Structure.Name</span></h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Properties/View/@Model.Property.Id">@Model.Property.Line1</a></li>
+            <li class="breadcrumb-item"><a href="/Measurements/Property/@Model.Property.Id">Measurements</a></li>
+            <li class="breadcrumb-item active">Version @nextVersion</li>
+        </ol></nav>
+    </div>
+</div>
+
+@if (Model.Current is not null)
+{
+    <div class="alert alert-info small"><i class="bi bi-layers me-1"></i>Prefilled from version @Model.Current.VersionNo. Saving creates version @nextVersion; version @Model.Current.VersionNo is kept.</div>
+}
+
+@if (Model.AiFilled.Count > 0 || Model.Input.ReportDocumentId is not null && Model.ReportFileName is not null)
+{
+    <div class="alert alert-warning small"><i class="bi bi-stars me-1"></i><strong>Read by AI from @Model.ReportFileName.</strong>
+        Check every number against the report before saving. Highlighted fields were filled in by the AI (@Model.AiFilled.Count); anything it couldn't find is blank.
+        @if (Model.AiNotes is not null) { <div class="mt-1 pre-wrap">@Model.AiNotes</div> }</div>
+}
+
+<form method="post" enctype="multipart/form-data">
+    @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" class="alert alert-danger"></div> }
+    <input type="hidden" asp-for="PropertyId"><input type="hidden" asp-for="StructureId"><input type="hidden" asp-for="TradeTypeId">
+    <input type="hidden" name="Input.ReportDocumentId" value="@Model.Input.ReportDocumentId"><input type="hidden" name="Input.ExtractionJson" value="@Model.Input.ExtractionJson">
+    <input type="hidden" name="ReportFileName" value="@Model.ReportFileName">
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="card mb-3 trade-accent" style="--trade-color:@Model.Trade.Color">
+                @if (isElevation)
+                {
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle measure-grid">
+                            <thead><tr><th>Measurement</th>@foreach (var s in surfaces) { <th class="text-capitalize">@s</th> }<th>Unit</th></tr></thead>
+                            <tbody>
+                                @foreach (var f in Model.Fields)
+                                {
+                                    <tr>
+                                        <td class="fw-medium">@f.Label</td>
+                                        @foreach (var s in surfaces)
+                                        {
+                                            <td><input type="number" step="any" min="0" name="Input.Values[@s|@f.Key]" value="@Val(s, f.Key)" class="form-control form-control-sm @(Model.AiFilled.Contains(s + "|" + f.Key) ? "ai-filled" : "")" aria-label="@f.Label @s"></td>
+                                        }
+                                        <td class="text-muted small">@f.Unit</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="card-body">
+                        @foreach (var group in Model.Fields.GroupBy(f => f.Group ?? ""))
+                        {
+                            @if (group.Key.Length > 0) { <h6 class="measure-group">@group.Key</h6> }
+                            <div class="row g-3 mb-3">
+                                @foreach (var f in group)
+                                {
+                                    <div class="col-sm-6 col-lg-4">
+                                        <label class="form-label" for="m-@f.Key">@f.Label</label>
+                                        <div class="input-group input-group-sm">
+                                            <input id="m-@f.Key" type="number" step="any" min="0" name="Input.Values[|@f.Key]" value="@Val("", f.Key)" class="form-control @(Model.AiFilled.Contains("|" + f.Key) ? "ai-filled" : "")">
+                                            <span class="input-group-text">@f.Unit</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        @if (Model.Fields.Count == 0) { <p class="text-muted mb-0">This trade has no measurement fields. Add some under Administration › Trades &amp; Measurements.</p> }
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card mb-3">
+                <div class="card-header">Source</div>
+                <div class="card-body">
+                    <label class="form-label" for="src">Where the numbers came from</label>
+                    <select id="src" name="Input.Source" class="form-select form-select-sm mb-3">
+                        @foreach (var s in MeasurementSources.All) { <option value="@s" selected="@(Model.Input.Source == s)">@MeasurementService.SourceLabel(s)</option> }
+                    </select>
+                    <label class="form-label" for="mon">Measured on</label>
+                    <input id="mon" type="date" name="Input.MeasuredOn" value="@Model.Input.MeasuredOn?.ToString("yyyy-MM-dd")" class="form-control form-control-sm mb-3">
+                    <label class="form-label" for="rep">Report file (PDF, image…)</label>
+                    @if (Model.Input.ReportDocumentId is not null && Model.ReportFileName is not null)
+                    {
+                        <div class="small mb-1"><i class="bi bi-file-earmark-pdf me-1"></i>@Model.ReportFileName <span class="text-muted">(saved on the property)</span></div>
+                    }
+                    <input id="rep" type="file" name="Report" accept=".pdf,image/*" class="form-control form-control-sm mb-1">
+                    <div class="form-text mb-2">Saved on the property and linked to this version.</div>
+                    @if (Model.AiReady)
+                    {
+                        <button type="submit" asp-page-handler="Extract" class="btn btn-sm btn-outline-primary w-100 mb-3" data-busy-text="Reading the report…"><i class="bi bi-stars me-1"></i>Read the PDF with AI</button>
+                    }
+                    else
+                    {
+                        <div class="form-text mb-3">AI reading of reports turns on when the AI key is added.</div>
+                    }
+                    <label class="form-label" for="mn">Notes</label>
+                    <textarea id="mn" name="Input.Notes" class="form-control form-control-sm" rows="3" maxlength="5000">@Model.Input.Notes</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save version @nextVersion</button>
+        <a class="btn btn-outline-secondary" href="/Measurements/Property/@Model.Property.Id">Cancel</a>
+    </div>
+</form>

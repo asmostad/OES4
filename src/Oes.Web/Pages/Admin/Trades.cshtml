@@ -1,0 +1,90 @@
+@page
+@model Oes.Web.Pages.Admin.TradesModel
+@using Oes.Domain.Measurements
+@{
+    ViewData["Title"] = "Trades & Measurements";
+}
+<div class="page-header">
+    <div>
+        <h1>Trades &amp; Measurements</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Trades &amp; Measurements</li></ol></nav>
+    </div>
+</div>
+<p class="small text-muted">Trades are used by measurements now, and by estimates and projects later. The measurement mode decides the form:
+    <strong>roof</strong> (areas and edges), <strong>elevation</strong> (per wall side), <strong>linear</strong> (runs and counts) or <strong>none</strong>.</p>
+
+<div class="row g-3">
+    <div class="col-xl-5">
+        <div class="card">
+            <div class="card-header">Trades</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var t in Model.Trades)
+                {
+                    var fid = "trade-" + t.Id.ToString("N");
+                    <li class="list-group-item @(Model.Selected?.Id == t.Id ? "active-version" : "")">
+                        <form method="post" asp-page-handler="Trade" class="d-flex flex-wrap gap-2 align-items-center" id="@fid">
+                            <input type="hidden" name="id" value="@t.Id">
+                            <input type="color" name="color" value="@t.Color" class="form-control form-control-sm form-control-color" aria-label="Color">
+                            <input name="name" value="@t.Name" class="form-control form-control-sm" style="max-width:150px" maxlength="100" required aria-label="Name">
+                            <select name="mode" class="form-select form-select-sm w-auto" aria-label="Measurement mode">
+                                @foreach (var m in MeasurementModes.All) { <option value="@m" selected="@(t.MeasurementMode == m)">@m</option> }
+                            </select>
+                            <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="isActive" value="true" id="ta-@t.Id" checked="@t.IsActive"><label class="form-check-label small" for="ta-@t.Id">Active</label></div>
+                            <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+                            @if (t.MeasurementMode != MeasurementModes.None) { <a class="btn btn-sm btn-link" href="?trade=@t.Id">Fields</a> }
+                        </form>
+                    </li>
+                }
+            </ul>
+            <div class="card-body border-top">
+                <form method="post" asp-page-handler="Trade" class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="hidden" name="isActive" value="true">
+                    <input type="color" name="color" value="#64748b" class="form-control form-control-sm form-control-color" aria-label="Color">
+                    <input name="name" class="form-control form-control-sm" style="max-width:150px" placeholder="New trade" maxlength="100" required aria-label="New trade name">
+                    <select name="mode" class="form-select form-select-sm w-auto" aria-label="Measurement mode">
+                        @foreach (var m in MeasurementModes.All) { <option value="@m">@m</option> }
+                    </select>
+                    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Add</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        @if (Model.Selected is { } sel)
+        {
+            <div class="card trade-accent" style="--trade-color:@sel.Color">
+                <div class="card-header">@sel.Name fields <span class="text-muted small fw-normal">(@sel.MeasurementMode@(sel.MeasurementMode == MeasurementModes.Elevation ? ", entered per wall side" : ""))</span></div>
+                <div class="table-responsive">
+                    <table class="table mb-0 align-middle small">
+                        <thead><tr><th>Label</th><th>Unit</th><th>Group</th><th>Key</th><th>Active</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var f in Model.Fields)
+                            {
+                                var ffid = "field-" + f.Id.ToString("N");
+                                <tr>
+                                    <td><form method="post" asp-page-handler="Field" id="@ffid"><input type="hidden" name="tradeId" value="@sel.Id"><input type="hidden" name="id" value="@f.Id"></form>
+                                        <input form="@ffid" name="label" value="@f.Label" class="form-control form-control-sm" maxlength="100" required aria-label="Label"></td>
+                                    <td><input form="@ffid" name="unit" value="@f.Unit" class="form-control form-control-sm" style="max-width:80px" maxlength="20" aria-label="Unit"></td>
+                                    <td><input form="@ffid" name="group" value="@f.Group" class="form-control form-control-sm" maxlength="60" aria-label="Group"></td>
+                                    <td><code>@f.Key</code></td>
+                                    <td><input form="@ffid" class="form-check-input" type="checkbox" name="isActive" value="true" checked="@f.IsActive" aria-label="Active"></td>
+                                    <td><button form="@ffid" class="btn btn-sm btn-outline-primary" type="submit">Save</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="Field" class="d-flex flex-wrap gap-2">
+                        <input type="hidden" name="tradeId" value="@sel.Id"><input type="hidden" name="isActive" value="true">
+                        <input name="label" class="form-control form-control-sm w-auto" placeholder="New field" maxlength="100" required aria-label="New field label">
+                        <input name="unit" class="form-control form-control-sm" style="max-width:90px" placeholder="Unit" maxlength="20" aria-label="Unit">
+                        <input name="group" class="form-control form-control-sm w-auto" placeholder="Group (optional)" maxlength="60" aria-label="Group">
+                        <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Add field</button>
+                    </form>
+                    <div class="form-text">Turning a field off hides it from new versions; existing versions keep their values.</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

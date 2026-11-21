@@ -1,0 +1,34 @@
+@page "/portal/u/{token}"
+@model Oes.Web.Pages.Portal.UnsubscribeModel
+@{
+    Layout = "_PortalLayout";
+    var v = Model.View;
+    ViewData["Title"] = "Email preferences";
+}
+@if (v is null)
+{
+    <div class="portal-card text-center">
+        <i class="bi bi-link-45deg fs-1 text-muted"></i>
+        <h1 class="h4 mt-2">This link isn't available</h1>
+        <p class="text-muted mb-0">It may have expired. Reply to the email and ask to be removed, and we'll take care of it.</p>
+    </div>
+}
+else if (v.Done)
+{
+    <div class="portal-card text-center">
+        <i class="bi bi-envelope-check fs-1 text-success"></i>
+        <h1 class="h4 mt-2">You're unsubscribed</h1>
+        <p class="text-muted mb-0">@v.MaskedAddress won't get marketing email from @v.Company again. You may still hear from us about work we're doing for you.</p>
+    </div>
+}
+else
+{
+    <div class="portal-card text-center">
+        <i class="bi bi-envelope-slash fs-1 text-muted"></i>
+        <h1 class="h4 mt-2">Unsubscribe from @v.Company?</h1>
+        <p class="text-muted">Stop marketing email to @v.MaskedAddress.</p>
+        <form method="post">
+            <button class="btn btn-primary" type="submit">Unsubscribe</button>
+        </form>
+    </div>
+}

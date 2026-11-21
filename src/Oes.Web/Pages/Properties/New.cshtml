@@ -1,0 +1,42 @@
+@page
+@model Oes.Web.Pages.Properties.NewModel
+@{
+    ViewData["Title"] = "New property";
+}
+<div class="page-header">
+    <div>
+        <h1>New property</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Properties">Properties</a></li><li class="breadcrumb-item active">New</li></ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    @if (Model.ExistingId is { } existing)
+    {
+        <div class="alert alert-info"><a href="/Properties/View/@existing" class="fw-medium"><i class="bi bi-box-arrow-up-right me-1"></i>Open the existing property</a></div>
+    }
+    <input type="hidden" asp-for="ContactId">
+    <div class="row">
+        <div class="col-xl-8">
+            <div class="card mb-3 record-header level-property">
+                <div class="card-body"><partial name="_AddressFields" model="Model.Input" /></div>
+            </div>
+            @if (Model.ContactName is not null)
+            {
+                <div class="card mb-3">
+                    <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                        <span>Link <strong>@Model.ContactName</strong> as</span>
+                        <select name="RoleKey" class="form-select form-select-sm w-auto" aria-label="Role">
+                            @foreach (var r in Model.Roles) { <option value="@r.Value" selected="@(Model.RoleKey == r.Value)">@r.Label</option> }
+                        </select>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create property</button>
+        <a class="btn btn-outline-secondary" href="@(Model.ContactId is null ? "/Properties" : $"/Contacts/View/{Model.ContactId}")">Cancel</a>
+    </div>
+</form>

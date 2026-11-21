@@ -1,0 +1,145 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Claims.ViewModel
+@using Oes.Domain.Crm
+@using Oes.Domain.Insurance
+@using Oes.Infrastructure.Insurance
+@{
+    var d = Model.Detail;
+    var c = d.Claim;
+    var o = d.Opportunity;
+    ViewData["Title"] = c.ClaimNumber is null ? "Claim (not filed)" : $"Claim {c.ClaimNumber}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    parents.Add(new Crumb(RecordLevel.Opportunity, o.Name, $"/Opportunities/View/{o.Id}"));
+    var chips = new List<RecordChip> { new(d.Contact.IsOrganization ? "bi-building" : "bi-person", d.Contact.DisplayName, $"/Contacts/View/{d.Contact.Id}") };
+    if (d.Carrier is not null) chips.Add(new("bi-bank", d.Carrier.Name, null));
+    if (d.Storm is not null) chips.Add(new("bi-cloud-lightning-rain", d.Storm.Name, $"/Storms/View/{d.Storm.Id}"));
+    if (Model.PerilLabel is not null) chips.Add(new("bi-lightning", Model.PerilLabel + (c.DateOfLoss is null ? "" : " · DOL " + c.DateOfLoss.Value.ToString("MMM d, yyyy")), null));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Claim,
+        Title = c.ClaimNumber ?? "Not filed yet",
+        Number = c.PolicyNumber is null ? null : "Policy " + c.PolicyNumber,
+        Status = ClaimService.Label(c.Status),
+        Subtitle = d.Property?.SingleLine ?? "No address yet",
+        Parents = parents,
+        Chips = chips,
+    };
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    @if (d.CanEdit) { <a class="btn btn-sm btn-outline-secondary" href="/Claims/Edit/@c.Id"><i class="bi bi-pencil me-1"></i>Edit claim</a> }
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (label, value, icon) in new[]
+    {
+        ("Deductible", Fmt.Money(c.Deductible), "bi-piggy-bank"),
+        ("Approved (claim)", Fmt.Money(c.ApprovedAmount), "bi-check2-circle"),
+        ("Supplements approved", Fmt.Money(d.SupplementsApproved == 0 ? null : d.SupplementsApproved), "bi-plus-circle"),
+        ("Total approved", Fmt.Money(d.TotalApproved), "bi-cash-stack"),
+    })
+    {
+        <div class="col-sm-6 col-xl-3">
+            <div class="card stat-card"><div class="d-flex align-items-center">
+                <div class="stat-icon bg-info-subtle text-info"><i class="bi @icon"></i></div>
+                <div class="ms-3"><div class="stat-value fs-5">@value</div><div class="stat-label">@label</div></div>
+            </div></div>
+        </div>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-bank me-2 text-level-claim"></i>Carrier</div>
+            <div class="card-body small">
+                @if (d.Carrier is null)
+                {
+                    <span class="text-muted">Not set yet.</span>
+                }
+                else
+                {
+                    <div class="fw-medium fs-6 mb-1">@d.Carrier.Name</div>
+                    @if (d.Carrier.PreferredSubmission is not null) { <div><i class="bi bi-send me-1"></i>Submit by @Fmt.Cap(d.Carrier.PreferredSubmission)</div> }
+                    @if (d.Carrier.ClaimsEmail is not null) { <div><i class="bi bi-envelope me-1"></i><a href="mailto:@d.Carrier.ClaimsEmail">@d.Carrier.ClaimsEmail</a></div> }
+                    @if (d.Carrier.Phone is not null) { <div><i class="bi bi-telephone me-1"></i>@d.Carrier.Phone</div> }
+                    @if (d.Carrier.ClaimsFax is not null) { <div><i class="bi bi-printer me-1"></i>@d.Carrier.ClaimsFax</div> }
+                    @if (d.Carrier.Notes is not null) { <div class="mt-2 pre-wrap text-muted">@d.Carrier.Notes</div> }
+                    @if (d.Carrier.ClaimsEmail is null && d.Carrier.Phone is null) { <div class="text-muted mt-1">No contact details yet. <a href="/Admin/Carriers">Add them</a> once for every claim.</div> }
+                }
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-calendar-event me-2"></i>Dates &amp; people</div>
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item d-flex"><span class="text-muted">Date of loss</span><span class="ms-auto">@(c.DateOfLoss?.ToString("MMM d, yyyy") ?? "—")</span></li>
+                <li class="list-group-item d-flex"><span class="text-muted">Filed</span><span class="ms-auto">@(c.FiledOn?.ToString("MMM d, yyyy") ?? "—")</span></li>
+                <li class="list-group-item d-flex"><span class="text-muted">Adjuster inspection</span><span class="ms-auto">@(c.InspectionOn?.ToString("MMM d, yyyy") ?? "—")</span></li>
+                @foreach (var (role, person) in new[] { ("Field adjuster", d.Adjuster), ("Desk adjuster", d.DeskAdjuster) })
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex"><span class="text-muted">@role</span>
+                            <span class="ms-auto">@if (person is null) { <text>—</text> } else { <a href="/Contacts/View/@person.Id">@person.DisplayName</a> }</span></div>
+                        @if (person is not null)
+                        {
+                            foreach (var m in person.Methods.Where(m => m.IsPrimary))
+                            {
+                                <div class="text-end text-muted">@m.Value</div>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+        @if (c.Notes is not null)
+        {
+            <div class="card mb-3"><div class="card-header">Notes</div><div class="card-body small pre-wrap">@c.Notes</div></div>
+        }
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Claim, entityId = Model.Id })
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Claim, entityId = Model.Id })
+    </div>
+
+    <div class="col-xl-8">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-file-earmark-plus me-2 text-level-claim"></i>Supplements</div>
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <thead><tr><th>For</th><th>Status</th><th class="text-end">Requested</th><th class="text-end">Approved</th><th>Sent</th><th>Answered</th><th></th></tr></thead>
+                    <tbody>
+                        @if (d.Supplements.Count == 0) { <tr><td colspan="7" class="text-muted">No supplements yet.</td></tr> }
+                        @foreach (var row in d.Supplements)
+                        {
+                            var s = row.Supplement;
+                            <tr>
+                                <td class="fw-medium">@s.Reason<div class="text-muted">@row.SubmittedBy</div></td>
+                                <td><span class="claim-status supp-@s.Status">@Fmt.Cap(s.Status)</span></td>
+                                <td class="text-end">@Fmt.Money(s.RequestedAmount)</td>
+                                <td class="text-end">@Fmt.Money(s.ApprovedAmount)</td>
+                                <td>@s.SentOn?.ToString("MMM d")</td>
+                                <td>@s.RespondedOn?.ToString("MMM d")</td>
+                                <td class="text-end">@if (d.CanEdit) { <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#supp-@s.Id">Update</button> }</td>
+                            </tr>
+                            @if (d.CanEdit)
+                            {
+                                <tr class="collapse" id="supp-@s.Id"><td colspan="7" class="bg-light">
+                                    <partial name="_SupplementForm" model="((Guid?)s.Id, new SupplementInput { Reason = s.Reason, Status = s.Status, RequestedAmount = s.RequestedAmount, ApprovedAmount = s.ApprovedAmount, SentOn = s.SentOn, RespondedOn = s.RespondedOn, Notes = s.Notes })" />
+                                </td></tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (d.CanEdit)
+            {
+                <div class="card-body border-top">
+                    <div class="small fw-medium mb-2">Add a supplement</div>
+                    <partial name="_SupplementForm" model="((Guid?)null, new SupplementInput())" />
+                </div>
+            }
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+</div>

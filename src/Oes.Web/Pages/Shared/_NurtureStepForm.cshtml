@@ -1,0 +1,25 @@
+@* Add or edit one nurture step. Model: (sequence id, step id or null for a new step, values). *@
+@model (Guid SequenceId, Guid? StepId, Oes.Infrastructure.Communication.StepInput Step)
+@using Oes.Domain.Communication
+@{
+    var key = Model.StepId?.ToString("N")[..8] ?? "new";
+}
+<form method="post" action="/Admin/NurtureEdit?handler=@(Model.StepId is null ? "AddStep" : "UpdateStep")" asp-antiforgery="true" class="row g-2">
+    <input type="hidden" name="Id" value="@Model.SequenceId">
+    @if (Model.StepId is { } sid) { <input type="hidden" name="stepId" value="@sid"> }
+    <div class="col-sm-4"><label class="form-label small" for="k-@key">Step</label>
+        <select id="k-@key" name="step.Kind" class="form-select form-select-sm">
+            <option value="@StepKinds.Email" selected="@(Model.Step.Kind == StepKinds.Email)">Email</option>
+            <option value="@StepKinds.Sms" selected="@(Model.Step.Kind == StepKinds.Sms)">Text</option>
+            <option value="@StepKinds.Task" selected="@(Model.Step.Kind == StepKinds.Task)">Task for the owner</option>
+        </select></div>
+    <div class="col-sm-4 col-6"><label class="form-label small" for="d-@key">Wait (days)</label>
+        <input id="d-@key" type="number" name="step.DelayDays" value="@Model.Step.DelayDays" min="0" max="365" class="form-control form-control-sm"></div>
+    <div class="col-sm-4 col-6"><label class="form-label small" for="h-@key">and hours</label>
+        <input id="h-@key" type="number" name="step.DelayHours" value="@Model.Step.DelayHours" min="0" max="23" class="form-control form-control-sm"></div>
+    <div class="col-12"><label class="form-label small" for="s-@key">Subject (email) or task title</label>
+        <input id="s-@key" name="step.Subject" value="@Model.Step.Subject" maxlength="300" class="form-control form-control-sm"></div>
+    <div class="col-12"><label class="form-label small" for="b-@key">Message (email or text) or task notes</label>
+        <textarea id="b-@key" name="step.Body" rows="4" maxlength="20000" class="form-control form-control-sm">@Model.Step.Body</textarea></div>
+    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">@(Model.StepId is null ? "Add step" : "Save step")</button></div>
+</form>

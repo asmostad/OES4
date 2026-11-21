@@ -1,0 +1,180 @@
+@page "{kind?}"
+@model Oes.Web.Pages.Reports.IndexModel
+@{
+    ViewData["Title"] = Model.Result is null ? "Reports" : $"{Model.Current.Title} report";
+    string Show(object? v, string kind) => v switch
+    {
+        null => "–",
+        decimal d when kind == "money" => Fmt.Money(d),
+        double d when kind == "percent" => d.ToString("P0"),
+        _ => v.ToString() ?? "",
+    };
+    string Cell(Oes.Infrastructure.Reports.ReportTable t, int col, object? v) =>
+        Show(v, t.MoneyColumns.Contains(col) ? "money" : t.PercentColumns.Contains(col) ? "percent" : "");
+    var query = $"from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}{(Model.Owner is null ? "" : "&owner=" + Model.Owner)}";
+}
+<div class="page-header">
+    <div>
+        <h1>@(Model.Result is null ? "Reports" : Model.Current.Title)</h1>
+        @if (Model.Result is not null)
+        {
+            <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Reports">Reports</a></li><li class="breadcrumb-item active">@Model.Current.Title</li></ol></nav>
+        }
+        else
+        {
+            <p class="page-subtitle">Every report only counts records you can see.</p>
+        }
+    </div>
+    @if (Model.Result is not null)
+    {
+        <a class="btn btn-sm btn-outline-secondary" href="/Reports/@Model.Current.Key?@query&amp;format=csv"><i class="bi bi-download me-1"></i>CSV</a>
+    }
+</div>
+
+@if (Model.Result is null)
+{
+    @if (Model.Saved.Count > 0)
+    {
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-bookmark-star me-2"></i>My saved reports</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var s in Model.Saved)
+                {
+                    <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                        <i class="bi @s.Kind.Icon text-primary"></i>
+                        <div class="flex-grow-1">
+                            <a href="@s.Url" class="fw-medium">@s.Report.Name</a>
+                            <div class="small text-muted">@s.Kind.Title · @s.RangeText@if (s.ScheduleText is not null) { <text> · @s.ScheduleText@(s.NextSendLocal is { } n ? $", next {n:ddd MMM d}" : "")</text> }</div>
+                            @if (s.Report.LastError is not null) { <div class="small text-danger">@s.Report.LastError</div> }
+                        </div>
+                        <form method="post" asp-page-handler="Send" asp-route-kind=""><input type="hidden" name="id" value="@s.Report.Id">
+                            <button class="btn btn-sm btn-outline-secondary" type="submit" title="Email it to me now"><i class="bi bi-envelope"></i></button></form>
+                        <form method="post" asp-page-handler="Delete" asp-route-kind=""><input type="hidden" name="id" value="@s.Report.Id">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Delete" data-confirm="Delete the saved report &quot;@s.Report.Name&quot;?"><i class="bi bi-trash"></i></button></form>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+    <div class="row g-3">
+        @foreach (var k in Oes.Web.Pages.Reports.IndexModel.Kinds)
+        {
+            <div class="col-md-6 col-xl-4">
+                <a class="card h-100 text-decoration-none report-card" href="/Reports/@k.Key">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2"><i class="bi @k.Icon fs-4 me-2 text-primary"></i><h5 class="mb-0">@k.Title</h5></div>
+                        <div class="text-muted small">@k.Blurb</div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+else
+{
+    var r = Model.Result;
+    <form method="get" class="card mb-3"><div class="card-body d-flex flex-wrap gap-2 align-items-end">
+        @if (Model.Current.UsesRange)
+        {
+            <div><label class="form-label small mb-0" for="from">From</label><input id="from" type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+            <div><label class="form-label small mb-0" for="to">To</label><input id="to" type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+        }
+        @if (Model.CanPickOwner)
+        {
+            <div><label class="form-label small mb-0" for="owner">@(Model.Kind == "tasks" ? "Person" : "Owner")</label>
+                <select id="owner" name="owner" class="form-select form-select-sm">
+                    <option value="">Everyone</option>
+                    @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(Model.Owner?.ToString() == u.Value)">@u.Label</option> }
+                </select></div>
+        }
+        <button class="btn btn-sm btn-primary" type="submit">Update</button>
+        @if (!Model.Current.UsesRange) { <span class="small text-muted ms-2">As of now.</span> }
+        <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#save-report"><i class="bi bi-bookmark-plus me-1"></i>Save this report</button>
+    </div></form>
+
+    <div class="collapse mb-3" id="save-report"><div class="card"><div class="card-body">
+        <form method="post" asp-page-handler="Save" class="row g-2 align-items-end">
+            <input type="hidden" name="from" value="@Model.From?.ToString("yyyy-MM-dd")"><input type="hidden" name="to" value="@Model.To?.ToString("yyyy-MM-dd")">
+            @if (Model.Owner is not null) { <input type="hidden" name="owner" value="@Model.Owner"> }
+            <div class="col-md-4"><label class="form-label small mb-0" for="sr-name">Name</label>
+                <input id="sr-name" name="name" class="form-control form-control-sm" maxlength="100" required value="@Model.Current.Title"></div>
+            @if (Model.Current.UsesRange)
+            {
+                <div class="col-md-3"><label class="form-label small mb-0" for="sr-range">Dates</label>
+                    <select id="sr-range" name="rangeKey" class="form-select form-select-sm">
+                        @foreach (var (key, label) in Oes.Domain.Reports.ReportRanges.All) { <option value="@key" selected="@(key == Oes.Domain.Reports.ReportRanges.ThisMonth)">@label@(key == Oes.Domain.Reports.ReportRanges.Fixed ? $" ({Model.From:MMM d}–{Model.To:MMM d, yyyy})" : "")</option> }
+                    </select></div>
+            }
+            else { <input type="hidden" name="rangeKey" value="this_month"> }
+            <div class="col-md-2"><label class="form-label small mb-0" for="sr-sched">Email it to me</label>
+                <select id="sr-sched" name="schedule" class="form-select form-select-sm">
+                    <option value="none">No</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label small mb-0" for="sr-wday">Weekly on / monthly on day</label>
+                <div class="d-flex gap-1">
+                    <select id="sr-wday" name="weeklyDay" class="form-select form-select-sm" aria-label="Weekday">
+                        @for (var d = 0; d < 7; d++) { <option value="@d" selected="@(d == 1)">@(((DayOfWeek)d).ToString()[..3])</option> }
+                    </select>
+                    <input type="number" name="monthlyDay" min="1" max="28" value="1" class="form-control form-control-sm" style="max-width:70px" aria-label="Day of month">
+                </div></div>
+            <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit">Save</button></div>
+            <div class="col-12 form-text mt-0">Emails go to you at 7 am company time and show only what you can see. Saving with an existing name replaces it.</div>
+        </form>
+    </div></div></div>
+
+    <div class="row g-3 mb-3">
+        @foreach (var k in r.Kpis)
+        {
+            <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body">
+                <div class="stat-value">@Show(k.Value, k.Kind)</div><div class="stat-label">@k.Label</div>
+            </div></div></div>
+        }
+    </div>
+
+    @foreach (var t in r.Tables)
+    {
+        var max = t.BarColumn < 0 ? 0m : t.Rows.Select(x => Convert.ToDecimal(x[t.BarColumn] ?? 0)).DefaultIfEmpty(0).Max();
+        <div class="card mb-3">
+            <div class="card-header">@t.Title</div>
+            @if (t.Rows.Count == 0)
+            {
+                <div class="card-body small text-muted">Nothing here for this range.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle report-table">
+                        <thead><tr>
+                            @for (var c = 0; c < t.Columns.Length; c++) { <th class="@(c > 0 && t.Rows[0][c] is not string ? "text-end" : "")">@t.Columns[c]</th> }
+                            @if (t.BarColumn >= 0) { <th class="report-bar-col" aria-hidden="true"></th> }
+                        </tr></thead>
+                        <tbody>
+                            @for (var i = 0; i < t.Rows.Count; i++)
+                            {
+                                var row = t.Rows[i];
+                                <tr>
+                                    @for (var c = 0; c < row.Length; c++)
+                                    {
+                                        <td class="@(c > 0 && row[c] is not string and not null ? "text-end text-nowrap" : "")">
+                                            @if (c == 0 && t.Links[i] is { } link) { <a href="@link">@Cell(t, c, row[c])</a> } else { @Cell(t, c, row[c]) }
+                                        </td>
+                                    }
+                                    @if (t.BarColumn >= 0)
+                                    {
+                                        var v = Convert.ToDecimal(row[t.BarColumn] ?? 0);
+                                        var pct = max == 0 ? 0 : (int)Math.Round(v / max * 100);
+                                        <td class="report-bar-col"><div class="report-bar" style="--bar:@(pct)%;--bar-color:@(t.Colors[i] ?? "var(--bs-primary)")"></div></td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                        @if (t.Totals is { } tot)
+                        {
+                            <tfoot><tr class="fw-medium">@for (var c = 0; c < tot.Length; c++) { <td class="@(c > 0 ? "text-end" : "")">@Cell(t, c, tot[c])</td> }@if (t.BarColumn >= 0) { <td></td> }</tr></tfoot>
+                        }
+                    </table>
+                </div>
+            }
+        </div>
+    }
+}

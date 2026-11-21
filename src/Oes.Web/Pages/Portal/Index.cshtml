@@ -1,0 +1,93 @@
+@page "/portal/{token}"
+@model Oes.Web.Pages.Portal.IndexModel
+@using Oes.Domain.Subcontractors
+@using Oes.Infrastructure.Subcontractors
+@{
+    Layout = "_PortalLayout";
+    var v = Model.View;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    ViewData["Title"] = v is null ? "Link not available" : $"Work order {v.Number}";
+}
+@if (v is null)
+{
+    <div class="portal-card text-center">
+        <i class="bi bi-link-45deg fs-1 text-muted"></i>
+        <h1 class="h4 mt-2">This link isn't available</h1>
+        <p class="text-muted mb-0">It may have expired, been replaced by a newer link, or the work order was cancelled. Please contact the company that sent it.</p>
+    </div>
+}
+else
+{
+    <div class="portal-card">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <div class="portal-company">@v.CompanyName</div>
+                <h1 class="h4 mb-0">Work order @v.Number</h1>
+                <div class="text-muted">For @v.SubName</div>
+            </div>
+            <span class="portal-status portal-@v.Status">@Fmt.Cap(v.Status)</span>
+        </div>
+
+        @if (TempData["Flash"] is string flash) { <div class="alert alert-success">@flash</div> }
+        @if (Model.Error is not null) { <div class="alert alert-danger">@Model.Error</div> }
+
+        <dl class="portal-facts">
+            <div><dt>Trade</dt><dd>@v.TradeName</dd></div>
+            <div><dt>Work date</dt><dd>@(v.WorkDate?.ToString("dddd, MMMM d, yyyy") ?? "To be scheduled")@(v.ArrivalTime is null ? "" : " · " + v.ArrivalTime)</dd></div>
+            <div><dt>Address</dt><dd>@(v.Address ?? "—")</dd></div>
+            @if (v.PropertyNotes is not null) { <div><dt>Site notes</dt><dd>@v.PropertyNotes</dd></div> }
+        </dl>
+        @if (v.Instructions is not null) { <h2 class="h6">Instructions</h2><p class="pre-wrap">@v.Instructions</p> }
+
+        <table class="table table-sm">
+            <thead><tr><th>Work</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+                @foreach (var l in v.Lines)
+                {
+                    <tr><td>@l.Description</td><td class="text-end">@l.Qty.ToString("#,0.##", us) @l.Unit</td><td class="text-end">@l.Rate.ToString("C2", us)</td><td class="text-end">@l.Amount.ToString("C2", us)</td></tr>
+                }
+            </tbody>
+            <tfoot><tr><td colspan="3" class="text-end fw-semibold">Total</td><td class="text-end fw-semibold">@v.Amount.ToString("C2", us)</td></tr></tfoot>
+        </table>
+
+        @if (v.Status == WorkOrderStatuses.Issued && v.AcceptStatus == AcceptStatuses.Pending)
+        {
+            <div class="portal-action">
+                <h2 class="h6">Can you take this job?</h2>
+                <form method="post" asp-page-handler="Respond" class="row g-2">
+                    <div class="col-sm-6"><input name="name" class="form-control" placeholder="Your name" maxlength="150" required aria-label="Your name"></div>
+                    <div class="col-sm-6 d-flex gap-2">
+                        <button class="btn btn-success flex-fill" type="submit" name="accept" value="true"><i class="bi bi-check-lg me-1"></i>Accept</button>
+                        <button class="btn btn-outline-danger flex-fill" type="button" data-bs-toggle="collapse" data-bs-target="#decline">Decline</button>
+                    </div>
+                    <div class="collapse col-12" id="decline">
+                        <textarea name="reason" class="form-control mb-2" rows="2" placeholder="Why can't you take it? (needed to decline)" maxlength="500" aria-label="Reason"></textarea>
+                        <button class="btn btn-danger" type="submit" name="accept" value="false">Decline work order</button>
+                    </div>
+                </form>
+            </div>
+        }
+        else if (v.AcceptStatus == AcceptStatuses.Declined)
+        {
+            <div class="alert alert-secondary">You declined this work order. Contact @v.CompanyName if that changes.</div>
+        }
+        else if (v.Status == WorkOrderStatuses.Issued && v.AcceptStatus == AcceptStatuses.Accepted)
+        {
+            <div class="alert alert-success small">Accepted by @v.AcceptedName on @v.AcceptedAt?.ToString("MMM d").</div>
+            <div class="portal-action">
+                <h2 class="h6">Done? Report completion</h2>
+                <form method="post" asp-page-handler="Complete" enctype="multipart/form-data">
+                    <textarea name="note" class="form-control mb-2" rows="3" maxlength="2000" placeholder="Anything the office should know (extra work found, materials left…)" aria-label="Note"></textarea>
+                    <label class="form-label small" for="photos">Photos (up to @PortalService.MaxPhotos)</label>
+                    <input id="photos" type="file" name="photos" accept="image/*,application/pdf" multiple class="form-control mb-3">
+                    <button class="btn btn-primary w-100" type="submit"><i class="bi bi-check2-all me-1"></i>Mark work complete</button>
+                </form>
+            </div>
+        }
+        else if (v.Status == WorkOrderStatuses.Completed || v.Status == WorkOrderStatuses.Paid)
+        {
+            <div class="alert alert-success">Completed @v.CompletedAt?.ToString("MMM d, yyyy")@(v.PhotosUploaded > 0 ? $" · {v.PhotosUploaded} photo(s) received" : ""). Thank you!</div>
+        }
+    </div>
+    <p class="text-center small text-muted mt-3">This page is private to you. Don't forward the link.</p>
+}

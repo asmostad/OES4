@@ -1,0 +1,204 @@
+@* Authenticated shell, ported from OES3 includes/header.cfm + footer.cfm *@
+@inject Shell ShellService
+@inject Oes.Infrastructure.Work.NotificationService Notifications
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var shell = await ShellService.GetAsync();
+    var path = Context.Request.Path;
+    var csrf = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var unread = await Notifications.UnreadCountAsync();
+    var notifications = await Notifications.LatestAsync(8);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@(ViewData["Title"] is string t ? t + " - " : "")Pich</title>
+    <meta name="csrf-token" content="@csrf">
+    <link rel="icon" type="image/x-icon" href="~/img/brand/favicon.ico" asp-append-version="true">
+    <link rel="apple-touch-icon" href="~/img/brand/pich-badge-180.png">
+    <meta name="theme-color" content="#062536">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="~/css/oes3.css" rel="stylesheet" asp-append-version="true">
+    <link href="~/css/oes4.css" rel="stylesheet" asp-append-version="true">
+    <link href="~/css/pich-brand.css" rel="stylesheet" asp-append-version="true">
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+
+<aside class="oes-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <a href="/">
+            <img class="pich-wordmark" src="~/img/brand/pich-wordmark-white.png" alt="Pich" width="72" height="30">
+
+        </a>
+    </div>
+
+    @if (shell is not null)
+    {
+        <div class="sidebar-user">
+            <div class="d-flex align-items-center">
+                <div class="sidebar-user-avatar"><span class="avatar-initials">@shell.Initials</span></div>
+                <div class="sidebar-user-info">
+                    <div class="sidebar-user-name">@shell.FullName</div>
+                    <div class="sidebar-user-role">@shell.TenantName</div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <ul class="sidebar-menu">
+                @foreach (var sec in Navigation.Sections)
+                {
+                    var items = sec.Items.Where(i => shell.Can(i.Permission)).ToList();
+                    var groups = (sec.Groups ?? []).Select(g => (Group: g, Items: g.Items.Where(i => shell.Can(i.Permission)).ToList()))
+                        .Where(g => g.Items.Count > 0).ToList();
+                    if (items.Count == 0 && groups.Count == 0) { continue; }
+
+                    <li class="menu-header">@sec.Title</li>
+                    @foreach (var item in items)
+                    {
+                        <partial name="_NavItem" model="item" />
+                    }
+                    @foreach (var (group, groupItems) in groups)
+                    {
+                        var active = groupItems.Any(i => i.IsActive(path));
+                        <li class="menu-group @(active ? "open has-active" : "")" data-group="@group.Key">
+                            <button type="button" class="menu-group-toggle" aria-expanded="@(active ? "true" : "false")">
+                                <i class="bi @group.Icon"></i><span>@group.Title</span><i class="bi bi-chevron-down menu-group-caret"></i>
+                            </button>
+                            <ul class="menu-sub">
+                                @foreach (var item in groupItems)
+                                {
+                                    <partial name="_NavItem" model="item" />
+                                }
+                            </ul>
+                        </li>
+                    }
+                }
+            </ul>
+        </nav>
+    }
+</aside>
+
+<div class="oes-content-wrapper" id="contentWrapper">
+    <header class="oes-topbar">
+        <div class="d-flex align-items-center">
+            <button class="btn btn-link sidebar-toggle me-3" id="sidebarToggle" type="button" aria-label="Toggle menu">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+            <div class="topbar-search d-none d-md-block position-relative">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="search" class="form-control border-start-0" id="globalSearch"
+                           placeholder="Search properties, contacts, opportunities..." autocomplete="off" aria-label="Search">
+                </div>
+                <div class="dropdown-menu global-search-menu" id="globalSearchMenu"></div>
+            </div>
+        </div>
+
+        @if (shell is not null)
+        {
+            <div class="d-flex align-items-center gap-2">
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-plus-lg me-1"></i> New
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="/Opportunities/New"><i class="bi bi-funnel me-2"></i>Lead / opportunity</a></li>
+                        <li><a class="dropdown-item" href="/Contacts/New"><i class="bi bi-person-plus me-2"></i>Contact</a></li><li><a class="dropdown-item" href="/Contacts/New?type=organization"><i class="bi bi-building-add me-2"></i>Organization</a></li>
+                        <li><a class="dropdown-item" href="/Properties/New"><i class="bi bi-house-add me-2"></i>Property</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/Estimates"><i class="bi bi-file-earmark-text me-2"></i>Estimate (from an opportunity)</a></li>
+                        <li><a class="dropdown-item" href="/Projects"><i class="bi bi-kanban me-2"></i>Project (from a signed estimate)</a></li>
+                        <li><a class="dropdown-item" href="/Tasks"><i class="bi bi-check2-square me-2"></i>Task</a></li>
+                        <li><a class="dropdown-item" href="/Calendar"><i class="bi bi-calendar-plus me-2"></i>Appointment</a></li>
+                    </ul>
+                </div>
+
+                <div class="dropdown">
+                    <button class="btn btn-icon position-relative" type="button" data-bs-toggle="dropdown" aria-label="Notifications">
+                        <i class="bi bi-bell fs-5"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge @(unread == 0 ? "d-none" : "")" id="notifBadge">@(unread > 99 ? "99+" : unread)</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end notification-dropdown">
+                        <div class="dropdown-header d-flex align-items-center"><strong>Notifications</strong>
+                            @if (unread > 0)
+                            {
+                                <form method="post" action="/Work/Items?handler=ReadAll" class="ms-auto">
+                                    <input type="hidden" name="__RequestVerificationToken" value="@csrf"><input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)">
+                                    <button class="btn btn-link btn-sm p-0" type="submit">Mark all read</button>
+                                </form>
+                            }</div>
+                        <div class="dropdown-divider"></div>
+                        @if (notifications.Count == 0) { <div class="text-center text-muted py-3 fs-sm">You're all caught up.</div> }
+                        @foreach (var n in notifications)
+                        {
+                            <a class="dropdown-item notification-item @(n.ReadAt is null ? "unread" : "")" href="/Work/Items?handler=Notification&amp;id=@n.Id">
+                                <div class="fw-medium text-wrap">@n.Title</div>
+                                @if (n.Body is not null) { <div class="small text-muted text-wrap">@n.Body</div> }
+                                <div class="small text-muted">@Fmt.Ago(n.CreatedAt)</div>
+                            </a>
+                        }
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="btn btn-icon dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-label="Account">
+                        <div class="topbar-avatar"><span class="avatar-initials-sm">@shell.Initials</span></div>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li class="dropdown-header">
+                            <strong>@shell.FullName</strong><br>
+                            <small class="text-muted">@shell.Email</small>
+                            @if (!string.IsNullOrEmpty(shell.RoleNames))
+                            {
+                                <br><small class="text-muted">@shell.RoleNames</small>
+                            }
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        @if (shell.TenantCount > 1)
+                        {
+                            <li><a class="dropdown-item" href="/Account/SelectTenant"><i class="bi bi-arrow-left-right me-2"></i>Switch company</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                        }
+                        <li>
+                            <form method="post" action="/Account/Logout">
+                                <input type="hidden" name="__RequestVerificationToken" value="@csrf">
+                                <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        }
+    </header>
+
+    <main class="oes-main-content">
+        @if (TempData["Flash"] is string flash)
+        {
+            var kind = TempData["FlashType"] as string ?? "success";
+            <div class="alert alert-@kind alert-dismissible fade show" role="alert">
+                <i class="bi @(kind == "success" ? "bi-check-circle" : kind == "danger" ? "bi-exclamation-circle" : "bi-info-circle") me-2"></i>@flash
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="oes-footer">
+        <div class="d-flex justify-content-between align-items-center">
+            <span>&copy; @DateTime.UtcNow.Year @(shell?.TenantName ?? "Pich")</span>
+            <span class="text-muted">Pich</span>
+        </div>
+    </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/oes4.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

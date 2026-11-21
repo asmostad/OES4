@@ -1,0 +1,78 @@
+@page
+@model Oes.Web.Pages.Opportunities.NewModel
+@{
+    ViewData["Title"] = "New lead";
+    var hasContact = Model.ContactId is not null;
+    var hasProperty = Model.PropertyId is not null;
+}
+<div class="page-header">
+    <div>
+        <h1>New lead</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Opportunities">Opportunities</a></li><li class="breadcrumb-item active">New</li></ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <div class="row g-3">
+        <div class="col-xl-6">
+            <div class="card mb-3 record-header level-contact">
+                <div class="card-header"><i class="bi bi-person text-level-contact me-2"></i>Who</div>
+                <div class="card-body">
+                    <label class="form-label" for="contact-search">Existing contact</label>
+                    <div class="typeahead mb-3" data-typeahead="/api/v1/lookup/contacts" data-typeahead-clears="#new-contact">
+                        <input type="hidden" name="ContactId" value="@Model.ContactId" data-typeahead-value>
+                        <input id="contact-search" name="ContactLabel" value="@Model.ContactLabel" class="form-control" autocomplete="off"
+                               placeholder="Search by name, email or phone…" data-typeahead-input>
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <div id="new-contact" class="@(hasContact ? "d-none" : "")">
+                        <div class="divider-text"><span>or a new person</span></div>
+                        <div class="row g-2">
+                            <div class="col-6"><label class="form-label" for="nf">First name</label><input id="nf" name="FirstName" value="@Model.FirstName" class="form-control" maxlength="100"></div>
+                            <div class="col-6"><label class="form-label" for="nl">Last name</label><input id="nl" name="LastName" value="@Model.LastName" class="form-control" maxlength="100"></div>
+                            <div class="col-6"><label class="form-label" for="ne">Email</label><input id="ne" name="Email" value="@Model.Email" type="email" class="form-control" maxlength="254"></div>
+                            <div class="col-6"><label class="form-label" for="np">Mobile</label><input id="np" name="Phone" value="@Model.Phone" type="tel" class="form-control" maxlength="40"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3 record-header level-property">
+                <div class="card-header"><i class="bi bi-house-door text-level-property me-2"></i>Where <span class="text-muted small fw-normal">(optional, add it later if you don't have it yet)</span></div>
+                <div class="card-body">
+                    <label class="form-label" for="property-search">Existing property</label>
+                    <div class="typeahead mb-3" data-typeahead="/api/v1/lookup/properties" data-typeahead-clears="#new-address">
+                        <input type="hidden" name="PropertyId" value="@Model.PropertyId" data-typeahead-value>
+                        <input id="property-search" name="PropertyLabel" value="@Model.PropertyLabel" class="form-control" autocomplete="off"
+                               placeholder="Search by street or ZIP…" data-typeahead-input>
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <div id="new-address" class="@(hasProperty ? "d-none" : "")" data-address-check="/api/v1/lookup/property-matches">
+                        <div class="divider-text"><span>or a new address</span></div>
+                        <div class="row g-2">
+                            <div class="col-8"><label class="form-label" for="a1">Street</label><input id="a1" name="Address.Line1" value="@Model.Address.Line1" class="form-control" maxlength="200" data-address-part></div>
+                            <div class="col-4"><label class="form-label" for="a2">Unit</label><input id="a2" name="Address.Line2" value="@Model.Address.Line2" class="form-control" maxlength="100" data-address-part></div>
+                            <div class="col-6"><label class="form-label" for="ac">City</label><input id="ac" name="Address.City" value="@Model.Address.City" class="form-control" maxlength="100" data-address-part></div>
+                            <div class="col-2"><label class="form-label" for="as">State</label><input id="as" name="Address.State" value="@Model.Address.State" class="form-control" maxlength="2" data-address-part></div>
+                            <div class="col-4"><label class="form-label" for="az">ZIP</label><input id="az" name="Address.PostalCode" value="@Model.Address.PostalCode" class="form-control" maxlength="10" data-address-part></div>
+                            <div class="col-12"><div class="address-matches alert alert-warning d-none mb-0" role="status"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-3 record-header level-opportunity">
+                <div class="card-header"><i class="bi bi-funnel text-level-opportunity me-2"></i>The opportunity</div>
+                <div class="card-body">
+                    <partial name="_DetailFields" model="(Model.Input, Model.Users, Model.Sources, Model.Perils, (List<Oes.Domain.Crm.PipelineStage>?)Model.Stages, Model.Storms)" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create lead</button>
+        <a class="btn btn-outline-secondary" href="/Opportunities">Cancel</a>
+    </div>
+</form>

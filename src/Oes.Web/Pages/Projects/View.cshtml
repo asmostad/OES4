@@ -1,0 +1,199 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Projects.ViewModel
+@using Oes.Domain.Production
+@{
+    var d = Model.Detail;
+    var p = d.Project;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal v) => v.ToString("C2", us);
+    ViewData["Title"] = $"{p.Number} {p.Name}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    var chips = new List<RecordChip>
+    {
+        new(d.Contact.IsOrganization ? "bi-building" : "bi-person", d.Contact.DisplayName, $"/Contacts/View/{d.Contact.Id}"),
+        new("bi-funnel", d.Opportunity.Number, $"/Opportunities/View/{d.Opportunity.Id}"),
+    };
+    if (d.EstimateNumber is not null) chips.Add(new("bi-calculator", d.EstimateNumber, $"/Estimates/View/{p.EstimateId}"));
+    if (p.ClaimId is not null) chips.Add(new("bi-shield-check", "Insurance claim", $"/Claims/View/{p.ClaimId}"));
+    chips.Add(new("bi-person-badge", d.OwnerName ?? "No PM", null));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Project, Title = p.Name, Number = p.Number, Status = d.Stage.Name,
+        Subtitle = $"{d.Property?.SingleLine ?? "No address"} · {d.Trades.Count} trade{(d.Trades.Count == 1 ? "" : "s")} · contract {M(p.ContractValue)}",
+        Parents = parents, Chips = chips,
+    };
+    var stageIdx = d.ProjectStages.FindIndex(s => s.Id == p.StageId);
+    var approvedCos = d.ChangeOrders.Where(c => c.Status == ChangeOrderStatuses.Approved).ToList();
+    var pendingCos = d.ChangeOrders.Count(c => c.Status == ChangeOrderStatuses.Draft);
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="/Workflow"><i class="bi bi-kanban me-1"></i>Workflow board</a>
+    @if (d.CanEdit)
+    {
+        @if (p.RemovedFromBoardAt is null)
+        {
+            <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#remove-form"><i class="bi bi-pause-circle me-1"></i>Remove from board</button>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Restore" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-play-circle me-1"></i>Restore to board</button></form>
+        }
+    }
+</div>
+
+@if (p.RemovedFromBoardAt is not null)
+{
+    <div class="alert alert-warning"><i class="bi bi-pause-circle me-2"></i>Off the board since @p.RemovedFromBoardAt.Value.ToString("MMM d") · @Fmt.Cap(p.RemovalReasonKey)@(p.RemovalNote is null ? "" : ": " + p.RemovalNote)</div>
+}
+<div class="collapse" id="remove-form">
+    <div class="card mb-3 border-warning"><div class="card-body">
+        <form method="post" asp-page-handler="Remove" class="d-flex flex-wrap gap-2 align-items-center">
+            <select name="reasonKey" class="form-select form-select-sm w-auto" required aria-label="Reason"><option value="">Reason…</option>
+                @foreach (var r in Model.RemovalReasons) { <option value="@r.Value">@r.Label</option> }</select>
+            <input name="note" class="form-control form-control-sm" style="max-width:360px" placeholder="Note (optional)" maxlength="500" aria-label="Note">
+            <button class="btn btn-sm btn-warning" type="submit">Remove from board</button>
+        </form>
+    </div></div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="stage-tracker">
+            @for (var i = 0; i < d.ProjectStages.Count; i++)
+            {
+                var s = d.ProjectStages[i];
+                var state = i < stageIdx ? "done" : i == stageIdx ? "current" : "";
+                <form method="post" asp-page-handler="Stage" class="stage-step @state" style="--stage-color:@s.Color">
+                    <input type="hidden" name="stageId" value="@s.Id">
+                    <button type="submit" @(d.CanAdvance && s.Id != p.StageId && p.RemovedFromBoardAt is null ? "" : "disabled") title="@StageRoles.Label(s.Role)">@s.Name</button>
+                </form>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (label, value, icon) in new[]
+    {
+        ("Original contract", M(p.OriginalContract), "bi-pen"),
+        ("Approved change orders", M(p.ApprovedChangeOrders), "bi-plus-slash-minus"),
+        ("Contract value", M(p.ContractValue), "bi-cash-stack"),
+        ("Trades complete", $"{d.Trades.Count(t => t.Trade.CompletedAt is not null)} of {d.Trades.Count}", "bi-layers"),
+    })
+    {
+        <div class="col-sm-6 col-xl-3"><div class="card stat-card"><div class="d-flex align-items-center">
+            <div class="stat-icon bg-success-subtle text-success"><i class="bi @icon"></i></div>
+            <div class="ms-3"><div class="stat-value fs-5">@value</div><div class="stat-label">@label</div></div>
+        </div></div></div>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-layers text-level-trade me-2"></i>Trades</div>
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <thead><tr><th>Trade</th><th>Stage</th><th>Material</th><th>Work</th><th class="text-end">Amount</th><th style="width:180px">Move to</th></tr></thead>
+                    <tbody>
+                        @foreach (var t in d.Trades)
+                        {
+                            <tr class="@(t.Trade.RemovedFromBoardAt is null ? "" : "text-muted")">
+                                <td><span class="trade-dot sm" style="--trade-color:@t.Type.Color"><i class="bi @t.Type.Icon"></i></span>
+                                    <a href="/Projects/Trade/@t.Trade.Id" class="fw-medium">@t.Type.Name</a>
+                                    @if (t.Trade.Description is not null) { <div class="text-muted">@t.Trade.Description</div> }</td>
+                                <td><span class="stage-pill" style="--stage-color:@t.Stage.Color">@t.Stage.Name</span>
+                                    @if (t.IsStale) { <i class="bi bi-hourglass-split text-warning" title="Stale"></i> }
+                                    @if (t.Trade.RemovedFromBoardAt is not null) { <span class="badge bg-secondary-subtle text-secondary">Off board</span> }</td>
+                                <td>@t.Trade.MaterialDate?.ToString("MMM d")</td>
+                                <td>@t.Trade.WorkDate?.ToString("MMM d")</td>
+                                <td class="text-end">@M(t.Trade.Amount)</td>
+                                <td>
+                                    @if (d.CanAdvance && t.Trade.RemovedFromBoardAt is null)
+                                    {
+                                        <form method="post" asp-page-handler="TradeStage" class="d-flex gap-1">
+                                            <input type="hidden" name="tradeId" value="@t.Trade.Id">
+                                            <select name="stageId" class="form-select form-select-sm" aria-label="Move @t.Type.Name to stage">
+                                                @foreach (var s in d.TradeStages) { <option value="@s.Id" selected="@(s.Id == t.Trade.StageId)">@s.Name</option> }
+                                            </select>
+                                            <button class="btn btn-sm btn-outline-primary" type="submit" title="Move"><i class="bi bi-arrow-right"></i></button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex"><i class="bi bi-plus-slash-minus me-2 text-level-project"></i>Change orders
+                @if (pendingCos > 0) { <span class="badge bg-warning-subtle text-warning ms-2">@pendingCos awaiting customer</span> }</div>
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <tbody>
+                        @if (d.ChangeOrders.Count == 0) { <tr><td class="text-muted">No change orders.</td></tr> }
+                        @foreach (var c in d.ChangeOrders)
+                        {
+                            <tr>
+                                <td class="text-nowrap"><a href="/Projects/ChangeOrder/@c.Id">#@c.Sequence</a></td>
+                                <td><a href="/Projects/ChangeOrder/@c.Id" class="text-reset">@c.Description</a>@if (c.IsItemized) { <span class="badge bg-light text-secondary ms-1">Itemized</span> }@if (c.IsInsuranceSupplement) { <span class="badge bg-info-subtle text-info ms-1">Supplement</span> }
+                                    @if (c.Reason is not null) { <div class="text-muted">@c.Reason</div> }
+                                    @if (c.ApprovedByName is not null) { <div class="text-success">Approved by @c.ApprovedByName · @c.DecidedAt?.ToString("MMM d")</div> }</td>
+                                <td class="text-end fw-medium">@M(c.Amount)</td>
+                                <td><span class="est-status @(c.Status == ChangeOrderStatuses.Approved ? "est-signed" : c.Status == ChangeOrderStatuses.Rejected ? "est-declined" : "")">@Fmt.Cap(c.Status)</span></td>
+                                <td class="text-end">
+                                    @if (c.Status == ChangeOrderStatuses.Draft && d.CanEdit && !(c.IsItemized && c.Amount == 0))
+                                    {
+                                        <form method="post" asp-page-handler="DecideChangeOrder" class="d-inline-flex gap-1">
+                                            <input type="hidden" name="changeOrderId" value="@c.Id">
+                                            <input name="approvedByName" value="@d.Contact.DisplayName" class="form-control form-control-sm" style="max-width:150px" maxlength="150" aria-label="Approved by">
+                                            <button class="btn btn-sm btn-success" type="submit" name="approve" value="true">Approved</button>
+                                            <button class="btn btn-sm btn-outline-danger" type="submit" name="approve" value="false">Rejected</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (d.CanEdit)
+            {
+                <div class="card-body border-top">
+                    <form method="post" asp-page-handler="ChangeOrder" class="row g-2 align-items-center">
+                        <div class="col-md-5"><input name="description" class="form-control form-control-sm" placeholder="What's changing" required maxlength="1000" aria-label="Description"></div>
+                        <div class="col-md-2"><input type="number" step="0.01" name="amount" class="form-control form-control-sm" placeholder="Amount, or blank to itemize" title="Leave blank to list items from the price list, products or custom lines" aria-label="Amount"></div>
+                        <div class="col-md-2"><select name="tradeId" class="form-select form-select-sm" aria-label="Trade"><option value="">Whole project</option>
+                            @foreach (var t in d.Trades) { <option value="@t.Trade.Id">@t.Type.Name</option> }</select></div>
+                        <div class="col-md-2"><div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="isSupplement" value="true" id="cosupp"><label class="form-check-label small" for="cosupp">Insurance supplement</label></div></div>
+                        <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit">Add</button></div>
+                        <div class="col-12"><input name="reason" class="form-control form-control-sm" placeholder="Reason (optional)" maxlength="500" aria-label="Reason"></div>
+                    </form>
+                </div>
+            }
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+    <div class="col-xl-5">
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Project, entityId = Model.Id })
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Project, entityId = Model.Id })
+        <div class="card">
+            <div class="card-header">Stage history</div>
+            <ul class="list-group list-group-flush small">
+                @foreach (var h in d.History)
+                {
+                    <li class="list-group-item">
+                        <div>@(h.From is null ? "Started in" : h.From + " →") <strong>@h.To</strong>@if (h.IsAutomatic) { <span class="badge bg-primary-subtle text-primary ms-1"><i class="bi bi-lightning-charge"></i> automatic</span> }</div>
+                        <div class="text-muted">@(h.By ?? "System") · @Fmt.Ago(h.At)@(h.Note is null ? "" : " · " + h.Note)</div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>

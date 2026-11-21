@@ -1,0 +1,74 @@
+@page
+@model Oes.Web.Pages.Admin.RoleEditModel
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New role" : $"Role: {Model.Name}";
+}
+<div class="page-header">
+    <div>
+        <h1>@(isNew ? "New role" : Model.Name)</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item"><a href="/Admin/Roles">Roles</a></li>
+            <li class="breadcrumb-item active">@(isNew ? "New" : "Edit")</li>
+        </ol></nav>
+    </div>
+</div>
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>@Model.Error</div>
+}
+
+<form method="post">
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="Name" class="form-label">Role name</label>
+                    <input asp-for="Name" class="form-control">
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-8">
+                    <label asp-for="Description" class="form-label"></label>
+                    <input asp-for="Description" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var group in Permissions.All.GroupBy(p => p.Group))
+        {
+            <div class="col-md-6 col-xl-4">
+                <div class="card h-100">
+                    <div class="card-header">@group.Key</div>
+                    <div class="card-body">
+                        @foreach (var p in group)
+                        {
+                            var id = "p-" + p.Key.Replace('.', '-');
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="PermissionKeys" value="@p.Key" id="@id"
+                                       checked="@Model.PermissionKeys.Contains(p.Key)">
+                                <label class="form-check-label" for="@id">
+                                    @p.Description
+                                    <code class="d-block small text-muted">@p.Key</code>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save role</button>
+        <a class="btn btn-outline-secondary" href="/Admin/Roles">Cancel</a>
+        @if (!isNew && !Model.IsSystem)
+        {
+            <button type="submit" class="btn btn-outline-danger ms-auto" asp-page-handler="Delete"
+                    data-confirm="Delete this role? This can't be undone."><i class="bi bi-trash me-1"></i> Delete role</button>
+        }
+    </div>
+</form>

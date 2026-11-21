@@ -1,0 +1,24 @@
+@model List<Oes.Infrastructure.Crm.OpportunityBrief>
+@if (Model.Count == 0)
+{
+    <div class="card-body text-muted small">No opportunities yet.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-clickable mb-0 align-middle">
+            <tbody>
+                @foreach (var o in Model)
+                {
+                    <tr data-href="/Opportunities/View/@o.Id">
+                        <td class="text-nowrap"><code class="small">@o.Number</code></td>
+                        <td><a href="/Opportunities/View/@o.Id" class="fw-medium">@o.Name</a>
+                            @if (o.Address is not null) { <div class="small text-muted"><i class="bi bi-house-door"></i> @o.Address</div> }</td>
+                        <td class="text-nowrap"><span class="stage-pill" style="--stage-color:@o.StageColor">@o.StageName</span></td>
+                        <td class="text-muted small text-nowrap">@o.CreatedAt.ToString("MMM d, yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

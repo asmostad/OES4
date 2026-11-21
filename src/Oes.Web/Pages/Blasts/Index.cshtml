@@ -1,0 +1,41 @@
+@page
+@model Oes.Web.Pages.Blasts.IndexModel
+@using Oes.Domain.Communication
+@{
+    ViewData["Title"] = "Email Blasts";
+}
+<div class="page-header">
+    <div>
+        <h1>Email Blasts</h1>
+        <p class="page-subtitle">Marketing email to a group of contacts. Opted-out and unsubscribed people are left out automatically.</p>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/Blasts/Edit"><i class="bi bi-plus-lg me-1"></i> New blast</a>
+</div>
+<div class="card">
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="empty-state"><i class="bi bi-send"></i><h5>No blasts yet</h5><p>Send a seasonal check-in, a storm alert or a referral ask.</p></div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-clickable mb-0 align-middle">
+                <thead><tr><th>Blast</th><th>Status</th><th class="text-end">Sent</th><th class="text-end">Skipped</th><th class="text-end">Failed</th><th>When</th></tr></thead>
+                <tbody>
+                    @foreach (var b in Model.Rows)
+                    {
+                        var href = b.Status == BlastStatuses.Draft ? $"/Blasts/Edit?id={b.Id}" : $"/Blasts/View?id={b.Id}";
+                        <tr data-href="@href">
+                            <td><a href="@href" class="fw-medium">@b.Name</a><div class="small text-muted">from @b.SenderName</div></td>
+                            <td><span class="badge blast-@b.Status">@Fmt.Cap(b.Status)</span></td>
+                            <td class="text-end">@(b.Status == BlastStatuses.Draft ? "" : $"{b.Sent} of {b.Total}")</td>
+                            <td class="text-end">@(b.Skipped == 0 ? "" : b.Skipped)</td>
+                            <td class="text-end">@(b.Failed == 0 ? "" : b.Failed)</td>
+                            <td class="small text-nowrap">@Model.Local[b.Id].ToString("MMM d, h:mm tt")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

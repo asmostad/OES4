@@ -1,0 +1,101 @@
+@page
+@model Oes.Web.Pages.Blasts.EditModel
+@using Oes.Domain.Crm
+@using Oes.Infrastructure.Communication
+@{
+    ViewData["Title"] = Model.Id is null ? "New blast" : Model.Input.Name;
+    var a = Model.Input.Audience;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Blasts">Email Blasts</a></li><li class="breadcrumb-item active">Draft</li></ol></nav>
+    </div>
+</div>
+
+<form method="post" id="blast-form" data-template-form>
+    <input type="hidden" asp-for="Id">
+    <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="card">
+                <div class="card-header">Message</div>
+                <div class="card-body row g-3">
+                    <div class="col-md-6"><label class="form-label" asp-for="Input.Name">Name (only you see this)</label>
+                        <input asp-for="Input.Name" class="form-control" maxlength="150" required placeholder="Spring roof check 2027"></div>
+                    <div class="col-md-6"><label class="form-label" for="tpl">Start from a template</label>
+                        <select id="tpl" asp-for="Input.TemplateId" class="form-select" data-template-picker>
+                            <option value="">None</option>
+                            @foreach (var t in Model.Templates) { <option value="@t.Id" data-subject="@t.Subject" data-body="@t.Body">@t.Name</option> }
+                        </select></div>
+                    <div class="col-12"><label class="form-label" asp-for="Input.Subject">Subject</label>
+                        <input asp-for="Input.Subject" class="form-control" maxlength="300" required data-template-subject></div>
+                    <div class="col-12"><label class="form-label" asp-for="Input.Body">Message</label>
+                        <textarea asp-for="Input.Body" class="form-control" rows="12" maxlength="100000" required data-template-body></textarea>
+                        <div class="form-text">Plain text with merge fields such as <code>{{contact.first_name}}</code>. Your company name, mailing address and an unsubscribe link are added at the bottom.</div></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card mb-3">
+                <div class="card-header">Who gets it</div>
+                <div class="card-body">
+                    <div class="mb-2 small fw-medium">Contacts who are</div>
+                    @foreach (var (key, label) in new[] { (ContactStatuses.Lead, "Leads"), (ContactStatuses.Customer, "Customers"), (ContactStatuses.PastCustomer, "Past customers") })
+                    {
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="Input.Audience.Statuses" value="@key" id="st-@key" checked="@a.Statuses.Contains(key)">
+                            <label class="form-check-label" for="st-@key">@label</label></div>
+                    }
+                    <div class="form-text mt-0 mb-2">None ticked = everyone.</div>
+                    <label class="form-label small" for="storm">Storm</label>
+                    <select id="storm" name="Input.Audience.StormEventId" class="form-select form-select-sm mb-2">
+                        <option value="">Any</option>
+                        @foreach (var s in Model.Storms) { <option value="@s.Id" selected="@(a.StormEventId == s.Id)">@s.Name</option> }
+                    </select>
+                    <label class="form-label small" for="src">Lead source</label>
+                    <select id="src" name="Input.Audience.SourceKey" class="form-select form-select-sm mb-2">
+                        <option value="">Any</option>
+                        @foreach (var s in Model.Sources) { <option value="@s.Value" selected="@(a.SourceKey == s.Value)">@s.Label</option> }
+                    </select>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="Input.Audience.IncludeOrganizations" value="true" id="orgs" checked="@a.IncludeOrganizations">
+                        <label class="form-check-label" for="orgs">Include organizations</label></div>
+                    <label class="form-label small mt-2" asp-for="Input.ThrottlePerMinute">Emails per minute</label>
+                    <input asp-for="Input.ThrottlePerMinute" type="number" min="1" max="@BlastService.MaxThrottle" class="form-control form-control-sm">
+                    <div class="form-text">Sending slowly keeps your mailbox out of spam filters.</div>
+                </div>
+                @if (Model.Preview is { } p)
+                {
+                    <div class="card-footer small">
+                        <div><strong>@p.Eligible</strong> will get it.
+                            @if (p.Blocked > 0) { <span>@p.Blocked left out (opted out, unsubscribed or duplicate address).</span> }
+                            @if (p.NoEmail > 0) { <span>@p.NoEmail have no email.</span> }</div>
+                        @if (p.Sample.Count > 0) { <div class="text-muted mt-1">@string.Join(", ", p.Sample)@(p.Eligible > p.Sample.Count ? "…" : "")</div> }
+                    </div>
+                }
+            </div>
+            <div class="card">
+                <div class="card-body d-grid gap-2">
+                    <button class="btn btn-outline-primary" type="submit">Save draft &amp; update count</button>
+                    @if (Model.Id is not null)
+                    {
+                        <button class="btn btn-outline-secondary" type="submit" asp-page-handler="Test"><i class="bi bi-envelope me-1"></i>Send me a test</button>
+                        <hr class="my-1">
+                        <div class="small fw-medium">Send</div>
+                        <div class="form-check"><input class="form-check-input" type="radio" name="when" value="now" id="w-now" checked><label class="form-check-label" for="w-now">Now</label></div>
+                        <div class="form-check"><input class="form-check-input" type="radio" name="when" value="later" id="w-later"><label class="form-check-label" for="w-later">Later</label></div>
+                        <div class="d-flex gap-2"><input type="date" name="date" class="form-control form-control-sm" min="@Model.Today.ToString("yyyy-MM-dd")" aria-label="Date">
+                            <input type="time" name="at" value="09:00" class="form-control form-control-sm" aria-label="Time"></div>
+                        <button class="btn btn-primary" type="submit" asp-page-handler="Schedule" data-confirm="Send this blast? The audience is locked in when you schedule it."><i class="bi bi-send me-1"></i>Schedule blast</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+@if (Model.Id is not null)
+{
+    <form method="post" asp-page-handler="Delete" class="mt-3 text-end">
+        <input type="hidden" name="Id" value="@Model.Id">
+        <button class="btn btn-sm btn-link text-danger" type="submit" data-confirm="Delete this draft?">Delete draft</button>
+    </form>
+}

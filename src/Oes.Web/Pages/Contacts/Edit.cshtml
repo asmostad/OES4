@@ -1,0 +1,28 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Contacts.EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.DisplayName}";
+}
+<div class="page-header">
+    <div>
+        <h1>Edit @Model.DisplayName</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Contacts">Contacts</a></li>
+            <li class="breadcrumb-item"><a href="/Contacts/View/@Model.Id">@Model.DisplayName</a></li>
+            <li class="breadcrumb-item active">Edit</li>
+        </ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <div class="row"><div class="col-xl-8">
+        <partial name="_ContactFields" model="(Model.Form, Model.Users, Model.Sources, false)" />
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <a class="btn btn-outline-secondary" href="/Contacts/View/@Model.Id">Cancel</a>
+        <button type="submit" asp-page-handler="Archive" class="btn btn-outline-danger ms-auto" formnovalidate
+                data-confirm="Archive this contact? It will be hidden from lists and search."><i class="bi bi-archive me-1"></i>Archive</button>
+    </div>
+</form>

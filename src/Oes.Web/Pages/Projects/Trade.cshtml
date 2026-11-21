@@ -1,0 +1,128 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Projects.TradeModel
+@using Oes.Domain.Production
+@{
+    var d = Model.Detail;
+    var t = d.Trade;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    ViewData["Title"] = $"{d.Type.Name} · {d.Project.Number}";
+    var parents = new List<Crumb>();
+    if (d.Property is not null) parents.Add(new Crumb(RecordLevel.Property, d.Property.Line1, $"/Properties/View/{d.Property.Id}"));
+    parents.Add(new Crumb(RecordLevel.Project, d.Project.Name, $"/Projects/View/{d.Project.Id}"));
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Trade, Title = d.Type.Name, Number = d.Project.Number, Status = d.Stage.Name,
+        Subtitle = (t.Description ?? "") + (t.WorkDate is null ? "" : $" · work {t.WorkDate:ddd MMM d}") + $" · {t.Amount.ToString("C2", us)}",
+        Parents = parents,
+        Chips = [new RecordChip(d.Contact.IsOrganization ? "bi-building" : "bi-person", d.Contact.DisplayName, $"/Contacts/View/{d.Contact.Id}")],
+    };
+    var idx = d.Stages.FindIndex(s => s.Id == t.StageId);
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="/Workflow?trade=@d.Type.Id"><i class="bi bi-kanban me-1"></i>@d.Type.Name board</a>
+    <a class="btn btn-sm btn-outline-primary" href="/Projects/OrderSheet/@d.Trade.Id"><i class="bi bi-truck me-1"></i>Order sheet@(d.Trade.OrderedAt is null ? "" : " · ordered")</a>
+    @if (d.CanEdit)
+    {
+        @if (t.RemovedFromBoardAt is null)
+        {
+            <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#remove-form"><i class="bi bi-pause-circle me-1"></i>Remove from board</button>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Restore" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-play-circle me-1"></i>Restore to board</button></form>
+        }
+    }
+</div>
+@if (t.RemovedFromBoardAt is not null)
+{
+    <div class="alert alert-warning"><i class="bi bi-pause-circle me-2"></i>Off the board · @Fmt.Cap(t.RemovalReasonKey)@(t.RemovalNote is null ? "" : ": " + t.RemovalNote)</div>
+}
+<div class="collapse" id="remove-form">
+    <div class="card mb-3 border-warning"><div class="card-body">
+        <form method="post" asp-page-handler="Remove" class="d-flex flex-wrap gap-2 align-items-center">
+            <select name="reasonKey" class="form-select form-select-sm w-auto" required aria-label="Reason"><option value="">Reason…</option>
+                @foreach (var r in Model.RemovalReasons) { <option value="@r.Value">@r.Label</option> }</select>
+            <input name="note" class="form-control form-control-sm" style="max-width:360px" placeholder="Note (optional)" maxlength="500" aria-label="Note">
+            <button class="btn btn-sm btn-warning" type="submit">Remove from board</button>
+        </form>
+    </div></div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="stage-tracker">
+            @for (var i = 0; i < d.Stages.Count; i++)
+            {
+                var s = d.Stages[i];
+                var state = i < idx ? "done" : i == idx ? "current" : "";
+                <form method="post" asp-page-handler="Stage" class="stage-step @state" style="--stage-color:@s.Color">
+                    <input type="hidden" name="stageId" value="@s.Id">
+                    <button type="submit" @(d.CanAdvance && s.Id != t.StageId && t.RemovedFromBoardAt is null ? "" : "disabled") title="@StageRoles.Label(s.Role)">@s.Name</button>
+                </form>
+            }
+        </div>
+        <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>The material date is needed before deliveries, and the work date before work starts. The project moves forward on its own as its trades do.</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-calendar-event me-2 text-level-trade"></i>Schedule</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Schedule">
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label small" for="md">Material delivery</label><input id="md" type="date" name="materialDate" value="@t.MaterialDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" disabled="@(!d.CanEdit)"></div>
+                        <div class="col-6"><label class="form-label small" for="wd">Work date</label><input id="wd" type="date" name="workDate" value="@t.WorkDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" disabled="@(!d.CanEdit)"></div>
+                        <div class="col-12"><label class="form-label small" for="td">Description</label><input id="td" name="description" value="@t.Description" class="form-control form-control-sm" maxlength="500" disabled="@(!d.CanEdit)"></div>
+                        <div class="col-12"><label class="form-label small" for="tc">Crew note</label><input id="tc" name="crewNote" value="@t.CrewNote" class="form-control form-control-sm" maxlength="500" placeholder="Crew, dumpster, access…" disabled="@(!d.CanEdit)"></div>
+                    </div>
+                    @if (d.CanEdit) { <button class="btn btn-sm btn-primary mt-2" type="submit">Save schedule</button> }
+                </form>
+            </div>
+        </div>
+        @if (d.ChangeOrders.Count > 0)
+        {
+            <div class="card mb-3">
+                <div class="card-header">Change orders on this trade</div>
+                <ul class="list-group list-group-flush small">
+                    @foreach (var c in d.ChangeOrders) { <li class="list-group-item d-flex"><a href="/Projects/ChangeOrder/@c.Id">#@c.Sequence @c.Description</a><span class="ms-auto">@c.Amount.ToString("C2", us) · @Fmt.Cap(c.Status)</span></li> }
+                </ul>
+            </div>
+        }
+        <div class="card mb-3">
+            <div class="card-header">Stage history</div>
+            <ul class="list-group list-group-flush small">
+                @foreach (var h in d.History)
+                {
+                    <li class="list-group-item"><div>@(h.From is null ? "Started in" : h.From + " →") <strong>@h.To</strong></div>
+                        <div class="text-muted">@(h.By ?? "System") · @Fmt.Ago(h.At)@(h.Note is null ? "" : " · " + h.Note)</div></li>
+                }
+            </ul>
+        </div>
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Trade, entityId = Model.Id })
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Trade, entityId = Model.Id })
+    </div>
+    <div class="col-xl-7">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-clipboard-check me-2 text-level-trade"></i>Work orders
+                @if (Model.Subs.Count > 0) { <button class="btn btn-sm btn-link ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#new-wo"><i class="bi bi-plus-lg"></i> New work order</button> }</div>
+            <div class="collapse" id="new-wo"><div class="card-body border-bottom bg-light">
+                <form method="post" asp-page-handler="WorkOrder" class="row g-2">
+                    <div class="col-md-5"><label class="form-label small" for="wsub">Subcontractor</label>
+                        <select id="wsub" name="subcontractorId" class="form-select form-select-sm" required>
+                            @foreach (var s in Model.Subs) { <option value="@s.Id">@s.Name@(s.InsuranceDaysLeft is null or < 0 ? " (insurance missing/expired)" : "")</option> }</select></div>
+                    <div class="col-md-3"><label class="form-label small" for="wdate">Work date</label><input id="wdate" type="date" name="workDate" value="@t.WorkDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+                    <div class="col-md-4"><label class="form-label small" for="warr">Arrival</label><input id="warr" name="arrivalTime" class="form-control form-control-sm" maxlength="50" placeholder="7:30 am"></div>
+                    <div class="col-12"><textarea name="instructions" class="form-control form-control-sm" rows="2" maxlength="5000" placeholder="Instructions for the crew" aria-label="Instructions">@t.CrewNote</textarea></div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Create draft</button></div>
+                </form>
+            </div></div>
+            <partial name="_WorkOrderTable" model="Model.WorkOrders" />
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+</div>

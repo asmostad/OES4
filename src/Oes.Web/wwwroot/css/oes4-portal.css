@@ -1,0 +1,18 @@
+/* Public pages (sub portal) */
+body.portal-body { background: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; }
+.portal-main { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.portal-card { background: #fff; border-radius: 14px; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08); padding: 1.5rem; border-top: 4px solid #0d9488; }
+.portal-company { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #0d9488; }
+.portal-status { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.65rem; border-radius: 999px; background: #e2e8f0; }
+.portal-issued { background: #cffafe; color: #0e7490; }
+.portal-completed, .portal-paid { background: #d1fae5; color: #047857; }
+.portal-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.portal-facts dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600; }
+.portal-facts dd { margin: 0; }
+.portal-action { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+.pre-wrap { white-space: pre-wrap; }
+
+/* Online booking */
+.book-day { margin-bottom: 1rem; }
+.book-times { display: flex; flex-wrap: wrap; gap: .4rem; }
+.book-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

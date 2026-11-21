@@ -1,0 +1,67 @@
+@page
+@model Oes.Web.Pages.Admin.TemplateEditModel
+@using Oes.Domain.Communication
+@using Oes.Infrastructure.Communication
+@{
+    var kind = Model.IsSms ? "Text" : "Email";
+    ViewData["Title"] = (Model.Id is null ? "New " : "Edit ") + kind.ToLowerInvariant() + " template";
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item"><a href="/Admin/Templates/@Model.Input.Channel">@(Model.IsSms ? "Texting & SMS Templates" : "Email Templates")</a></li>
+            <li class="breadcrumb-item active">@(Model.Id is null ? "New" : Model.Input.Name)</li></ol></nav>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+                <form method="post" class="row g-3">
+                    <input type="hidden" asp-for="Input.Channel">
+                    <div class="col-md-8"><label class="form-label" asp-for="Input.Name">Name</label>
+                        <input asp-for="Input.Name" class="form-control" maxlength="150" required></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="Input.Category">Category</label>
+                        <select asp-for="Input.Category" class="form-select">
+                            <option value="@MessagePurposes.Transactional">Everyday (about their job)</option>
+                            <option value="@MessagePurposes.Marketing">Marketing</option>
+                        </select></div>
+                    @if (!Model.IsSms)
+                    {
+                        <div class="col-12"><label class="form-label" asp-for="Input.Subject">Subject</label>
+                            <input asp-for="Input.Subject" class="form-control" maxlength="300" required></div>
+                    }
+                    <div class="col-12"><label class="form-label" asp-for="Input.Body">Message</label>
+                        <textarea asp-for="Input.Body" class="form-control font-monospace" rows="@(Model.IsSms ? 4 : 12)" maxlength="@(Model.IsSms ? TemplateService.SmsMaxLength : 100000)" required data-char-count></textarea>
+                        <div class="form-text">Plain text. @(Model.IsSms ? "Texts over 160 characters are sent as several parts. \"Reply STOP to opt out.\" is added to the first text to each number." : "Line breaks are kept; links are sent as typed.")</div></div>
+                    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" asp-for="Input.IsActive"><label class="form-check-label" asp-for="Input.IsActive">Active (shown when writing messages)</label></div></div>
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">Save template</button>
+                        <a class="btn btn-outline-secondary" href="/Admin/Templates/@Model.Input.Channel">Cancel</a>
+                    </div>
+                </form>
+                @if (Model.Id is not null)
+                {
+                    <form method="post" asp-page-handler="Delete" class="mt-3 text-end">
+                        <button class="btn btn-sm btn-link text-danger" type="submit" data-confirm="Delete this template? Messages already sent keep their text.">Delete template</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">Merge fields</div>
+            <ul class="list-group list-group-flush small">
+                @foreach (var (key, label) in MergeFields.Available)
+                {
+                    <li class="list-group-item d-flex"><code>{{@key}}</code><span class="ms-auto text-muted">@label</span></li>
+                }
+            </ul>
+            <div class="card-body form-text">Fields with no value (say, no property on the record) are left blank.</div>
+        </div>
+    </div>
+</div>

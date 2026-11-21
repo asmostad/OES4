@@ -1,0 +1,50 @@
+@page
+@model Oes.Web.Pages.Measurements.IndexModel
+@using Oes.Infrastructure.Measurements
+@{
+    ViewData["Title"] = "Measurements";
+}
+<div class="page-header">
+    <div>
+        <h1>Measurements</h1>
+        <p class="page-subtitle">Saved per property, structure and trade. Pick a property to measure it, or open a recent entry.</p>
+    </div>
+</div>
+
+<div class="card mb-3" style="max-width:640px">
+    <div class="card-body">
+        <label class="form-label" for="mprop">Measure a property</label>
+        <div class="typeahead" data-typeahead="/api/v1/lookup/properties" data-typeahead-go="/Measurements/Property/{id}">
+            <input type="hidden" data-typeahead-value>
+            <input id="mprop" class="form-control" autocomplete="off" placeholder="Search by street or ZIP…" data-typeahead-input>
+            <div class="typeahead-menu dropdown-menu"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Recently measured</div>
+    <div class="table-responsive">
+        <table class="table table-clickable mb-0 align-middle">
+            <thead><tr><th>Property</th><th>Structure</th><th>Trade</th><th>Summary</th><th>Version</th><th>Source</th><th>Measured</th></tr></thead>
+            <tbody>
+                @if (Model.Recent.Count == 0)
+                {
+                    <tr><td colspan="7"><div class="empty-state"><i class="bi bi-rulers"></i><h5>No measurements yet</h5><p>Open a property and choose Measurements.</p></div></td></tr>
+                }
+                @foreach (var (s, p) in Model.Recent)
+                {
+                    <tr data-href="/Measurements/Set/@s.Id">
+                        <td><a href="/Measurements/Property/@p.Id" class="fw-medium">@p.Line1</a><div class="small text-muted">@p.CityLine</div></td>
+                        <td>@s.StructureName</td>
+                        <td><span class="trade-dot sm" style="--trade-color:@s.TradeColor"><i class="bi @s.TradeIcon"></i></span> @s.TradeName</td>
+                        <td><a href="/Measurements/Set/@s.Id">@s.Headline</a></td>
+                        <td>v@(s.VersionNo)</td>
+                        <td class="text-muted">@MeasurementService.SourceLabel(s.Source)</td>
+                        <td class="text-muted small text-nowrap">@s.MeasuredOn?.ToString("MMM d, yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

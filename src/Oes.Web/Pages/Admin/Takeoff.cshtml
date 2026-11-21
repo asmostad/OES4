@@ -1,0 +1,72 @@
+@page
+@model Oes.Web.Pages.Admin.TakeoffModel
+@using Oes.Domain.Estimating
+@using Oes.Infrastructure.Estimating
+@{
+    ViewData["Title"] = "Takeoff Rules";
+    string N(decimal d) => d.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
+}
+<div class="page-header">
+    <div>
+        <h1>Takeoff Rules</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Takeoff Rules</li></ol></nav>
+    </div>
+    @if (Model.Current is not null) { <a class="btn btn-primary btn-sm" href="/Admin/TakeoffRule?trade=@Model.Current.Code"><i class="bi bi-plus-lg me-1"></i>New rule</a> }
+</div>
+<p class="small text-muted">Each rule turns a measurement into a quantity of one product:
+    <strong>measurement × multiplier × (1 + waste%)</strong>, rounded up (or down, or to the nearest) to a multiple, then held between a minimum and maximum.
+    Conditions and on/off options decide when it applies. A rule's product is fixed, or comes from a <strong>slot</strong> the rep fills on each job
+    from the <a href="/Admin/Products">products</a> tagged with it. Run a takeoff from an estimate section that has measurements.</p>
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var t in Model.Trades)
+    {
+        <li class="nav-item"><a class="nav-link @(Model.Current?.Id == t.Id ? "active" : "")" href="?trade=@t.Code">@t.Name</a></li>
+    }
+</ul>
+
+@if (Model.Current is not null)
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle small">
+                <thead><tr><th style="width:70px">Order</th><th>Rule</th><th>Product</th><th>Quantity</th><th>When</th><th></th></tr></thead>
+                <tbody>
+                    @if (Model.Rules.Count == 0) { <tr><td colspan="6" class="text-muted">No rules for @Model.Current.Name yet.</td></tr> }
+                    @foreach (var row in Model.Rules)
+                    {
+                        var r = row.Rule;
+                        <tr class="@(r.IsActive ? "" : "text-muted")">
+                            <td class="text-nowrap">
+                                <form method="post" asp-page-handler="Move" class="d-inline"><input type="hidden" name="id" value="@r.Id"><input type="hidden" name="direction" value="-1"><input type="hidden" name="trade" value="@Model.Current.Code">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move up"><i class="bi bi-arrow-up"></i></button></form>
+                                <form method="post" asp-page-handler="Move" class="d-inline"><input type="hidden" name="id" value="@r.Id"><input type="hidden" name="direction" value="1"><input type="hidden" name="trade" value="@Model.Current.Code">
+                                    <button class="btn btn-sm btn-link p-0" type="submit" title="Move down"><i class="bi bi-arrow-down"></i></button></form>
+                            </td>
+                            <td><a href="/Admin/TakeoffRule/@r.Id" class="fw-medium">@r.Name</a>@if (!r.IsActive) { <span class="badge bg-secondary-subtle text-secondary ms-1">Off</span> }
+                                @if (r.Notes is not null) { <div class="text-muted">@r.Notes</div> }</td>
+                            <td>
+                                @if (r.Slot is { } slot)
+                                {
+                                    var n = Model.SlotProducts.GetValueOrDefault(slot);
+                                    <span class="badge bg-light text-dark border">slot: @slot</span>
+                                    <div class="@(n == 0 ? "text-warning" : "text-muted")">@(n == 0 ? "No products tagged yet" : $"{n} product{(n == 1 ? "" : "s")}")</div>
+                                }
+                                else { @row.ProductName }
+                            </td>
+                            <td class="text-nowrap">@Model.DriverLabels.GetValueOrDefault(r.Driver, r.Driver) × @N(r.Multiplier)
+                                <div class="text-muted">@(r.UseSuggestedWaste ? $"waste {N(r.WastePercent)}% or the measured" : $"waste {N(r.WastePercent)}%") · @Fmt.Cap(r.RoundMode) to @N(r.RoundTo)@(r.MinQty > 0 ? $" · min {N(r.MinQty)}" : "")@(r.MaxQty is { } mx ? $" · max {N(mx)}" : "")</div></td>
+                            <td>
+                                @if (r.Cond1Field is not null) { <div>@Model.DriverLabels.GetValueOrDefault(r.Cond1Field, r.Cond1Field) @TakeoffOps.All.First(o => o.Key == r.Cond1Op).Label @N(r.Cond1Value ?? 0)</div> }
+                                @if (r.Cond2Field is not null) { <div>@Model.DriverLabels.GetValueOrDefault(r.Cond2Field, r.Cond2Field) @TakeoffOps.All.First(o => o.Key == r.Cond2Op).Label @N(r.Cond2Value ?? 0)</div> }
+                                @if (r.OptionKey is not null) { <div class="text-muted">Option: @r.OptionLabel (@(r.OptionDefaultOn ? "on" : "off") by default)</div> }
+                                @if (r.Cond1Field is null && r.Cond2Field is null && r.OptionKey is null) { <span class="text-muted">Always</span> }
+                            </td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/Admin/TakeoffRule/@r.Id">Edit</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

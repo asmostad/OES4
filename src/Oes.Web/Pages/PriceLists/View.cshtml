@@ -1,0 +1,98 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.PriceLists.ViewModel
+@using Oes.Domain.Estimating
+@{
+    var l = Model.List;
+    ViewData["Title"] = l.Name;
+}
+<div class="page-header">
+    <div>
+        <h1>@l.Name</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/PriceLists">Price Lists</a></li><li class="breadcrumb-item active">@l.Name</li></ol></nav>
+    </div>
+</div>
+
+<div asp-validation-summary="All" class="alert alert-danger"></div>
+
+@if (Model.Imported is { } r)
+{
+    <div class="alert @(r.Errors.Count == 0 ? "alert-success" : "alert-warning")">
+        <strong>Imported @r.Rows.ToString("N0") rows:</strong> @r.PricesCreated.ToString("N0") new prices, @r.PricesUpdated.ToString("N0") updated, @r.ItemsCreated.ToString("N0") new catalog items.
+        @if (r.Errors.Count > 0)
+        {
+            <div class="mt-2 small">@r.Errors.Count row(s) skipped:</div>
+            <ul class="small mb-0">@foreach (var e in r.Errors.Take(20)) { <li>@e</li> }</ul>
+        }
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <form method="get" class="mb-2 d-flex gap-2">
+            <input name="q" value="@Model.Q" class="form-control form-control-sm list-search" placeholder="Search code or description (e.g. RFG 300, drip edge)" aria-label="Search items">
+            <button class="btn btn-sm btn-secondary" type="submit">Search</button>
+        </form>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle small">
+                    <thead><tr><th>Cat</th><th>Code</th><th>Description</th><th>Activity</th><th>Unit</th><th class="text-end" style="width:170px">Unit price</th></tr></thead>
+                    <tbody>
+                        @if (Model.Items.Items.Count == 0) { <tr><td colspan="6" class="text-muted">No items@(string.IsNullOrEmpty(Model.Q) ? " yet. Import a CSV to fill this list." : " match.")</td></tr> }
+                        @foreach (var i in Model.Items.Items)
+                        {
+                            <tr>
+                                <td><code>@i.CategoryCode</code></td>
+                                <td><code>@i.Code</code></td>
+                                <td>@i.Description</td>
+                                <td>@Activities.Label(i.Activity)</td>
+                                <td>@i.Unit</td>
+                                <td class="text-end">
+                                    <form method="post" asp-page-handler="Price" class="d-flex gap-1 justify-content-end">
+                                        <input type="hidden" name="itemId" value="@i.PriceListItemId"><input type="hidden" name="q" value="@Model.Q"><input type="hidden" name="p" value="@Model.PageNumber">
+                                        <input type="number" step="0.01" min="0" name="unitPrice" value="@i.UnitPrice.ToString("0.00")" class="form-control form-control-sm text-end" style="max-width:100px" aria-label="Unit price">
+                                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Save price"><i class="bi bi-check"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <partial name="_Pager" model="(Model.Items.Page, Model.Items.Pages, Model.Items.Total)" />
+    </div>
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header">Settings</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Settings">
+                    <div class="mb-2"><label class="form-label" for="ln">Name</label><input id="ln" name="input.Name" value="@l.Name" class="form-control form-control-sm" required maxlength="150"></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><label class="form-label" for="lr">Region</label><input id="lr" name="input.RegionCode" value="@l.RegionCode" class="form-control form-control-sm" maxlength="30"></div>
+                        <div class="col-6"><label class="form-label" for="le">Effective</label><input id="le" type="date" name="input.EffectiveDate" value="@l.EffectiveDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm"></div>
+                    </div>
+                    <div class="mb-2"><label class="form-label" for="ls">Status</label>
+                        <select id="ls" name="input.Status" class="form-select form-select-sm">
+                            @foreach (var s in PriceListStatuses.All) { <option value="@s" selected="@(l.Status == s)">@Fmt.Cap(s)</option> }
+                        </select>
+                        <div class="form-text">Only active lists can be chosen for new estimates.</div></div>
+                    <div class="mb-2"><label class="form-label" for="lno">Notes</label><textarea id="lno" name="input.Notes" class="form-control form-control-sm" rows="2" maxlength="2000">@l.Notes</textarea></div>
+                    <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><i class="bi bi-filetype-csv me-1"></i>Import prices</div>
+            <div class="card-body small">
+                <form method="post" asp-page-handler="Import" enctype="multipart/form-data">
+                    <input type="file" name="file" accept=".csv" class="form-control form-control-sm mb-2" required aria-label="CSV file">
+                    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-upload me-1"></i>Import</button>
+                </form>
+                <p class="mt-3 mb-1 text-muted">Columns (header row, any order):</p>
+                <code class="d-block">category, code, description, unit, activity, unit_price, material, labor</code>
+                <p class="mt-2 mb-0 text-muted">Activity: <code>replace</code>, <code>remove</code>, <code>r&amp;r</code>, <code>install</code>, <code>d&amp;r</code> or blank.
+                    Matching rows update prices; new codes are added to the catalog. Up to 25,000 rows per file.</p>
+            </div>
+        </div>
+    </div>
+</div>

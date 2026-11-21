@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "oes-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Oes.Web", "--launch-profile", "http"],
+      "port": 5169
+    },
+    {
+      "name": "pich-mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081"],
+      "port": 8081
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+@page
+@model Oes.Web.Pages.Messages.UnmatchedModel
+@using Oes.Domain.Communication
+@{
+    ViewData["Title"] = "Unmatched texts";
+}
+<div class="page-header">
+    <div>
+        <h1>Unmatched texts</h1>
+        <p class="page-subtitle">Texts from numbers that aren't on any contact. File them on a contact, start a new lead, or dismiss them.</p>
+    </div>
+</div>
+
+@if (Model.Threads.Count == 0)
+{
+    <div class="card"><div class="card-body text-center text-muted py-5"><i class="bi bi-check2-circle fs-2 d-block mb-2"></i>Nothing waiting. Every text has found its contact.</div></div>
+}
+@foreach (var t in Model.Threads)
+{
+    var key = t.Number;
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-phone"></i><span class="fw-semibold">@t.Display</span>
+            <span class="badge bg-warning-subtle text-warning">@t.Unread new</span>
+            <span class="small text-muted ms-auto">last @Fmt.Ago(t.LastAt)</span>
+        </div>
+        <div class="card-body">
+            <div class="sms-thread mb-3">
+                @foreach (var m in t.Messages)
+                {
+                    var inbound = m.Direction == Directions.Inbound;
+                    <div class="d-flex @(inbound ? "" : "justify-content-end") mb-1">
+                        <div class="px-3 py-2 rounded-3 small @(inbound ? "bg-light" : "bg-primary-subtle")" style="max-width:75%">
+                            <div class="pre-wrap">@m.Body</div>
+                            <div class="text-muted" style="font-size:.75rem">@Fmt.Ago(m.At)@(inbound ? "" : m.SentByUserId is null ? " · automatic reply" : " · sent")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <form method="post" asp-page-handler="Reply" class="d-flex gap-2 mb-3">
+                <input type="hidden" name="number" value="@key">
+                <input name="body" class="form-control form-control-sm" maxlength="1500" placeholder="Reply by text…" required aria-label="Reply">
+                <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-send me-1"></i>Reply</button>
+            </form>
+            @if (t.Possible.Count > 0)
+            {
+                <div class="alert alert-info small py-2">This number is on an archived contact:
+                    @foreach (var (id, name) in t.Possible) { <a class="ms-1" href="/Contacts/View/@id">@name</a> }</div>
+            }
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <form method="post" asp-page-handler="Link" class="d-flex gap-2">
+                        <input type="hidden" name="number" value="@key">
+                        <div class="typeahead flex-grow-1" data-typeahead="/api/v1/lookup/contacts">
+                            <input type="hidden" name="contactId" data-typeahead-value required>
+                            <input class="form-control form-control-sm" autocomplete="off" data-typeahead-input placeholder="File on a contact…" aria-label="Contact">
+                            <div class="typeahead-menu dropdown-menu"></div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">File here</button>
+                    </form>
+                </div>
+                <div class="col-lg-5">
+                    <form method="post" asp-page-handler="NewLead" class="d-flex flex-wrap gap-2 align-items-center">
+                        <input type="hidden" name="number" value="@key">
+                        <input name="firstName" class="form-control form-control-sm" style="max-width:120px" maxlength="100" placeholder="First name" aria-label="First name">
+                        <input name="lastName" class="form-control form-control-sm" style="max-width:120px" maxlength="100" placeholder="Last name" aria-label="Last name">
+                        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="createOpportunity" value="true" id="lead-@key" checked>
+                            <label class="form-check-label small" for="lead-@key">and a lead</label></div>
+                        <button class="btn btn-sm btn-primary" type="submit">New contact</button>
+                    </form>
+                </div>
+                <div class="col-lg-2 text-lg-end">
+                    <form method="post" asp-page-handler="Dismiss"><input type="hidden" name="number" value="@key">
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Spam or a wrong number">Dismiss</button></form>
+                </div>
+            </div>
+        </div>
+    </div>
+}

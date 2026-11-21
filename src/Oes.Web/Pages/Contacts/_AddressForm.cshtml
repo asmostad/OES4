@@ -1,0 +1,17 @@
+@model (string Kind, Oes.Domain.Crm.ContactAddress? Address)
+@{
+    var a = Model.Address;
+    var id = "addr-" + Model.Kind;
+}
+<form method="post" asp-page-handler="SaveAddress" class="row g-2 mt-1">
+    <input type="hidden" name="kind" value="@Model.Kind">
+    <div class="col-12"><input name="address.Line1" value="@a?.Line1" class="form-control form-control-sm" placeholder="Street address" maxlength="200" required aria-label="Street address" id="@id-line1"></div>
+    <div class="col-12"><input name="address.Line2" value="@a?.Line2" class="form-control form-control-sm" placeholder="Apt, suite, PO box (optional)" maxlength="100" aria-label="Address line 2"></div>
+    <div class="col-6"><input name="address.City" value="@a?.City" class="form-control form-control-sm" placeholder="City" maxlength="100" required aria-label="City"></div>
+    <div class="col-2"><input name="address.State" value="@a?.State" class="form-control form-control-sm" placeholder="ST" maxlength="50" required aria-label="State"></div>
+    <div class="col-4"><input name="address.PostalCode" value="@a?.PostalCode" class="form-control form-control-sm" placeholder="ZIP" maxlength="20" required aria-label="ZIP code"></div>
+    <div class="col-12 d-flex gap-2 align-items-center">
+        <button class="btn btn-sm btn-primary" type="submit">Save</button>
+        <span class="small text-muted">@Oes.Web.Infrastructure.Fmt.Cap(Model.Kind) address</span>
+    </div>
+</form>

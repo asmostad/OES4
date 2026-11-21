@@ -1,0 +1,34 @@
+@* Edit one appointment in place: move it, hand it to someone else, invite teammates, change the details. *@
+@model Oes.Infrastructure.Work.AppointmentRow
+@inject Oes.Infrastructure.Crm.CrmLookups Lookups
+@{
+    var users = await Lookups.UsersAsync();
+    var types = await Lookups.ValuesAsync(Oes.Domain.Work.AppointmentTypes.LookupType);
+    var self = Context.Request.Path + Context.Request.QueryString;
+    var minutes = Model.IsAllDay ? 60 : (int)(Model.EndLocal - Model.StartLocal).TotalMinutes;
+    var durations = new[] { 30, 60, 90, 120, 240, 480 }.Append(minutes).Distinct().Order();
+    var invited = Model.AttendeeIds ?? [];
+    var fid = Model.Id.ToString("N");
+}
+<form method="post" asp-antiforgery="true" action="/Work/Items?handler=UpdateAppointment" class="row g-2 mt-1">
+    <input type="hidden" name="id" value="@Model.Id"><input type="hidden" name="returnUrl" value="@self">
+    <input type="hidden" name="appointment.AttendeesSent" value="true">
+    <div class="col-12"><input name="appointment.Title" value="@Model.Title" class="form-control form-control-sm" required maxlength="300" aria-label="Title"></div>
+    <div class="col-12"><select name="appointment.TypeKey" class="form-select form-select-sm" aria-label="Type">
+        @foreach (var t in types) { <option value="@t.Value" selected="@(t.Value == Model.TypeKey)">@t.Label</option> }</select></div>
+    <div class="col-12"><input type="date" name="appointment.Date" value="@Model.FirstDay.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required aria-label="Date"></div>
+    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="appointment.AllDay" value="true" id="ad-@fid" checked="@Model.IsAllDay">
+        <label class="form-check-label small" for="ad-@fid">All day, through</label></div>
+        <input type="date" name="appointment.EndDate" value="@(Model.IsAllDay ? Model.LastDay.ToString("yyyy-MM-dd") : "")" class="form-control form-control-sm" aria-label="Last day (all day)"></div>
+    <div class="col-6"><input type="time" name="appointment.StartTime" value="@(Model.IsAllDay ? "09:00" : Model.StartLocal.ToString("HH:mm"))" class="form-control form-control-sm" required aria-label="Start"></div>
+    <div class="col-6"><select name="appointment.DurationMinutes" class="form-select form-select-sm" aria-label="Length">
+        @foreach (var m in durations) { <option value="@m" selected="@(m == minutes)">@(m < 60 ? $"{m}m" : m % 60 == 0 ? $"{m / 60}h" : $"{m / 60.0:0.#}h")</option> }</select></div>
+    <div class="col-12"><input name="appointment.Location" value="@Model.Location" class="form-control form-control-sm" maxlength="300" placeholder="Location" aria-label="Location"></div>
+    <div class="col-12"><select name="appointment.AssignedToUserId" class="form-select form-select-sm" aria-label="With">
+        @foreach (var u in users) { <option value="@u.Value" selected="@(u.Value == Model.AssignedToUserId.ToString())">@u.Label</option> }</select></div>
+    <div class="col-12"><label class="form-label small mb-0" for="att-@fid">Also invite</label>
+        <select id="att-@fid" name="appointment.AttendeeUserIds" class="form-select form-select-sm" multiple size="3">
+            @foreach (var u in users.Where(u => u.Value != Model.AssignedToUserId.ToString())) { <option value="@u.Value" selected="@invited.Any(i => i.ToString() == u.Value)">@u.Label</option> }</select></div>
+    <div class="col-12"><textarea name="appointment.Notes" class="form-control form-control-sm" rows="2" maxlength="5000" aria-label="Notes">@Model.Notes</textarea></div>
+    <div class="col-12 text-end"><button class="btn btn-sm btn-primary" type="submit">Save</button></div>
+</form>

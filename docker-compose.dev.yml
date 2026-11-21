@@ -1,0 +1,17 @@
+# Local development database. Start with:  docker compose -f docker-compose.dev.yml up -d
+# Matches ConnectionStrings:Oes in src/Oes.Web/appsettings.Development.json (dev-only password).
+services:
+  mysql:
+    image: mysql:9.6
+    container_name: oes4-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oes4dev
+      MYSQL_DATABASE: oes4
+    volumes:
+      - oes4-mysql:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  oes4-mysql:

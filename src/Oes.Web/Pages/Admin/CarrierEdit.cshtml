@@ -1,0 +1,44 @@
+@page
+@model Oes.Web.Pages.Admin.CarrierEditModel
+@using Oes.Domain.Insurance
+@{
+    ViewData["Title"] = Model.Current is null ? "Add carrier" : $"Edit {Model.Current.Name}";
+    var i = Model.Input;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item"><a href="/Admin/Carriers">Insurance Carriers</a></li><li class="breadcrumb-item active">Edit</li></ol></nav>
+    </div>
+</div>
+@if (Model.IsDefault)
+{
+    <div class="alert alert-info small"><i class="bi bi-info-circle me-1"></i>This is one of Pich's default carriers. What you enter here is saved as your company's version; leave a field blank to use the default.</div>
+}
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <input type="hidden" asp-for="Choice">
+    <div class="row"><div class="col-xl-8">
+        <div class="card mb-3 record-header level-claim"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8"><label class="form-label" for="cn">Name</label><input id="cn" name="Input.Name" value="@i.Name" class="form-control" maxlength="150" required></div>
+                <div class="col-md-4"><label class="form-label" for="cs">Preferred submission</label>
+                    <select id="cs" name="Input.PreferredSubmission" class="form-select">
+                        <option value="">—</option>
+                        @foreach (var m in SubmissionMethods.All) { <option value="@m" selected="@(i.PreferredSubmission == m)">@Fmt.Cap(m)</option> }
+                    </select></div>
+                <div class="col-md-6"><label class="form-label" for="ce">Claims email</label><input id="ce" type="email" name="Input.ClaimsEmail" value="@i.ClaimsEmail" class="form-control" maxlength="254"></div>
+                <div class="col-md-3"><label class="form-label" for="cp">Phone</label><input id="cp" name="Input.Phone" value="@i.Phone" class="form-control" maxlength="40"></div>
+                <div class="col-md-3"><label class="form-label" for="cf">Claims fax</label><input id="cf" name="Input.ClaimsFax" value="@i.ClaimsFax" class="form-control" maxlength="40"></div>
+                <div class="col-md-6"><label class="form-label" for="cw">Website / portal</label><input id="cw" name="Input.Website" value="@i.Website" class="form-control" maxlength="200"></div>
+                <div class="col-md-6"><label class="form-label" for="ca">Mailing address</label><input id="ca" name="Input.Address" value="@i.Address" class="form-control" maxlength="300"></div>
+                <div class="col-12"><label class="form-label" for="cno">Notes for your team</label>
+                    <textarea id="cno" name="Input.Notes" class="form-control" rows="4" maxlength="5000" placeholder="Supplement tips, preferred desk adjusters, required photos…">@i.Notes</textarea></div>
+            </div>
+        </div></div>
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+        <a class="btn btn-outline-secondary" href="/Admin/Carriers">Cancel</a>
+    </div>
+</form>

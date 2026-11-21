@@ -1,0 +1,145 @@
+@page
+@model Oes.Web.Pages.Prospecting.WorkModel
+@using Oes.Domain.Crm
+@{
+    ViewData["Title"] = "Prospecting";
+    var card = Model.Card;
+    var hidden = Model.FilterRoute(Model.Id, Model.Skip);
+}
+<div class="page-header">
+    <div>
+        <h1>Prospecting</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Prospecting">Prospecting</a></li><li class="breadcrumb-item active">Call list</li></ol></nav>
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.Previous is { } prev)
+        {
+            <a class="btn btn-sm btn-outline-secondary" asp-page="/Prospecting/Work" asp-all-route-data="Model.FilterRoute(prev, Model.Skip)"><i class="bi bi-arrow-left me-1"></i>Back</a>
+        }
+        @if (card is not null)
+        {
+            <form method="post" asp-page-handler="Skip">
+                @foreach (var (k, v) in hidden) { <input type="hidden" name="@k" value="@v"> }
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Skip<i class="bi bi-arrow-right ms-1"></i></button>
+            </form>
+        }
+        <form method="post" asp-page-handler="Stop">
+            @foreach (var (k, v) in hidden) { <input type="hidden" name="@k" value="@v"> }
+            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-stop-circle me-1"></i>Stop</button>
+        </form>
+    </div>
+</div>
+
+@if (card is null)
+{
+    <div class="card"><div class="card-body text-center py-5">
+        <i class="bi bi-check2-circle fs-1 text-success"></i>
+        <h2 class="h5 mt-2">You're all caught up</h2>
+        <p class="text-muted small">No leads are due right now@(string.IsNullOrEmpty(Model.Skip) ? "" : " apart from the ones you skipped"). Call-backs come back on their day.</p>
+        <a class="btn btn-outline-primary" href="/Prospecting">Back to the call list</a>
+        @if (!string.IsNullOrEmpty(Model.Skip))
+        {
+            <a class="btn btn-outline-secondary" asp-page="/Prospecting/Work" asp-all-route-data="Model.FilterRoute()">Go through the skipped leads</a>
+        }
+    </div></div>
+}
+else
+{
+    var o = card.Opportunity;
+    var c = card.Contact;
+    var phones = card.Methods.Where(m => ContactMethodKinds.IsPhone(m.Kind) && m.Kind != ContactMethodKinds.Fax).ToList();
+    var emails = card.Methods.Where(m => m.Kind == ContactMethodKinds.Email).ToList();
+    var canAct = Model.HaveLock && card.CanEdit && o.Outcome == Outcomes.Open;
+
+    @if (card.LockedBy is not null)
+    {
+        <div class="alert alert-warning"><i class="bi bi-lock me-2"></i>@card.LockedBy is working this lead right now. Skip it, or come back to it later.</div>
+    }
+    else if (!canAct)
+    {
+        <div class="alert alert-secondary"><i class="bi bi-info-circle me-2"></i>@(o.Outcome != Outcomes.Open ? "This opportunity is closed." : "You can't change this lead.")</div>
+    }
+    @if (c.CautionNote is not null)
+    {
+        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@c.CautionNote</div>
+    }
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-grow-1">
+                            <h2 class="h4 mb-1"><a href="/Contacts/View/@c.Id">@c.DisplayName</a></h2>
+                            <div class="small text-muted">@(card.Property?.SingleLine ?? "No address yet")</div>
+                        </div>
+                        <span class="badge" style="background:@card.Stage.Color">@card.Stage.Name</span>
+                    </div>
+                    <ul class="list-unstyled mt-3 mb-0">
+                        @if (phones.Count == 0) { <li class="text-muted small">No phone number on file.</li> }
+                        @foreach (var m in phones)
+                        {
+                            <li class="mb-2"><a class="btn btn-success btn-sm me-2" href="tel:@m.NormalizedValue"><i class="bi bi-telephone"></i></a>
+                                <span class="fs-5">@m.Value</span> <span class="small text-muted">@Fmt.Cap(m.Label ?? m.Kind)@(m.IsPrimary ? " · primary" : "")</span></li>
+                        }
+                        @foreach (var m in emails)
+                        {
+                            <li class="small"><i class="bi bi-envelope me-2 text-muted"></i><a href="mailto:@m.Value">@m.Value</a></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header"><i class="bi bi-funnel text-level-opportunity me-2"></i><a href="/Opportunities/View/@o.Id">@o.Number</a> @o.Name</div>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Owner</span><span>@(card.OwnerName ?? "Unassigned")</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Attempts</span>
+                        <span>@o.ContactAttempts@(o.LastContactAt is null ? "" : ", last " + Fmt.Ago(o.LastContactAt.Value))</span></li>
+                    @if (card.LastDisposition is not null) { <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Last outcome</span><span>@card.LastDisposition.Name</span></li> }
+                    @if (card.StormName is not null) { <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Storm</span><span>@card.StormName</span></li> }
+                    <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Created</span><span>@Fmt.Ago(o.CreatedAt)</span></li>
+                    @if (o.Description is not null) { <li class="list-group-item">@o.Description</li> }
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card mb-3">
+                <div class="card-header">What happened?</div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="Disposition">
+                        @foreach (var (k, v) in hidden) { <input type="hidden" name="@k" value="@v"> }
+                        <fieldset disabled="@(!canAct)">
+                            <textarea name="note" class="form-control mb-2" rows="2" maxlength="500" placeholder="Notes from the call (optional)" aria-label="Call notes"></textarea>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <label class="small text-muted text-nowrap" for="cb">Call back on</label>
+                                <input id="cb" type="date" name="callBackOn" min="@Model.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm w-auto">
+                                <span class="small text-muted">optional; otherwise the outcome decides</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var d in Model.Dispositions)
+                                {
+                                    <button type="submit" name="dispositionId" value="@d.Id" class="btn btn-outline-dark disposition-btn" style="border-left:6px solid @d.Color"
+                                            title="@(d.IsDoNotContact ? "Off the call list for good; opts out of marketing" : d.RecycleDays is { } days ? $"Back on the list in {days} day{(days == 1 ? "" : "s")}" : "Off the call list")">@d.Name</button>
+                                }
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Call history</div>
+                <ul class="list-group list-group-flush">
+                    @if (card.Calls.Count == 0) { <li class="list-group-item small text-muted">Not called yet.</li> }
+                    @foreach (var h in card.Calls)
+                    {
+                        <li class="list-group-item small">
+                            <span class="badge" style="background:@h.Color">@h.Disposition</span>
+                            <span class="text-muted ms-1">@Fmt.Ago(h.At)@(h.By is null ? "" : " · " + h.By)</span>
+                            @if (h.Note is not null) { <div class="mt-1">@h.Note</div> }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}

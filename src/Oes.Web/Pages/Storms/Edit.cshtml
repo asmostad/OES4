@@ -1,0 +1,47 @@
+@page "{id:guid?}"
+@model Oes.Web.Pages.Storms.EditModel
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New storm" : $"Edit {Model.Input.Name}";
+    var i = Model.Input;
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Storms">Storm Events</a></li><li class="breadcrumb-item active">@(isNew ? "New" : "Edit")</li></ol></nav>
+    </div>
+</div>
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+    <div class="row"><div class="col-xl-8">
+        <div class="card mb-3 record-header level-storm"><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8"><label class="form-label" for="sn">Name</label>
+                    <input id="sn" name="Input.Name" value="@i.Name" class="form-control" maxlength="150" required placeholder="May 14 2026 hail – North Lincoln" autofocus></div>
+                <div class="col-md-4"><label class="form-label" for="sd">Date</label>
+                    <input id="sd" type="date" name="Input.EventDate" value="@i.EventDate.ToString("yyyy-MM-dd")" class="form-control" required></div>
+                <div class="col-md-4"><label class="form-label" for="sp">Peril</label>
+                    <select id="sp" name="Input.PerilKey" class="form-select">
+                        @foreach (var p in Model.Perils) { <option value="@p.Value" selected="@(i.PerilKey == p.Value)">@p.Label</option> }
+                    </select></div>
+                <div class="col-md-4"><label class="form-label" for="sh">Max hail size (in)</label>
+                    <input id="sh" type="number" step="0.25" min="0" max="10" name="Input.MaxHailSizeIn" value="@i.MaxHailSizeIn" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label" for="sw">Max wind (mph)</label>
+                    <input id="sw" type="number" step="1" min="0" max="300" name="Input.MaxWindMph" value="@i.MaxWindMph" class="form-control"></div>
+                <div class="col-12"><label class="form-label" for="sz">ZIP codes hit</label>
+                    <textarea id="sz" name="Input.ZipCodes" class="form-control" rows="2" placeholder="68502, 68503, 68516">@i.ZipCodes</textarea>
+                    <div class="form-text">Used for the canvass list (properties in these ZIPs with no lead on this storm yet) and to suggest the storm on new leads.</div></div>
+                <div class="col-12"><label class="form-label" for="sno">Notes</label>
+                    <textarea id="sno" name="Input.Notes" class="form-control" rows="3" maxlength="5000">@i.Notes</textarea></div>
+            </div>
+        </div></div>
+    </div></div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save storm</button>
+        <a class="btn btn-outline-secondary" href="@(isNew ? "/Storms" : $"/Storms/View/{Model.Id}")">Cancel</a>
+        @if (!isNew)
+        {
+            <button type="submit" asp-page-handler="Archive" formnovalidate class="btn btn-outline-danger ms-auto" data-confirm="Archive this storm? Its leads and claims keep the link."><i class="bi bi-archive me-1"></i>Archive</button>
+        }
+    </div>
+</form>

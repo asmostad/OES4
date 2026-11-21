@@ -1,0 +1,97 @@
+@page
+@model Oes.Web.Pages.Calendar.IndexModel
+@{
+    ViewData["Title"] = "Calendar";
+    var self = Request.Path + Request.QueryString;
+    string Week(int offset) => $"?date={Model.WeekStart.AddDays(offset * 7):yyyy-MM-dd}{(Model.UserFilter is null ? "" : "&user=" + Model.UserFilter)}";
+}
+<div class="page-header">
+    <div>
+        <h1>Calendar</h1>
+        <p class="page-subtitle">Week of @Model.WeekStart.ToString("MMMM d, yyyy"). Microsoft 365 calendar sync comes with the email integration.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-sm btn-outline-secondary" href="@Week(-1)" aria-label="Previous week"><i class="bi bi-chevron-left"></i></a>
+        <a class="btn btn-sm btn-outline-secondary" href="?date=@Model.Today.ToString("yyyy-MM-dd")">This week</a>
+        <a class="btn btn-sm btn-link" href="/Availability"><i class="bi bi-clock me-1"></i>My hours</a>
+        <a class="btn btn-sm btn-outline-secondary" href="@Week(1)" aria-label="Next week"><i class="bi bi-chevron-right"></i></a>
+        <form method="get" class="d-inline">
+            <input type="hidden" name="date" value="@Model.WeekStart.ToString("yyyy-MM-dd")">
+            <select name="user" class="form-select form-select-sm" data-autosubmit aria-label="Whose calendar">
+                <option value="">Everyone I can see</option>
+                @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(Model.UserFilter?.ToString() == u.Value)">@u.Label</option> }
+            </select>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-9">
+        <div class="week-grid">
+            @for (var i = 0; i < 7; i++)
+            {
+                var day = Model.WeekStart.AddDays(i);
+                var appts = Model.Appointments.Where(a => a.Covers(day)).OrderByDescending(a => a.IsAllDay).ThenBy(a => a.StartLocal).ToList();
+                var tasks = Model.DueTasks.Where(t => DateOnly.FromDateTime(t.DueLocal!.Value) == day).ToList();
+                <div class="week-day @(day == Model.Today ? "today" : "")">
+                    <div class="week-day-head"><span>@day.ToString("ddd")</span><strong>@day.Day</strong></div>
+                    @foreach (var a in appts)
+                    {
+                        <div class="cal-item cal-@a.TypeKey @(a.Status == "completed" ? "done" : "") @(a.IsAllDay ? "cal-allday" : "")">
+                            <div class="cal-time">@(a.IsAllDay ? (a.FirstDay == a.LastDay ? "All day" : $"All day · {a.FirstDay:MMM d}–{a.LastDay:MMM d}") : $"{a.StartLocal:h:mm tt}–{a.EndLocal:h:mm}")</div>
+                            <div class="cal-title">@if (a.RecordUrl is not null) { <a href="@a.RecordUrl">@a.Title</a> } else { @a.Title }</div>
+                            <div class="cal-meta">@a.AssigneeName@(a.AttendeeNames is { Count: > 0 } names ? " + " + string.Join(", ", names) : "")@(a.Location is null ? "" : " · " + a.Location)</div>
+                            @if (a.CanEdit && a.Status == "scheduled")
+                            {
+                                <form method="post" asp-antiforgery="true" action="/Work/Items?handler=AppointmentStatus" class="cal-actions">
+                                    <input type="hidden" name="id" value="@a.Id"><input type="hidden" name="returnUrl" value="@self">
+                                    <button class="btn btn-link btn-sm p-0" type="submit" name="status" value="completed">Done</button>
+                                    <button class="btn btn-link btn-sm p-0 text-danger" type="submit" name="status" value="cancelled" data-confirm="Cancel this appointment?">Cancel</button>
+                                    <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#edit-appt-@a.Id.ToString("N")">Edit</button>
+                                </form>
+                                <div class="collapse" id="edit-appt-@a.Id.ToString("N")"><partial name="_AppointmentEditForm" model="a" /></div>
+                            }
+                        </div>
+                    }
+                    @foreach (var b in Model.Busy.Where(b => DateOnly.FromDateTime(b.StartLocal) <= day && DateOnly.FromDateTime(b.EndLocal.AddTicks(-1)) >= day))
+                    {
+                        var whole = b.StartLocal.TimeOfDay == TimeSpan.Zero && b.EndLocal.TimeOfDay == TimeSpan.Zero;
+                        <div class="cal-busy"><i class="bi bi-slash-circle me-1"></i>@(whole ? "All day" : $"{b.StartLocal:h:mm tt}–{b.EndLocal:h:mm tt}") · Busy (@b.Label)@(Model.UserFilter is null && b.UserId != Model.Me ? " · " + (Model.Users.FirstOrDefault(u => u.Value == b.UserId.ToString())?.Label ?? "") : "")</div>
+                    }
+                    @foreach (var t in tasks)
+                    {
+                        <div class="cal-task @(t.IsOverdue ? "overdue" : "")"><i class="bi bi-check2-square"></i> @t.Title</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="card">
+            <div class="card-header">New appointment</div>
+            <div class="card-body">
+                <form method="post" asp-antiforgery="true" action="/Work/Items?handler=Appointment" class="row g-2">
+                    <input type="hidden" name="returnUrl" value="@self">
+                    <div class="col-12"><input name="appointment.Title" class="form-control form-control-sm" placeholder="Title" required maxlength="300" aria-label="Title"></div>
+                    <div class="col-12"><select name="appointment.TypeKey" class="form-select form-select-sm" aria-label="Type">
+                        @foreach (var t in Model.Types) { <option value="@t.Value">@t.Label</option> }</select></div>
+                    <div class="col-12"><input type="date" name="appointment.Date" value="@Model.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required aria-label="Date"></div>
+                    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="appointment.AllDay" value="true" id="new-allday">
+                        <label class="form-check-label small" for="new-allday">All day, through</label></div>
+                        <input type="date" name="appointment.EndDate" class="form-control form-control-sm" aria-label="Last day (all day)"></div>
+                    <div class="col-6"><input type="time" name="appointment.StartTime" value="09:00" class="form-control form-control-sm" required aria-label="Start"></div>
+                    <div class="col-6"><select name="appointment.DurationMinutes" class="form-select form-select-sm" aria-label="Duration">
+                        @foreach (var (m, l) in new[] { (30, "30m"), (60, "1h"), (90, "1.5h"), (120, "2h"), (240, "4h"), (480, "8h") }) { <option value="@m" selected="@(m == 60)">@l</option> }</select></div>
+                    <div class="col-12"><input name="appointment.Location" class="form-control form-control-sm" placeholder="Location" maxlength="300" aria-label="Location"></div>
+                    <div class="col-12"><select name="appointment.AssignedToUserId" class="form-select form-select-sm" aria-label="With">
+                        @foreach (var u in Model.Users) { <option value="@u.Value" selected="@(u.Value == Model.Me?.ToString())">@u.Label</option> }</select></div>
+                    <div class="col-12"><label class="form-label small mb-0" for="new-att">Also invite</label>
+                        <select id="new-att" name="appointment.AttendeeUserIds" class="form-select form-select-sm" multiple size="3">
+                            @foreach (var u in Model.Users) { <option value="@u.Value">@u.Label</option> }</select></div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary w-100" type="submit">Schedule</button></div>
+                </form>
+                <div class="form-text">To tie an appointment to a job, schedule it from that record's page.</div>
+            </div>
+        </div>
+    </div>
+</div>

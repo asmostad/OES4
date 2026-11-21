@@ -1,0 +1,129 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Properties.ViewModel
+@inject Oes.Application.Abstractions.ICurrentUser CurrentUser
+@{
+    var p = Model.Detail.Property;
+    ViewData["Title"] = p.Line1;
+    var current = Model.Detail.Contacts.Where(c => c.IsCurrent).ToList();
+    var past = Model.Detail.Contacts.Where(c => !c.IsCurrent).ToList();
+    var chips = current.Take(3).Select(c => new RecordChip(c.Type == "organization" ? "bi-building" : "bi-person",
+        c.Name + (c.IsPrimary ? "" : " · " + Fmt.Cap(c.RoleKey)), $"/Contacts/View/{c.ContactId}")).ToList();
+    var header = new RecordHeaderModel
+    {
+        Level = RecordLevel.Property,
+        Title = p.Line1 + (p.Line2 is null ? "" : " " + p.Line2),
+        Subtitle = $"{p.CityLine} · {Fmt.Cap(p.Kind)} · {Model.Detail.Structures.Count} structure{(Model.Detail.Structures.Count == 1 ? "" : "s")}",
+        Chips = chips,
+    };
+    var mapQuery = Uri.EscapeDataString(p.SingleLine);
+}
+
+<partial name="_RecordHeader" model="header" />
+
+<div class="record-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="/Properties/Edit/@p.Id"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <a class="btn btn-sm btn-primary" href="/Opportunities/New?propertyId=@p.Id"><i class="bi bi-funnel me-1"></i>New opportunity</a>
+    <a class="btn btn-sm btn-outline-primary" href="/Measurements/Property/@p.Id"><i class="bi bi-rulers me-1"></i>Measurements</a>
+    <a class="btn btn-sm btn-outline-secondary" href="https://www.google.com/maps/search/?api=1&query=@mapQuery" target="_blank" rel="noopener noreferrer"><i class="bi bi-geo-alt me-1"></i>Map</a>
+    @if (p.ArchivedAt is null && await CurrentUser.HasPermissionAsync(Oes.Application.Security.Permissions.RecordsMerge)) { <a class="btn btn-sm btn-outline-secondary" href="/Merge/property/@p.Id"><i class="bi bi-intersect me-1"></i>Merge duplicate</a> }
+</div>
+
+@if (p.ArchivedAt is not null)
+{
+    <div class="alert alert-secondary"><i class="bi bi-archive me-2"></i>This property was @(p.MergedIntoId is null ? "archived" : "merged") on @p.ArchivedAt.Value.ToString("MMM d, yyyy").@if (p.MergedIntoId is { } into) { <a class="ms-1" href="/Properties/View/@into">Open the property it was merged into</a> }</div>
+}
+
+@if (p.Notes is not null)
+{
+    <div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>@p.Notes</div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-4">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-people text-level-contact me-2"></i>Contacts</div>
+            <ul class="list-group list-group-flush">
+                @if (current.Count == 0) { <li class="list-group-item text-muted small">Nobody linked yet.</li> }
+                @foreach (var c in current)
+                {
+                    <li class="list-group-item d-flex align-items-start gap-2">
+                        <i class="bi @(c.Type == "organization" ? "bi-building text-level-organization" : "bi-person text-level-contact") mt-1"></i>
+                        <div class="flex-grow-1">
+                            <a href="/Contacts/View/@c.ContactId" class="fw-medium">@c.Name</a>@if (c.IsPrimary) { <span class="badge bg-primary-subtle text-primary ms-1">Primary</span> }
+                            <div class="small text-muted">@Fmt.Cap(c.RoleKey)@(c.StartedOn is null ? "" : " since " + c.StartedOn.Value.ToString("MMM yyyy"))</div>
+                            <div class="small">@c.Phone @(c.Email is null ? "" : " · ") @c.Email</div>
+                        </div>
+                        <form method="post" asp-page-handler="EndLink">
+                            <input type="hidden" name="linkId" value="@c.LinkId">
+                            <button class="btn btn-link btn-sm text-muted p-0" type="submit" title="End link (sold, moved out…)" data-confirm="End this link? It stays in the history."><i class="bi bi-x-circle"></i></button>
+                        </form>
+                    </li>
+                }
+            </ul>
+            <div class="card-body border-top">
+                <form method="post" asp-page-handler="LinkContact" class="d-flex flex-wrap gap-2">
+                    <div class="typeahead flex-grow-1" data-typeahead="/api/v1/lookup/contacts">
+                        <input type="hidden" name="contactId" data-typeahead-value required>
+                        <input class="form-control form-control-sm" placeholder="Link a contact…" autocomplete="off" data-typeahead-input aria-label="Contact">
+                        <div class="typeahead-menu dropdown-menu"></div>
+                    </div>
+                    <select name="roleKey" class="form-select form-select-sm w-auto" aria-label="Role">
+                        @foreach (var r in Model.Roles) { <option value="@r.Value">@r.Label</option> }
+                    </select>
+                    <div class="form-check align-self-center mb-0">
+                        <input class="form-check-input" type="checkbox" name="isPrimary" value="true" id="lp-primary">
+                        <label class="form-check-label small" for="lp-primary">Primary</label>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Link</button>
+                </form>
+            </div>
+            @if (past.Count > 0)
+            {
+                <div class="card-footer small">
+                    <div class="text-muted mb-1">Past</div>
+                    @foreach (var c in past)
+                    {
+                        <div><a href="/Contacts/View/@c.ContactId">@c.Name</a> <span class="text-muted">· @Fmt.Cap(c.RoleKey) · until @c.EndedOn?.ToString("MMM yyyy")</span></div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-rulers text-level-property me-2"></i>Structures &amp; measurements
+                <a class="btn btn-sm btn-link ms-auto" href="/Measurements/Property/@p.Id">Open</a></div>
+            <ul class="list-group list-group-flush">
+                @foreach (var s in Model.Detail.Structures)
+                {
+                    var sets = Model.Measurements.Where(m => m.StructureId == s.Id).ToList();
+                    <li class="list-group-item">
+                        <div class="d-flex align-items-center"><i class="bi bi-house me-2 text-muted"></i><span class="fw-medium">@s.Name</span></div>
+                        @if (sets.Count == 0) { <div class="small text-muted ms-4">Not measured yet</div> }
+                        @foreach (var m in sets)
+                        {
+                            <div class="small ms-4"><span class="trade-dot sm" style="--trade-color:@m.TradeColor"><i class="bi @m.TradeIcon"></i></span>
+                                @m.TradeName: <a href="/Measurements/Set/@m.Id">@m.Headline</a></div>
+                        }
+                    </li>
+                }
+            </ul>
+            <div class="card-body border-top">
+                <form method="post" asp-page-handler="AddStructure" class="d-flex gap-2">
+                    <input name="name" class="form-control form-control-sm" placeholder="Detached garage, Building B…" maxlength="100" required aria-label="Structure name">
+                    <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">Add</button>
+                </form>
+            </div>
+        </div>
+        @await Component.InvokeAsync("RecordMessaging", new { entityType = Oes.Domain.Crm.EntityTypes.Property, entityId = Model.Id })
+        @await Component.InvokeAsync("RecordAgenda", new { entityType = Oes.Domain.Crm.EntityTypes.Property, entityId = Model.Id })
+    </div>
+
+    <div class="col-xl-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex align-items-center"><i class="bi bi-funnel text-level-opportunity me-2"></i>Opportunities &amp; jobs
+                <a class="btn btn-sm btn-link ms-auto" href="/Opportunities/New?propertyId=@p.Id"><i class="bi bi-plus-lg"></i> New</a></div>
+            <partial name="_OpportunityList" model="Model.Detail.Opportunities" />
+        </div>
+        <partial name="_Timeline" model="Model.Timeline" />
+    </div>
+</div>

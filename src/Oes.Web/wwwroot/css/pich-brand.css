@@ -1,0 +1,68 @@
+/* Pich brand layer (draft 1, 19 Nov 2026), loaded after oes3.css and oes4.css.
+   Core pair: navy #062536 and orange #FF7900; cloud and slate are supporting neutrals.
+   Orange is an accent only: white on orange and orange on white are too low-contrast for text,
+   so buttons and links are navy and orange marks things (active menu item, focus, highlights).
+   Status, stage and trade colours are left alone because they carry meaning. */
+:root {
+    --pich-orange: #FF7900;
+    --pich-orange-ink: #B34F00;   /* orange dark enough for text on white (4.9:1) */
+    --pich-navy: #062536;
+    --pich-navy-2: #0B3A52;
+    --pich-cloud: #F4F6F7;
+    --pich-slate: #526570;
+
+    --oes-primary: var(--pich-navy);
+    --oes-primary-dark: #031822;
+    --oes-primary-light: #FFB070;  /* on navy: the accent text in the sidebar */
+    --oes-primary-bg: #E9EFF2;
+    --oes-body-bg: var(--pich-cloud);
+    --oes-text: var(--pich-navy);
+    --oes-text-secondary: var(--pich-slate);
+    --oes-sidebar-bg: var(--pich-navy);
+    --oes-sidebar-text: #A8B7C0;
+    --oes-sidebar-hover: rgba(255, 255, 255, 0.07);
+    --oes-sidebar-active: rgba(255, 121, 0, 0.14);
+
+    --bs-primary: #062536;
+    --bs-primary-rgb: 6, 37, 54;
+    --bs-link-color: #0E5478;
+    --bs-link-color-rgb: 14, 84, 120;
+    --bs-link-hover-color: #062536;
+    --bs-link-hover-color-rgb: 6, 37, 54;
+    --bs-body-color: #062536;
+    --bs-body-color-rgb: 6, 37, 54;
+    --bs-secondary-color: #526570;
+    --bs-focus-ring-color: rgba(255, 121, 0, 0.35);
+}
+
+body { font-family: 'Inter', Arial, sans-serif; }
+
+/* Sidebar: the white wordmark on navy, an orange marker on the current page. */
+.sidebar-brand a { gap: 0.6rem; }
+.sidebar-brand .pich-wordmark { height: 30px; width: auto; display: block; }
+.sidebar-brand .pich-mark { height: 30px; width: auto; display: none; }
+.menu-item.active a { border-left-color: var(--pich-orange); }
+.menu-item.active a i { color: var(--pich-orange); }
+.sidebar-user-avatar { background: rgba(255, 121, 0, 0.18); }
+
+/* Navy buttons; orange focus ring. */
+.btn-primary { --bs-btn-bg: #062536; --bs-btn-border-color: #062536; --bs-btn-hover-bg: #0B3A52; --bs-btn-hover-border-color: #0B3A52;
+    --bs-btn-active-bg: #031822; --bs-btn-active-border-color: #031822; --bs-btn-disabled-bg: #062536; --bs-btn-disabled-border-color: #062536; }
+.btn-outline-primary { --bs-btn-color: #062536; --bs-btn-border-color: #062536; --bs-btn-hover-bg: #062536; --bs-btn-hover-border-color: #062536;
+    --bs-btn-active-bg: #031822; --bs-btn-active-border-color: #031822; }
+.btn:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    border-color: var(--pich-orange); box-shadow: 0 0 0 0.2rem rgba(255, 121, 0, 0.25);
+}
+.form-check-input:checked { background-color: #062536; border-color: #062536; }
+.nav-tabs .nav-link.active { border-bottom: 2px solid var(--pich-orange); }
+.page-header h1::after {
+    content: ""; display: block; width: 2.25rem; height: 3px; margin-top: 0.35rem; border-radius: 2px; background: var(--pich-orange);
+}
+.text-primary { color: #062536 !important; }
+.bg-primary { background-color: #062536 !important; }
+
+/* Sign-in pages: navy field, white lockup. */
+.auth-body { background: #062536; }
+.login-logo .pich-lockup { height: 84px; width: auto; margin-bottom: 0.75rem; }
+.btn-login { background: #062536; }
+.btn-login:hover { background: #0B3A52; }

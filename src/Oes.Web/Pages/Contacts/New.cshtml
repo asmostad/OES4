@@ -1,0 +1,61 @@
+@page
+@model Oes.Web.Pages.Contacts.NewModel
+@{
+    var org = Model.Form.IsOrganization;
+    ViewData["Title"] = org ? "New organization" : "New contact";
+}
+<div class="page-header">
+    <div>
+        <h1>@ViewData["Title"]</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/Contacts">Contacts</a></li><li class="breadcrumb-item active">New</li></ol></nav>
+    </div>
+</div>
+
+<form method="post">
+    <div asp-validation-summary="All" class="alert alert-danger" data-hide-empty></div>
+
+    @if (Model.Duplicates.Count > 0)
+    {
+        <div class="alert alert-warning">
+            <h6 class="alert-heading"><i class="bi bi-people me-1"></i>This might be someone you already have</h6>
+            <p class="mb-2">These contacts share an email or phone number:</p>
+            <ul class="mb-2">
+                @foreach (var d in Model.Duplicates) { <li><a href="/Contacts/View/@d.Id" target="_blank">@d.Name</a></li> }
+            </ul>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="CreateAnyway" value="true" id="anyway">
+                <label class="form-check-label" for="anyway">It's a different person. Create anyway.</label>
+            </div>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-xl-8">
+            <partial name="_ContactFields" model="(Model.Form, Model.Users, Model.Sources, true)" />
+        </div>
+        <div class="col-xl-4">
+            <div class="card mb-3 level-property record-side">
+                <div class="card-header"><i class="bi bi-house-door me-1 text-level-property"></i>Property (optional)</div>
+                <div class="card-body">
+                    <p class="small text-muted">Add the address now, or later from the contact. An existing property is reused, not duplicated.</p>
+                    <div class="mb-2"><label class="form-label" for="a1">Street</label><input id="a1" name="Address.Line1" value="@Model.Address.Line1" class="form-control form-control-sm" maxlength="200"></div>
+                    <div class="mb-2"><label class="form-label" for="a2">Unit</label><input id="a2" name="Address.Line2" value="@Model.Address.Line2" class="form-control form-control-sm" maxlength="100"></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><label class="form-label" for="ac">City</label><input id="ac" name="Address.City" value="@Model.Address.City" class="form-control form-control-sm" maxlength="100"></div>
+                        <div class="col-3"><label class="form-label" for="as">State</label><input id="as" name="Address.State" value="@Model.Address.State" class="form-control form-control-sm" maxlength="2"></div>
+                        <div class="col-3"><label class="form-label" for="az">ZIP</label><input id="az" name="Address.PostalCode" value="@Model.Address.PostalCode" class="form-control form-control-sm" maxlength="10"></div>
+                    </div>
+                    <label class="form-label" for="ar">Their role</label>
+                    <select id="ar" name="AddressRole" class="form-select form-select-sm">
+                        @foreach (var r in Model.Roles) { <option value="@r.Value" selected="@(Model.AddressRole == r.Value)">@r.Label</option> }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create @(org ? "organization" : "contact")</button>
+        <a class="btn btn-outline-secondary" href="/Contacts">Cancel</a>
+    </div>
+</form>

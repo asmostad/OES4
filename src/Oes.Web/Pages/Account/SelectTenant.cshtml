@@ -1,0 +1,25 @@
+@page
+@model Oes.Web.Pages.Account.SelectTenantModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Choose a company";
+    ViewData["Tagline"] = "Choose the company to work in";
+}
+<h4>Choose a company</h4>
+<p class="subtitle">Your account belongs to more than one company.</p>
+
+<div class="tenant-list">
+    @foreach (var t in Model.Tenants)
+    {
+        <form method="post" class="mb-2">
+            <input type="hidden" name="tenantId" value="@t.TenantId">
+            <input type="hidden" asp-for="ReturnUrl">
+            <button type="submit" class="tenant-choice @(t.TenantId == Model.LastTenantId ? "last" : "")">
+                <i class="bi bi-building"></i>
+                <span class="tenant-name">@t.Name</span>
+                @if (t.TenantId == Model.LastTenantId) { <span class="tenant-last">Last used</span> }
+                <i class="bi bi-chevron-right ms-auto"></i>
+            </button>
+        </form>
+    }
+</div>

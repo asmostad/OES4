@@ -1,0 +1,113 @@
+@page
+@model Oes.Web.Pages.Admin.AutomationModel
+@using Oes.Domain.Work
+@using Oes.Infrastructure.Crm
+@using Oes.Infrastructure.Work
+@{
+    ViewData["Title"] = "Automation";
+    string Does(AutomationRuleRow r) => r.Rule.Action switch
+    {
+        AutomationActions.CreateTask => $"create a task \"{r.Rule.Text}\" for {r.AssigneeName ?? "the owner"}{(r.Rule.DueInDays is { } d ? d == 0 ? ", due today" : $", due in {d} day{(d == 1 ? "" : "s")}" : "")}",
+        AutomationActions.Notify => $"notify {r.AssigneeName ?? "the owner"}: \"{r.Rule.Text}\"",
+        _ => $"enroll the contact in \"{r.SequenceName ?? "(deleted workflow)"}\"",
+    };
+}
+<div class="page-header">
+    <div>
+        <h1>Automation</h1>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Administration</li><li class="breadcrumb-item active">Automation</li></ol></nav>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card mb-3">
+            <div class="card-header">Rules</div>
+            @if (Model.Rules.Count == 0)
+            {
+                <div class="empty-state"><i class="bi bi-lightning-charge"></i><h5>No rules yet</h5><p>For example: when an opportunity enters Inspection Scheduled, give the owner a task to send the pre-inspection text.</p></div>
+            }
+            <ul class="list-group list-group-flush">
+                @foreach (var r in Model.Rules)
+                {
+                    <li class="list-group-item d-flex align-items-start gap-2 @(r.Rule.IsActive ? "" : "text-muted")">
+                        <i class="bi bi-lightning-charge@(r.Rule.IsActive ? "-fill text-warning" : "") mt-1"></i>
+                        <div class="me-auto">
+                            <div class="fw-medium">@r.Rule.Name @if (!r.Rule.IsActive) { <span class="badge bg-secondary-subtle text-secondary">Off</span> }</div>
+                            <div class="small">When @Oes.Web.Pages.Admin.AutomationModel.TriggerLabel(r.Rule.Trigger).ToLowerInvariant() enters <strong>@r.StageName</strong>, @Does(r).</div>
+                            <div class="small text-muted">Ran @r.Runs time@(r.Runs == 1 ? "" : "s")</div>
+                        </div>
+                        <form method="post" asp-page-handler="Toggle"><input type="hidden" name="id" value="@r.Rule.Id"><input type="hidden" name="active" value="@((!r.Rule.IsActive).ToString().ToLowerInvariant())">
+                            <button class="btn btn-sm btn-link p-0" type="submit">@(r.Rule.IsActive ? "Turn off" : "Turn on")</button></form>
+                        <form method="post" asp-page-handler="Delete"><input type="hidden" name="id" value="@r.Rule.Id">
+                            <button class="btn btn-sm btn-link p-0 text-danger" type="submit" data-confirm="Delete this rule?">Delete</button></form>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Recent runs</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th>When</th><th>Rule</th><th>Record</th><th>Result</th></tr></thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.Runs.Count; i++)
+                        {
+                            var run = Model.Runs[i];
+                            <tr>
+                                <td class="small text-nowrap">@Model.RunLocal[i].ToString("MMM d, h:mm tt")</td>
+                                <td>@run.RuleName</td>
+                                <td><a href="@RecordUrls.For(run.EntityType, run.EntityId)">@RecordScope.Describe(run.EntityType)</a></td>
+                                <td class="small">@Fmt.Cap(run.Status)@(run.Detail is null ? "" : ": " + run.Detail)</td>
+                            </tr>
+                        }
+                        @if (Model.Runs.Count == 0) { <tr><td colspan="4" class="small text-muted">Nothing yet. Rules run within a minute of a move (the worker must be running).</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card">
+            <div class="card-header">New rule</div>
+            <div class="card-body">
+                <form method="post" class="row g-2">
+                    <div class="col-12"><label class="form-label small" for="rn">Name</label>
+                        <input id="rn" name="rule.Name" class="form-control form-control-sm" required maxlength="150" placeholder="Pre-inspection text task"></div>
+                    <div class="col-12"><label class="form-label small" for="wh">When</label>
+                        <select id="wh" name="when" class="form-select form-select-sm" required>
+                            @foreach (var g in Model.Stages.GroupBy(s => s.Group))
+                            {
+                                <optgroup label="@g.Key">
+                                    @foreach (var s in g) { <option value="@s.Value">@s.Label</option> }
+                                </optgroup>
+                            }
+                        </select></div>
+                    <div class="col-12"><label class="form-label small" for="ac">Then</label>
+                        <select id="ac" name="rule.Action" class="form-select form-select-sm">
+                            <option value="@AutomationActions.CreateTask">Create a task</option>
+                            <option value="@AutomationActions.Notify">Send a notification</option>
+                            <option value="@AutomationActions.Enroll">Enroll the contact in a nurture workflow</option>
+                        </select></div>
+                    <div class="col-12"><label class="form-label small" for="tx">Task title or notification text</label>
+                        <input id="tx" name="rule.Text" class="form-control form-control-sm" maxlength="500" placeholder="Text {{contact.first_name}} before the inspection"></div>
+                    <div class="col-6"><label class="form-label small" for="dd">Task due in (days)</label>
+                        <input id="dd" type="number" name="rule.DueInDays" min="0" max="365" class="form-control form-control-sm" placeholder="No due date"></div>
+                    <div class="col-6"><label class="form-label small" for="as">For</label>
+                        <select id="as" name="rule.AssigneeUserId" class="form-select form-select-sm">
+                            <option value="">The record's owner</option>
+                            @foreach (var u in Model.Users) { <option value="@u.Value">@u.Label</option> }
+                        </select></div>
+                    <div class="col-12"><label class="form-label small" for="sq">Nurture workflow (for enrolling)</label>
+                        <select id="sq" name="rule.SequenceId" class="form-select form-select-sm">
+                            <option value="">–</option>
+                            @foreach (var s in Model.Sequences) { <option value="@s.Id">@s.Name</option> }
+                        </select></div>
+                    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Add rule</button></div>
+                </form>
+                <div class="form-text">Rules run once per move, within a minute, and only for moves made after the rule is added. The owner is the opportunity's owner, or the project manager for projects and trades.</div>
+            </div>
+        </div>
+    </div>
+</div>

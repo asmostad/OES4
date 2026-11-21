@@ -1,0 +1,196 @@
+@page "{id:guid}"
+@model Oes.Web.Pages.Projects.ChangeOrderModel
+@using Oes.Domain.Production
+@{
+    var d = Model.Detail;
+    var co = d.ChangeOrder;
+    var p = d.Project;
+    var us = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+    string M(decimal x) => x.ToString("C2", us);
+    string Q(decimal x) => x.ToString("#,0.###", us);
+    ViewData["Title"] = $"{p.Number} change order #{co.Sequence}";
+    var draft = co.Status == ChangeOrderStatuses.Draft;
+    var statusClass = co.Status == ChangeOrderStatuses.Approved ? "est-signed" : co.Status == ChangeOrderStatuses.Rejected ? "est-declined" : "";
+    if (Model.Print) { Layout = "_PrintLayout"; }
+}
+
+@if (Model.Print)
+{
+    <div class="print-toolbar no-print">
+        <a href="/Projects/ChangeOrder/@co.Id" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left me-1"></i>Back to the change order</a>
+        <span class="small text-muted">@Fmt.Cap(co.Status)</span>
+        <span class="d-flex gap-2"><a class="btn btn-sm btn-primary" href="?handler=Pdf" data-pdf-download><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+            <button type="button" class="btn btn-sm btn-outline-light" data-print><i class="bi bi-printer me-1"></i>Print</button></span>
+    </div>
+    @if (Model.EmailPanel is { } panel && !Oes.Web.Infrastructure.PdfDocument.IsPdf(ViewData)) { <partial name="_DocumentEmail" model="panel" /> }
+    <article class="proposal">
+        <header class="proposal-head">
+            <div>
+                <div class="proposal-company">@Model.Company.Name</div>
+                @if (Model.Company.PostalAddress is not null) { <div class="small text-muted pre-wrap">@Model.Company.PostalAddress</div> }
+            </div>
+            <div class="text-end">
+                <div class="proposal-title">Change order</div>
+                <div><strong>@p.Number</strong> · #@co.Sequence</div>
+                <div class="small text-muted">@co.CreatedAt.ToString("MMMM d, yyyy")</div>
+            </div>
+        </header>
+        <section class="proposal-parties">
+            <div><div class="label">Customer</div><div class="fw-semibold">@d.CustomerName</div></div>
+            <div><div class="label">Property</div><div>@(d.Address ?? "—")</div></div>
+            <div><div class="label">Project</div><div>@p.Name@(d.TradeName is null ? "" : " · " + d.TradeName)</div></div>
+        </section>
+        <h1 class="proposal-name">@co.Description</h1>
+        @if (co.Reason is not null) { <p class="pre-wrap">@co.Reason</p> }
+        @if (d.Lines.Count > 0)
+        {
+            <table class="table table-sm proposal-lines">
+                <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit price</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                    @foreach (var l in d.Lines)
+                    {
+                        <tr><td>@l.Description</td><td class="text-end text-nowrap">@Q(l.Qty) @l.Unit</td><td class="text-end">@M(l.UnitPrice)</td><td class="text-end">@M(l.Amount)</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <section class="proposal-totals">
+            <table class="table table-sm">
+                <tr><td>Contract before this change</td><td class="text-end">@M(p.ContractValue - (co.Status == ChangeOrderStatuses.Approved ? co.Amount : 0))</td></tr>
+                <tr><td>This change order</td><td class="text-end">@M(co.Amount)</td></tr>
+                <tr class="grand"><td>New contract total</td><td class="text-end">@M(p.ContractValue + (co.Status == ChangeOrderStatuses.Approved ? 0 : co.Amount))</td></tr>
+            </table>
+        </section>
+        <section class="proposal-sign">
+            <div><div class="sign-line">@(co.ApprovedByName ?? "")</div><div class="label">Customer signature@(co.DecidedAt is null || co.Status != ChangeOrderStatuses.Approved ? "" : " · approved " + co.DecidedAt.Value.ToString("MMM d, yyyy"))</div></div>
+            <div><div class="sign-line"></div><div class="label">Date</div></div>
+            <div><div class="sign-line"></div><div class="label">@Model.Company.Name</div></div>
+        </section>
+        <footer class="proposal-foot">@p.Number change order #@co.Sequence</footer>
+    </article>
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>Change order #@co.Sequence <span class="est-status @statusClass fs-6 align-middle">@Fmt.Cap(co.Status)</span></h1>
+            <nav aria-label="breadcrumb"><ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/Projects/View/@p.Id">@p.Number @p.Name</a></li>
+                <li class="breadcrumb-item active">Change order #@co.Sequence</li>
+            </ol></nav>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary" href="/Projects/ChangeOrder/@co.Id?print=true"><i class="bi bi-printer me-1"></i>Print for signature</a>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="fw-semibold fs-5">@co.Description</div>
+                    <div class="small text-muted">@d.CustomerName · @(d.TradeName ?? "Whole project")@(co.IsInsuranceSupplement ? " · insurance supplement" : "")</div>
+                    @if (co.Reason is not null) { <div class="mt-2">@co.Reason</div> }
+                </div>
+            </div>
+
+            @if (co.IsItemized)
+            {
+                <div class="card mb-3">
+                    <div class="card-header">Items <span class="small text-muted">· a negative quantity is a credit</span></div>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead><tr><th>Item</th><th class="text-end" style="width:110px">Qty</th><th class="text-end" style="width:130px">Unit price</th><th class="text-end">Amount</th>@if (d.CanEdit) { <th></th> }</tr></thead>
+                            <tbody>
+                                @if (d.Lines.Count == 0) { <tr><td colspan="5" class="small text-muted">No items yet. Add what's being added or credited below.</td></tr> }
+                                @foreach (var l in d.Lines)
+                                {
+                                    var fid = "l-" + l.Id.ToString("N");
+                                    <tr>
+                                        <td>@if (l.Code is not null) { <span class="small text-muted me-1">@l.Code</span> }@l.Description</td>
+                                        @if (d.CanEdit)
+                                        {
+                                            <td><form method="post" asp-page-handler="UpdateLine" id="@fid"><input type="hidden" name="lineId" value="@l.Id"></form>
+                                                <div class="input-group input-group-sm"><input form="@fid" type="number" step="0.001" name="qty" value="@l.Qty.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control text-end" aria-label="Quantity"><span class="input-group-text">@l.Unit</span></div></td>
+                                            <td><input form="@fid" type="number" step="0.01" min="0" name="unitPrice" value="@l.UnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm text-end" aria-label="Unit price"></td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-end text-nowrap">@Q(l.Qty) @l.Unit</td>
+                                            <td class="text-end">@M(l.UnitPrice)</td>
+                                        }
+                                        <td class="text-end fw-medium @(l.Amount < 0 ? "text-danger" : "")">@M(l.Amount)</td>
+                                        @if (d.CanEdit)
+                                        {
+                                            <td class="text-end text-nowrap">
+                                                <button form="@fid" class="btn btn-sm btn-link p-0 me-2" type="submit" title="Save"><i class="bi bi-check-lg"></i></button>
+                                                <form method="post" asp-page-handler="RemoveLine" class="d-inline"><input type="hidden" name="lineId" value="@l.Id">
+                                                    <button class="btn btn-sm btn-link p-0 text-danger" type="submit" title="Remove"><i class="bi bi-trash"></i></button></form>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot><tr><td colspan="3" class="text-end">Change order total</td><td class="text-end fw-semibold">@M(co.Amount)</td>@if (d.CanEdit) { <td></td> }</tr></tfoot>
+                        </table>
+                    </div>
+                    @if (d.CanEdit)
+                    {
+                        <div class="card-body border-top">
+                            @if (d.PriceListEstimateId is { } eid)
+                            {
+                                <form method="post" asp-page-handler="PriceItem" class="d-flex flex-wrap gap-2 mb-2">
+                                    <div class="typeahead flex-grow-1" style="min-width:260px" data-typeahead="/api/v1/estimates/@eid/price-items">
+                                        <input type="hidden" name="priceListItemId" data-typeahead-value required>
+                                        <input class="form-control form-control-sm" autocomplete="off" data-typeahead-input placeholder="From the job's price list…" aria-label="Price list item">
+                                        <div class="typeahead-menu dropdown-menu"></div>
+                                    </div>
+                                    <input type="number" step="0.001" name="qty" class="form-control form-control-sm" style="max-width:110px" placeholder="Qty" required aria-label="Quantity">
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+                                </form>
+                            }
+                            <form method="post" asp-page-handler="Product" class="d-flex flex-wrap gap-2 mb-2">
+                                <div class="typeahead flex-grow-1" style="min-width:260px" data-typeahead="/api/v1/lookup/products">
+                                    <input type="hidden" name="productId" data-typeahead-value required>
+                                    <input class="form-control form-control-sm" autocomplete="off" data-typeahead-input placeholder="A product…" aria-label="Product">
+                                    <div class="typeahead-menu dropdown-menu"></div>
+                                </div>
+                                <input type="number" step="0.001" name="qty" class="form-control form-control-sm" style="max-width:110px" placeholder="Qty" required aria-label="Quantity">
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+                            </form>
+                            <form method="post" asp-page-handler="Custom" class="d-flex flex-wrap gap-2">
+                                <input name="description" class="form-control form-control-sm flex-grow-1" style="min-width:220px" maxlength="1000" placeholder="Anything else (e.g. Replace rotted fascia)" required aria-label="Description">
+                                <input type="number" step="0.001" name="qty" class="form-control form-control-sm" style="max-width:90px" placeholder="Qty" required aria-label="Quantity">
+                                <input name="unit" class="form-control form-control-sm" style="max-width:70px" maxlength="20" placeholder="EA" aria-label="Unit">
+                                <input type="number" step="0.01" min="0" name="unitPrice" class="form-control form-control-sm" style="max-width:120px" placeholder="Unit price" required aria-label="Unit price">
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <div class="col-xl-4">
+            <div class="card">
+                <div class="card-header">Contract</div>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between"><span>Current contract</span><span>@M(p.ContractValue)</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>This change order</span><span class="fw-semibold">@M(co.Amount)</span></li>
+                    @if (draft) { <li class="list-group-item d-flex justify-content-between"><span>If approved</span><span class="fw-semibold">@M(p.ContractValue + co.Amount)</span></li> }
+                    @if (co.ApprovedByName is not null) { <li class="list-group-item text-success">Approved by @co.ApprovedByName · @co.DecidedAt?.ToString("MMM d, yyyy")</li> }
+                </ul>
+                @if (draft && p.ArchivedAt is null)
+                {
+                    <div class="card-body border-top">
+                        <form method="post" asp-page-handler="Decide" class="d-flex flex-column gap-2">
+                            <label class="small text-muted" for="co-approver">Customer's decision</label>
+                            <input id="co-approver" name="approvedByName" value="@d.CustomerName" class="form-control form-control-sm" maxlength="150" aria-label="Approved by">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-success" type="submit" name="approve" value="true">Approved</button>
+                                <button class="btn btn-sm btn-outline-danger" type="submit" name="approve" value="false">Rejected</button>
+                            </div>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}

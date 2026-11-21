@@ -1,0 +1,42 @@
+/* Proposal and other printed documents */
+body.print-body { background: #e2e8f0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; }
+.print-toolbar {
+    position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem; align-items: center; justify-content: space-between;
+    padding: 0.6rem 1rem; background: #1e293b; color: #fff;
+}
+.print-toolbar .text-muted { color: #cbd5e1 !important; }
+.proposal {
+    max-width: 8.5in; margin: 1.5rem auto; background: #fff; padding: 0.75in;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-size: 10.5pt;
+}
+.proposal-head { display: flex; justify-content: space-between; border-bottom: 3px solid #d97706; padding-bottom: 0.75rem; margin-bottom: 1rem; }
+.proposal-company { font-size: 16pt; font-weight: 700; }
+.proposal-title { font-size: 18pt; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.06em; }
+.proposal-parties { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.proposal .label { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-weight: 600; }
+.proposal-name { font-size: 14pt; font-weight: 700; margin: 0.75rem 0; }
+.proposal-section { margin-bottom: 1rem; break-inside: avoid-page; }
+.proposal-section-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #e2e8f0; margin-bottom: 0.4rem; }
+.proposal-section h2, .proposal-terms h2 { font-size: 11.5pt; font-weight: 700; margin: 0 0 0.25rem; }
+.proposal-lines { font-size: 9.5pt; }
+.proposal-lines thead th { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+.proposal-totals { display: flex; justify-content: flex-end; }
+.proposal-totals table { width: 50%; }
+.proposal-totals .grand td { font-size: 13pt; font-weight: 700; border-top: 2px solid #1e293b; }
+.proposal-terms { font-size: 8.5pt; color: #334155; margin-top: 1rem; break-inside: avoid-page; }
+.proposal-sign { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 1.5rem; margin-top: 2.5rem; break-inside: avoid; }
+.sign-line { border-bottom: 1px solid #1e293b; height: 2rem; font-family: cursive; font-size: 14pt; }
+.proposal-foot { margin-top: 2rem; font-size: 7pt; color: #94a3b8; text-align: right; }
+.pre-wrap { white-space: pre-wrap; }
+
+@media print {
+    @page { size: letter; margin: 0.5in; }
+    body.print-body { background: #fff; }
+    .no-print { display: none !important; }
+    .proposal { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+}
+
+/* Email the proposal (screen only) */
+.proposal-email { max-width: 8.5in; margin: 1rem auto 0; background: #fff; padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.proposal-email > summary { list-style: none; }
+.proposal-email > summary::-webkit-details-marker { display: none; }
