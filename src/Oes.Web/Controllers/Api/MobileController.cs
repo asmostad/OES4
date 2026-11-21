@@ -12,12 +12,13 @@ public sealed record MyDayResponse(int Overdue, int DueToday, IReadOnlyList<Task
 public sealed record DoneRequest(bool Done);
 public sealed record AppointmentStatusInput(string? Status);
 public sealed record ContactEditInput(string? FirstName, string? LastName, string? OrganizationName, List<ContactMethodDto>? Methods);
+public sealed record LeadEditInput(string? Name, decimal? ExpectedValue, bool IsInsurance, string? SourceKey, string? Description);
 public sealed record NoteRequest(string Body);
 public sealed record CreatedResponse(Guid Id);
 public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary);
 public sealed record OpportunityDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome,
     decimal? ExpectedValue, string? OwnerName, Guid ContactId, string ContactName, IReadOnlyList<ContactMethodDto> ContactMethods,
-    Guid? PropertyId, string? Address, string? Description, bool CanEdit);
+    Guid? PropertyId, string? Address, string? Description, bool CanEdit, bool IsInsurance = false, string? SourceKey = null);
 public sealed record StageOption(Guid Id, string Name, string Color, string Outcome);
 public sealed record LinkDto(Guid Id, string Label, string? Role);
 public sealed record OpportunityBriefDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome, string? Address);
@@ -87,7 +88,7 @@ public sealed class MobileController(WorkService work, OpportunityService opport
             .Select(m => new ContactMethodDto(m.Kind, m.Value, m.IsPrimary)).ToListAsync(ct);
         var o = d.Opportunity;
         return new OpportunityDto(o.Id, o.Number, o.Name, d.Stage.Name, d.Stage.Color, o.Outcome, o.ExpectedValue, d.OwnerName,
-            d.Contact.Id, d.Contact.DisplayName, methods, d.Property?.Id, d.Property?.SingleLine, o.Description, d.CanEdit);
+            d.Contact.Id, d.Contact.DisplayName, methods, d.Property?.Id, d.Property?.SingleLine, o.Description, d.CanEdit, o.IsInsurance, o.SourceKey);
     }
 
     [HttpGet("records/{entityType}/{id:guid}/timeline")]
@@ -135,6 +136,31 @@ public sealed class MobileController(WorkService work, OpportunityService opport
             Methods = (input.Methods ?? []).Where(m => !string.IsNullOrWhiteSpace(m.Value))
                 .Select(m => new MethodInput(m.Kind, m.Value.Trim(), labels.GetValueOrDefault((m.Kind, m.Value.Trim())), m.IsPrimary)).ToList(),
         }, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// A lead's details from the field: its name, expected value, whether it's insurance, how it came in, and the
+    /// description. Owner, stage, storm and the rest stay as they are (turning insurance off clears its peril and storm, as on the web).
+    /// </summary>
+    [HttpPut("opportunities/{id:guid}")]
+    public async Task<IActionResult> UpdateOpportunity(Guid id, LeadEditInput input, CancellationToken ct)
+    {
+        var o = (await opportunities.GetAsync(id, ct)).Opportunity;
+        await opportunities.UpdateAsync(id, new OpportunityInput
+        {
+            Name = input.Name ?? o.Name, PrimaryContactId = o.PrimaryContactId, PropertyId = o.PropertyId, OwnerUserId = o.OwnerUserId,
+            SourceKey = input.SourceKey ?? o.SourceKey, ExpectedValue = input.ExpectedValue, IsInsurance = input.IsInsurance,
+            PerilKey = o.PerilKey, DateOfLoss = o.DateOfLoss, StormEventId = o.StormEventId, Description = input.Description,
+        }, ct);
+        return NoContent();
+    }
+
+    /// <summary>Edits a task you can edit: what, notes, priority and when it's due.</summary>
+    [HttpPut("tasks/{id:guid}")]
+    public async Task<IActionResult> UpdateTask(Guid id, TaskInput input, CancellationToken ct)
+    {
+        await work.UpdateTaskAsync(id, input, ct);
         return NoContent();
     }
 

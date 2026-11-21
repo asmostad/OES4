@@ -48,6 +48,8 @@ function Navigator() {
         <Stack.Screen name="hours" options={{ title: 'Booking hours' }} />
         <Stack.Screen name="appointment/[id]" options={{ title: 'Appointment' }} />
         <Stack.Screen name="edit-contact" options={{ title: 'Edit contact', presentation: 'modal' }} />
+        <Stack.Screen name="edit-lead" options={{ title: 'Edit lead', presentation: 'modal' }} />
+        <Stack.Screen name="edit-task" options={{ title: 'Edit task', presentation: 'modal' }} />
         <Stack.Screen name="texts" options={{ title: 'Unknown numbers' }} />
         <Stack.Screen name="change-order/[id]" options={{ title: 'Change order' }} />
         <Stack.Screen name="new-change-order" options={{ title: 'Change order', presentation: 'modal' }} />

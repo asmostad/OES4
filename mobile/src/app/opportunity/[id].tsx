@@ -87,6 +87,11 @@ export default function OpportunityScreen() {
           <Action icon="navigate" text="Directions" onPress={maps ? () => Linking.openURL(maps) : undefined} />
         </View>
         {opp.description && <Text style={[styles.body, { marginTop: space.md }]}>{opp.description}</Text>}
+        {opp.canEdit && (
+          <Text style={{ color: colors.navy, marginTop: space.md }} onPress={() => router.push({ pathname: '/edit-lead', params: { id } })} accessibilityRole="button">
+            Edit details
+          </Text>
+        )}
       </Card>
 
       <Message text={actionError} />

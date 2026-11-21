@@ -46,6 +46,13 @@ export function TaskItem({ task, last, onChanged, onError }: { task: Task; last?
             {task.isOverdue && !done ? 'Overdue · ' : ''}{due}{task.priority === 'high' ? ' · High priority' : ''}
           </Text>
         </Pressable>
+        {task.canEdit && !done && (
+          <Ionicons name="create-outline" size={20} color={colors.muted} accessibilityLabel={`Edit ${task.title}`}
+            onPress={() => router.push({
+              pathname: '/edit-task',
+              params: { id: task.id, title: task.title, notes: task.notes ?? '', due: task.dueLocal?.slice(0, 10) ?? '', priority: task.priority },
+            })} />
+        )}
       </View>
     </Row>
   );

@@ -29,7 +29,7 @@ export type ContactMethod = { kind: string; value: string; isPrimary: boolean };
 export type Opportunity = {
   id: string; number: string; name: string; stageName: string; stageColor: string; outcome: string; expectedValue: number | null;
   ownerName: string | null; contactId: string; contactName: string; contactMethods: ContactMethod[];
-  propertyId: string | null; address: string | null; description: string | null; canEdit: boolean;
+  propertyId: string | null; address: string | null; description: string | null; canEdit: boolean; isInsurance?: boolean; sourceKey?: string | null;
 };
 export type TimelineItem = {
   itemType: string; id: string; at: string; authorName: string | null; text: string; entityType: string; entityId: string;

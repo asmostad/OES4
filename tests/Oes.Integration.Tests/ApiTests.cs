@@ -442,4 +442,34 @@ public sealed class ApiTests(MySqlFixture fx)
         var other = await SignedInAsync(await fx.AddMemberAsync(t.Id, "Sales Rep"), t.Id);
         Assert.NotEqual(HttpStatusCode.NoContent, (await other.PutAsJsonAsync($"/api/v1/contacts/{id}", new { lastName = "Hacked" })).StatusCode);
     }
+
+    [Fact]
+    public async Task Field_app_edits_a_leads_details_and_a_task()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        Guid opp, contact;
+        await using (var s = fx.ScopeAs(t.Id, rep))
+        {
+            contact = await s.Get<ContactService>().CreateAsync(new ContactInput { FirstName = "Lee", LastName = "Edits", OwnerUserId = rep.Id });
+            opp = await s.Get<OpportunityService>().CreateAsync(new OpportunityInput { PrimaryContactId = contact, OwnerUserId = rep.Id, SourceKey = "door_knock" });
+        }
+        var api = await SignedInAsync(rep, t.Id);
+        var put = await api.PutAsJsonAsync($"/api/v1/opportunities/{opp}", new { name = "Lee Edits – full roof", expectedValue = 18500m, isInsurance = true, description = "Hail, north slope" });
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        var o = await Json(await api.GetAsync($"/api/v1/opportunities/{opp}"));
+        Assert.Equal(("Lee Edits – full roof", 18500m, true, "door_knock", "Hail, north slope"), (o.GetProperty("name").GetString(), o.GetProperty("expectedValue").GetDecimal(),
+            o.GetProperty("isInsurance").GetBoolean(), o.GetProperty("sourceKey").GetString(), o.GetProperty("description").GetString()));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await api.PutAsJsonAsync($"/api/v1/opportunities/{opp}", new { expectedValue = -5m })).StatusCode);
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/tasks") { Content = JsonContent.Create(new { title = "Call back", entityType = "opportunity", entityId = opp }) };
+        req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var task = (await Json(await api.SendAsync(req))).GetProperty("id").GetGuid();
+        var due = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"/api/v1/tasks/{task}", new { title = "Call back about the adjuster", priority = "high", dueDate = due.ToString("yyyy-MM-dd"), notes = "After 5" })).StatusCode);
+        var row = (await Json(await api.GetAsync("/api/v1/tasks"))).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == task);
+        Assert.Equal(("Call back about the adjuster", "high", "After 5"), (row.GetProperty("title").GetString(), row.GetProperty("priority").GetString(), row.GetProperty("notes").GetString()));
+        Assert.StartsWith(due.ToString("yyyy-MM-dd"), row.GetProperty("dueLocal").GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await api.PutAsJsonAsync($"/api/v1/tasks/{task}", new { title = " " })).StatusCode);
+    }
 }
