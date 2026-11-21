@@ -245,6 +245,17 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type ChangeOrderItem = {
+  id: string; sequence: number; description: string; amount: number; status: 'draft' | 'approved' | 'rejected' | string; isItemized: boolean;
+  isInsuranceSupplement: boolean; tradeId: string | null; approvedByName: string | null; decidedAt: string | null;
+};
+export type ChangeOrderList = { canAdd: boolean; contractValue: number; items: ChangeOrderItem[] };
+export type ChangeOrderDetail = {
+  id: string; sequence: number; projectId: string; projectNumber: string; customerName: string; address: string | null; tradeName: string | null;
+  description: string; reason: string | null; amount: number; status: string; isItemized: boolean; isInsuranceSupplement: boolean;
+  approvedByName: string | null; decidedAt: string | null;
+  lines: { id: string; code: string | null; description: string; qty: number; unit: string; unitPrice: number; amount: number }[]; canDecide: boolean;
+};
 export type AssistantHome = { configured: boolean; conversations: { id: string; title: string; lastMessageAt: string }[] };
 export type ChatLine = { role: 'user' | 'assistant' | string; text: string; at: string; tools: string[] };
 export type Conversation = {

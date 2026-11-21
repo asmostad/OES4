@@ -98,15 +98,10 @@ builder.Services.AddRazorPages(o => o.Conventions
     .AllowAnonymousToPage("/Portal/Booking")
     .AllowAnonymousToFolder("/Book")
     .AllowAnonymousToPage("/Error")
-    // The field app fetches proposal PDFs here with its bearer token (handler=Copy); tokens only count under /api.
-    // Match-only, so links and redirects to the page keep using /Estimates/Proposal.
-    .AddPageRouteModelConvention("/Estimates/Proposal", model => model.Selectors.Add(new Microsoft.AspNetCore.Mvc.ApplicationModels.SelectorModel
-    {
-        AttributeRouteModel = new Microsoft.AspNetCore.Mvc.ApplicationModels.AttributeRouteModel
-        {
-            Template = "api/v1/estimate-versions/{id:guid}/proposal", SuppressLinkGeneration = true,
-        },
-    })))
+    // The field app fetches print documents here with its bearer token (tokens only count under /api): proposals
+    // (handler=Copy) and change orders (handler=Pdf). Match-only, so links and redirects keep using the page's own URL.
+    .AddApiPageRoute("/Estimates/Proposal", "api/v1/estimate-versions/{id:guid}/proposal")
+    .AddApiPageRoute("/Projects/ChangeOrder", "api/v1/change-orders/{id:guid}/document"))
     .AddMvcOptions(o => o.Filters.Add<Oes.Web.Infrastructure.SavedViewDefaultFilter>());
 builder.Services.AddControllers(o =>
 {

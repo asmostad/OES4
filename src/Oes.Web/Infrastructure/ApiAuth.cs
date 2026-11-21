@@ -19,6 +19,23 @@ public static class ApiAuth
         && http.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
 }
 
+public static class ApiPageRoutes
+{
+    /// <summary>
+    /// Also serves a page at an /api address, so the field app's bearer token works on it (for its PDF handlers).
+    /// Match-only: links and redirects to the page keep using its own URL. Same authorization as the page.
+    /// </summary>
+    public static Microsoft.AspNetCore.Mvc.ApplicationModels.PageConventionCollection AddApiPageRoute(
+        this Microsoft.AspNetCore.Mvc.ApplicationModels.PageConventionCollection conventions, string page, string template)
+    {
+        conventions.AddPageRouteModelConvention(page, model => model.Selectors.Add(new Microsoft.AspNetCore.Mvc.ApplicationModels.SelectorModel
+        {
+            AttributeRouteModel = new Microsoft.AspNetCore.Mvc.ApplicationModels.AttributeRouteModel { Template = template, SuppressLinkGeneration = true },
+        }));
+        return conventions;
+    }
+}
+
 /// <summary>
 /// Anti-forgery for cookie-authenticated API calls only. A cross-site page can't attach an
 /// Authorization header (no CORS here), so bearer calls need no CSRF token. Respects [IgnoreAntiforgeryToken].

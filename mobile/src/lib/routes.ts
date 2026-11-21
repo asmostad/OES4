@@ -12,6 +12,8 @@ export function routeFor(url: unknown): Href | null {
   if (contact) return `/contact/${contact}`;
   const project = m('Projects');
   if (project) return `/project/${project}`;
+  const changeOrder = new RegExp(`^/Projects/ChangeOrder/${ID}`, 'i').exec(u)?.[1];
+  if (changeOrder) return `/change-order/${changeOrder}`;
   const trade = new RegExp(`^/Projects/Trade/${ID}`, 'i').exec(u)?.[1];
   if (trade) return `/trade/${trade}`;
   const workOrder = m('WorkOrders');

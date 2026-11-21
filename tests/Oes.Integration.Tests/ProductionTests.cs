@@ -390,4 +390,60 @@ public sealed class ProductionTests(MySqlFixture fx)
         Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.GetAsync($"/api/v1/trades/{roof}")).StatusCode);
         Assert.Empty((await Json(await other.GetAsync("/api/v1/trades"))).EnumerateArray());
     }
+
+    [Fact]
+    public async Task Field_app_adds_a_change_order_on_site_gets_it_approved_and_opens_its_pdf()
+    {
+        var sold = await SignedEstimateAsync();
+        Guid id, roof;
+        await using (var s = fx.ScopeAs(sold.Tenant, sold.Admin))
+        {
+            var svc = s.Get<ProjectService>();
+            id = await svc.CreateFromEstimateAsync(sold.Estimate);
+            roof = (await svc.GetAsync(id)).Trades.Single(t => t.Type.Code == "roofing").Trade.Id;
+        }
+        var api = await ApiAs(sold.Admin);
+        Task<HttpResponseMessage> Post(string url, object body)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            return api.SendAsync(req);
+        }
+
+        var before = await Json(await api.GetAsync($"/api/v1/projects/{id}/change-orders"));
+        Assert.True(before.GetProperty("canAdd").GetBoolean());
+        Assert.Empty(before.GetProperty("items").EnumerateArray());
+        var contract = before.GetProperty("contractValue").GetDecimal();
+
+        // Rotten decking found on site: a change order on the roof, then the customer approves it there.
+        var noAmount = await Post($"/api/v1/projects/{id}/change-orders", new { tradeId = roof, description = "Replace rotten decking", amount = 0 });
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, noAmount.StatusCode);
+        var created = await Post($"/api/v1/projects/{id}/change-orders", new { tradeId = roof, description = "Replace 6 sheets of rotten decking", amount = 540m, reason = "Found at tear-off" });
+        Assert.Equal(System.Net.HttpStatusCode.OK, created.StatusCode);
+        var coId = (await Json(created)).GetProperty("id").GetGuid();
+        var co = await Json(await api.GetAsync($"/api/v1/change-orders/{coId}"));
+        Assert.Equal(("draft", 1, true), (co.GetProperty("status").GetString(), co.GetProperty("sequence").GetInt32(), co.GetProperty("canDecide").GetBoolean()));
+        Assert.Equal("Roofing", co.GetProperty("tradeName").GetString());
+
+        var unnamed = await Post($"/api/v1/change-orders/{coId}/decide", new { approve = true });
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, unnamed.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, (await Post($"/api/v1/change-orders/{coId}/decide", new { approve = true, approvedByName = "Dee Duction" })).StatusCode);
+        co = await Json(await api.GetAsync($"/api/v1/change-orders/{coId}"));
+        Assert.Equal(("approved", "Dee Duction", false), (co.GetProperty("status").GetString(), co.GetProperty("approvedByName").GetString(), co.GetProperty("canDecide").GetBoolean()));
+        Assert.Equal(contract + 540m, (await Json(await api.GetAsync($"/api/v1/projects/{id}/change-orders"))).GetProperty("contractValue").GetDecimal());
+
+        // Its PDF downloads with the bearer token; with no browser on the server, the reason comes back, not a redirect.
+        fx.Pdf.Reset();
+        var pdf = await api.GetAsync($"/api/v1/change-orders/{coId}/document?handler=Pdf");
+        Assert.Equal(System.Net.HttpStatusCode.OK, pdf.StatusCode);
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("Replace 6 sheets of rotten decking", fx.Pdf.LastHtml);
+        fx.Pdf.Unavailable = true;
+        try
+        {
+            var refused = await api.GetAsync($"/api/v1/change-orders/{coId}/document?handler=Pdf");
+            Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        }
+        finally { fx.Pdf.Unavailable = false; }
+    }
 }

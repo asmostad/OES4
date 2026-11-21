@@ -56,7 +56,8 @@ public sealed class PdfPageResult(string fileName, string? footer, string printU
         try { pdf = await http.RequestServices.GetRequiredService<IPdfRenderer>().RenderAsync(html, footer, http.RequestAborted); }
         catch (PdfUnavailableException ex)
         {
-            if (Respond is not null) { await Refuse(context, ex.Message); return; }
+            // The field app (an /api address) gets the reason, not a redirect to a page it can't open.
+            if (Respond is not null || http.Request.Path.StartsWithSegments("/api")) { await Refuse(context, ex.Message); return; }
             if (WithoutPdf is not null)
             {
                 try { Flash(http, $"{await WithoutPdf()} No PDF was attached: {ex.Message}", "warning"); }

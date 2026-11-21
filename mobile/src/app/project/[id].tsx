@@ -7,8 +7,8 @@ import { ContactMethods, openMaps } from '@/components/Records';
 import { useRecordFeed } from '@/components/RecordFeed';
 import { StageMover } from '@/components/StageMover';
 import { Button, Card, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
-import { ProjectDetail } from '@/lib/api';
-import { day } from '@/lib/format';
+import { ChangeOrderList, ProjectDetail } from '@/lib/api';
+import { cents, day, label } from '@/lib/format';
 import { colors, space } from '@/lib/theme';
 import { useCached } from '@/lib/useCached';
 
@@ -18,10 +18,13 @@ export default function ProjectScreen() {
   const r = useCached<ProjectDetail>(`/api/v1/projects/${id}`, "Couldn't load this project.");
   const p = r.data;
   const feed = useRecordFeed('project', id, p?.number ?? 'a project', 'Add to this project');
+  const changes = useCached<ChangeOrderList>(`/api/v1/projects/${id}/change-orders`, "Couldn't load the change orders.");
+  const co = changes.data;
   const [pulling, setPulling] = useState(false);
   const { reload } = r;
   const { reload: reloadFeed } = feed;
-  const load = useCallback(async () => { await Promise.all([reload(), reloadFeed()]); }, [reload, reloadFeed]);
+  const { reload: reloadChanges } = changes;
+  const load = useCallback(async () => { await Promise.all([reload(), reloadFeed(), reloadChanges()]); }, [reload, reloadFeed, reloadChanges]);
 
   if (!p) return <Screen>{r.error ? <Message text={r.error} /> : <Loading />}</Screen>;
   return (
@@ -65,6 +68,31 @@ export default function ProjectScreen() {
 
       <StageMover kind="projects" id={p.id} label={p.number} current={p.stage} stages={p.stages} history={p.history}
         canAdvance={p.canAdvance && !p.isRemoved} onSent={load} />
+
+      {co && (co.items.length > 0 || co.canAdd) && (
+        <>
+          <SectionTitle>Change orders</SectionTitle>
+          <Card>
+            {co.items.length === 0 && <Muted>None yet.</Muted>}
+            {co.items.map((c, i) => (
+              <Row key={c.id} last={i === co.items.length - 1} onPress={() => router.push(`/change-order/${c.id}`)}>
+                <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.body} numberOfLines={2}>{`#${c.sequence} ${c.description}`}</Text>
+                    <Muted>{[label(c.status), c.approvedByName ? `by ${c.approvedByName}` : null, c.isInsuranceSupplement ? 'supplement' : null].filter(Boolean).join(' · ')}</Muted>
+                  </View>
+                  <Text style={[styles.body, c.status === 'rejected' && { color: colors.muted, textDecorationLine: 'line-through' }]}>{cents(c.amount)}</Text>
+                </View>
+              </Row>
+            ))}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: space.sm }}>
+              <Muted>Contract with approved changes</Muted>
+              <Text style={[styles.body, { fontWeight: '600' }]}>{cents(co.contractValue)}</Text>
+            </View>
+          </Card>
+          {co.canAdd && <Button title="Add a change order" kind="secondary" onPress={() => router.push({ pathname: '/new-change-order', params: { projectId: id } })} />}
+        </>
+      )}
 
       {feed.view}
     </Screen>
