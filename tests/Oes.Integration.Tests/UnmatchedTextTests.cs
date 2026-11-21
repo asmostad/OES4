@@ -93,4 +93,62 @@ public sealed class UnmatchedTextTests(MySqlFixture fx)
         Assert.Contains("WIN AGAIN", page);
         Assert.Contains("File here", page);
     }
+
+    [Fact]
+    public async Task Field_app_answers_texts_from_unknown_numbers()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var company = Number("+1532");
+        var stranger = Number("+1402");
+        var spam = Number("+1800");
+        await using (var s = fx.ScopeAs(t.Id, admin)) await s.Get<MessagingService>().SetPhoneNumberAsync(company);
+        async Task Receive(string from, string body) { await using var s = fx.ScopeFor(null); Assert.True(await s.Get<MessagingService>().ReceiveSmsAsync(from, company, body, null)); }
+        await Receive(stranger, "Hail hit us, can someone come look?");
+        await Receive(spam, "WIN A PRIZE");
+
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = admin.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return r.StatusCode == System.Net.HttpStatusCode.NoContent ? default : await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+        Task<HttpResponseMessage> Post(string url, object body)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            return api.SendAsync(req);
+        }
+
+        var threads = (await Json(await api.GetAsync("/api/v1/texts/unmatched"))).EnumerateArray().ToList();
+        Assert.Equal(2, threads.Count);
+        var number = threads.Single(x => x.GetProperty("number").GetString() == ContactValue.Phone(stranger)).GetProperty("number").GetString()!;
+
+        Assert.True((await Json(await Post("/api/v1/texts/unmatched/reply", new { number, body = "On our way tomorrow. What's the address?" }))).GetProperty("ok").GetBoolean());
+        var lead = await Json(await Post("/api/v1/texts/unmatched/lead", new { number, firstName = "Hal", lastName = "Hailed", createOpportunity = true }));
+        var oppId = lead.GetProperty("opportunityId").GetGuid();
+        await Json(await Post("/api/v1/texts/unmatched/dismiss", new { number = ContactValue.Phone(spam) }));
+        Assert.Empty((await Json(await api.GetAsync("/api/v1/texts/unmatched"))).EnumerateArray());
+
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            var texts = await db.SmsMessages.Where(m => m.FromNumber == ContactValue.Phone(stranger) || m.ToNumber == ContactValue.Phone(stranger)).ToListAsync();
+            Assert.Equal(2, texts.Count);
+            Assert.All(texts, m => Assert.Equal(lead.GetProperty("contactId").GetGuid(), m.ContactId));
+            Assert.Equal("phone_in", (await db.Opportunities.SingleAsync(o => o.Id == oppId)).SourceKey);
+        }
+        var unnamed = await Post("/api/v1/texts/unmatched/lead", new { number = ContactValue.Phone(spam), createOpportunity = false });
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, unnamed.StatusCode);
+
+        // A rep without sms.view_all can't see the inbox.
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        var repApi = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var repTok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(repApi, "/api/v1/auth/token", new { email = rep.Email, password = MySqlFixture.Password });
+        repApi.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",
+            (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(repTok.Content)).GetProperty("accessToken").GetString());
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await repApi.GetAsync("/api/v1/texts/unmatched")).StatusCode);
+    }
 }

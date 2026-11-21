@@ -6,7 +6,7 @@ import { OfflineNote } from '@/components/OfflineNote';
 import { OutboxBanner } from '@/components/OutboxBanner';
 import { TaskItem } from '@/components/TaskRow';
 import { Card, Loading, Message, Muted, Row, Screen, SectionTitle, styles } from '@/components/ui';
-import { MyDay } from '@/lib/api';
+import { MyDay, UnmatchedThread } from '@/lib/api';
 import { label, time } from '@/lib/format';
 import { useApi } from '@/lib/session';
 import { colors, space } from '@/lib/theme';
@@ -26,6 +26,7 @@ export default function Today() {
       <OfflineNote offline={day.offline} savedAt={day.savedAt} />
       <Message text={day.error ?? actionError} />
       <OutboxBanner />
+      {me.permissions.includes('sms.view_all') && <UnknownTexts />}
       {!data && !day.error && <Loading />}
       {data && (
         <>
@@ -65,5 +66,20 @@ export default function Today() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** For people who handle the company's texts: how many unknown numbers are waiting, linking to them. */
+function UnknownTexts() {
+  const r = useCached<UnmatchedThread[]>('/api/v1/texts/unmatched', "Couldn't load texts.");
+  const n = r.data?.length ?? 0;
+  if (n === 0) return null;
+  return (
+    <Card>
+      <Row last onPress={() => router.push('/texts')}>
+        <Text style={[styles.body, { color: colors.navy, fontWeight: '600' }]}>{`${n} text${n === 1 ? '' : 's'} from unknown numbers`}</Text>
+        <Muted>Reply, file on a contact, or start a lead</Muted>
+      </Row>
+    </Card>
   );
 }

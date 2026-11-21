@@ -24,6 +24,7 @@ export function routeFor(url: unknown): Href | null {
   if (estimate) return `/estimate/${estimate}`;
   const property = m('Properties');
   if (property) return `/property/${property}`;
+  if (/^\/Messages\/Unmatched\b/i.test(u)) return '/texts';
   if (/^\/Tasks\b/i.test(u)) return '/tasks';
   if (/^\/Calendar\b/i.test(u)) return '/calendar';
   return null;

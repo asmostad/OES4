@@ -245,6 +245,11 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type UnmatchedThread = {
+  number: string; display: string; unread: number; lastAt: string;
+  messages: { id: string; direction: 'inbound' | 'outbound' | string; body: string; at: string; status: string }[];
+  possible: { id: string; name: string }[];
+};
 export type ChangeOrderItem = {
   id: string; sequence: number; description: string; amount: number; status: 'draft' | 'approved' | 'rejected' | string; isItemized: boolean;
   isInsuranceSupplement: boolean; tradeId: string | null; approvedByName: string | null; decidedAt: string | null;
