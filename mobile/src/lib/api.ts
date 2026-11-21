@@ -245,6 +245,35 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type Person = { contactId: string; name: string; methods: ContactMethod[] };
+export type WorkOrderItem = {
+  id: string; number: string; status: string; acceptStatus: string; subName: string; projectId: string; projectNumber: string; tradeId: string;
+  tradeName: string; address: string | null; workDate: string | null; amount: number;
+};
+export type WorkOrderDetail = {
+  id: string; number: string; status: 'draft' | 'issued' | 'completed' | 'paid' | 'cancelled' | string; acceptStatus: 'pending' | 'accepted' | 'declined' | string;
+  acceptedName: string | null; acceptedAt: string | null; declineReason: string | null; amount: number; workDate: string | null; arrivalTime: string | null;
+  instructions: string | null; issuedAt: string | null; pdfDocumentId: string | null; completedAt: string | null; completionNote: string | null;
+  sub: Person; projectId: string; projectNumber: string; projectName: string; tradeId: string; tradeName: string; address: string | null;
+  lines: { id: string; description: string; qty: number; unit: string; rate: number; amount: number }[]; canEdit: boolean;
+};
+export type ClaimItem = {
+  id: string; claimNumber: string | null; status: string; carrierName: string | null; opportunityId: string; opportunityNumber: string; contactName: string;
+  address: string | null; dateOfLoss: string | null; inspectionOn: string | null; approvedAmount: number | null; openSupplements: number;
+};
+export type Supplement = {
+  id: string; reason: string; status: string; requestedAmount: number | null; approvedAmount: number | null; sentOn: string | null;
+  respondedOn: string | null; submittedBy: string | null; notes: string | null;
+};
+export type ClaimDetail = {
+  id: string; claimNumber: string | null; policyNumber: string | null; status: string; dateOfLoss: string | null; perilKey: string | null;
+  deductible: number | null; filedOn: string | null; inspectionOn: string | null; approvedAmount: number | null; totalApproved: number | null;
+  notes: string | null; opportunityId: string; opportunityNumber: string; opportunityName: string; contactId: string; contactName: string;
+  propertyId: string | null; address: string | null;
+  carrier: { name: string; phone: string | null; claimsEmail: string | null; claimsFax: string | null; website: string | null; preferredSubmission: string | null } | null;
+  adjuster: Person | null; deskAdjuster: Person | null; stormName: string | null; supplements: Supplement[]; statuses: string[];
+  canEdit: boolean; isArchived: boolean;
+};
 export type EstimateItem = {
   id: string; number: string; name: string; status: string; total: number; opportunityId: string; contactName: string; address: string | null;
   ownerName: string | null; latestVersionNo: number; pendingApprovals: number; updatedAt: string;

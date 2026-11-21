@@ -14,6 +14,10 @@ export function routeFor(url: unknown): Href | null {
   if (project) return `/project/${project}`;
   const trade = new RegExp(`^/Projects/Trade/${ID}`, 'i').exec(u)?.[1];
   if (trade) return `/trade/${trade}`;
+  const workOrder = m('WorkOrders');
+  if (workOrder) return `/work-order/${workOrder}`;
+  const claim = m('Claims');
+  if (claim) return `/claim/${claim}`;
   const estimate = m('Estimates');
   if (estimate) return `/estimate/${estimate}`;
   const property = m('Properties');

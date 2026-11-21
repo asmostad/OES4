@@ -6,9 +6,9 @@ import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import { LeadActions } from '@/components/LeadActions';
 import { OfflineNote } from '@/components/OfflineNote';
 import { useRecordFeed } from '@/components/RecordFeed';
-import { EstimateList } from '@/components/Records';
+import { ClaimList, EstimateList } from '@/components/Records';
 import { Card, Loading, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
-import { EstimateItem, Opportunity } from '@/lib/api';
+import { ClaimItem, EstimateItem, Opportunity } from '@/lib/api';
 import { money } from '@/lib/format';
 import { useApi } from '@/lib/session';
 import { colors, radius, space } from '@/lib/theme';
@@ -23,6 +23,7 @@ export default function OpportunityScreen() {
   const opp = lead.data;
   const feed = useRecordFeed('opportunity', id, opp?.number ?? 'a lead', 'Add to this lead');
   const estimates = useCached<EstimateItem[]>(`/api/v1/estimates?opportunityId=${id}`, "Couldn't load the estimates.");
+  const claims = useCached<ClaimItem[]>(`/api/v1/claims?opportunityId=${id}`, "Couldn't load the claim.");
   const { me } = useApi();
   const canEstimate = me.permissions.includes('estimates.create') || me.permissions.includes('estimates.manage');
   const error = lead.error;
@@ -33,9 +34,10 @@ export default function OpportunityScreen() {
   const { reload: reloadLead } = lead;
   const { reload: reloadFeed } = feed;
   const { reload: reloadEstimates } = estimates;
+  const { reload: reloadClaims } = claims;
   const load = useCallback(async () => {
-    await Promise.all([reloadLead(), reloadFeed(), reloadEstimates()]);
-  }, [reloadLead, reloadFeed, reloadEstimates]);
+    await Promise.all([reloadLead(), reloadFeed(), reloadEstimates(), reloadClaims()]);
+  }, [reloadLead, reloadFeed, reloadEstimates, reloadClaims]);
 
   if (!opp) return <Screen>{error ? <Message text={error} /> : <Loading />}</Screen>;
 
@@ -75,6 +77,13 @@ export default function OpportunityScreen() {
       <LeadActions opp={opp} onSent={load} onMessage={(text, kind) => {
         if (kind === 'success') { setNotice(text); setActionError(null); } else { setActionError(text); setNotice(null); }
       }} />
+
+      {(claims.data?.length ?? 0) > 0 && (
+        <>
+          <SectionTitle>Insurance claim</SectionTitle>
+          <ClaimList claims={claims.data!} />
+        </>
+      )}
 
       {estimates.data && (estimates.data.length > 0 || canEstimate) && (
         <>

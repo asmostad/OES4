@@ -3,11 +3,11 @@ import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { OfflineNote } from '@/components/OfflineNote';
-import { ContactMethods, openMaps } from '@/components/Records';
+import { ContactMethods, openMaps, WorkOrderList } from '@/components/Records';
 import { useRecordFeed } from '@/components/RecordFeed';
 import { StageMover } from '@/components/StageMover';
 import { Button, Card, Loading, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
-import { TradeDetail } from '@/lib/api';
+import { TradeDetail, WorkOrderItem } from '@/lib/api';
 import { day } from '@/lib/format';
 import { colors, space } from '@/lib/theme';
 import { useCached } from '@/lib/useCached';
@@ -19,10 +19,12 @@ export default function TradeScreen() {
   const t = r.data;
   const what = t ? `${t.projectNumber} ${t.name}` : 'a trade';
   const feed = useRecordFeed('trade', id, what, 'From the site');
+  const workOrders = useCached<WorkOrderItem[]>(`/api/v1/work-orders?tradeId=${id}`, "Couldn't load the work orders.");
   const [pulling, setPulling] = useState(false);
   const { reload } = r;
   const { reload: reloadFeed } = feed;
-  const load = useCallback(async () => { await Promise.all([reload(), reloadFeed()]); }, [reload, reloadFeed]);
+  const { reload: reloadWorkOrders } = workOrders;
+  const load = useCallback(async () => { await Promise.all([reload(), reloadFeed(), reloadWorkOrders()]); }, [reload, reloadFeed, reloadWorkOrders]);
 
   if (!t) return <Screen>{r.error ? <Message text={r.error} /> : <Loading />}</Screen>;
   return (
@@ -58,6 +60,13 @@ export default function TradeScreen() {
         {t.description && <Muted>{t.description}</Muted>}
       </Card>
       <Card><ContactMethods methods={t.contactMethods} /></Card>
+
+      {(workOrders.data?.length ?? 0) > 0 && (
+        <>
+          <SectionTitle>Work orders</SectionTitle>
+          <WorkOrderList workOrders={workOrders.data!} />
+        </>
+      )}
 
       <StageMover kind="trades" id={t.id} label={what} current={t.stage} stages={t.stages} history={t.history}
         canAdvance={t.canAdvance && !t.isRemoved} onSent={load} />

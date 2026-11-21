@@ -248,4 +248,77 @@ public sealed class SubcontractorTests(MySqlFixture fx)
         }
         finally { fx.Pdf.Unavailable = false; }
     }
+
+    [Fact]
+    public async Task Field_app_reads_work_orders_and_claims_and_updates_them_on_site()
+    {
+        var x = await SetupAsync();
+        Guid woId, oppId, claimId, adjuster;
+        await using (var s = fx.ScopeAs(x.Tenant, x.Admin))
+        {
+            var wos = s.Get<WorkOrderService>();
+            woId = await wos.CreateAsync(x.Trade, x.Sub, new DateOnly(2026, 12, 3), "7:30 AM", "Dumpster in driveway");
+            await wos.AddLineAsync(woId, null, "Tear-off & install", 25, "SQ", 90m);
+            await wos.MarkIssuedAsync(woId);
+            var db = s.Get<OesDbContext>();
+            oppId = (await db.Projects.SingleAsync(p => db.ProjectTrades.Any(t => t.Id == x.Trade && t.ProjectId == p.Id))).OpportunityId;
+            adjuster = await s.Get<ContactService>().CreateAsync(new ContactInput
+            {
+                FirstName = "Ada", LastName = "Adjuster", OwnerUserId = x.Admin.Id, Methods = [new MethodInput(ContactMethodKinds.Mobile, "(402) 555-0190", null, true)],
+            });
+            claimId = await s.Get<Oes.Infrastructure.Insurance.ClaimService>().CreateAsync(oppId, new Oes.Infrastructure.Insurance.ClaimInput
+            {
+                PolicyNumber = "POL-9", Deductible = 1000m, AdjusterContactId = adjuster, Notes = "Hail on north slope",
+            });
+        }
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = x.Admin.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+        Task<HttpResponseMessage> Post(string url)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(new { }) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            return api.SendAsync(req);
+        }
+
+        // The trade's work orders, then one in full: the sub with their numbers, the work and the lines.
+        var list = await Json(await api.GetAsync($"/api/v1/work-orders?tradeId={x.Trade}"));
+        Assert.Equal(woId, list.EnumerateArray().Single().GetProperty("id").GetGuid());
+        var wo = await Json(await api.GetAsync($"/api/v1/work-orders/{woId}"));
+        Assert.Equal("Top Crew LLC", wo.GetProperty("sub").GetProperty("name").GetString());
+        Assert.Equal("crew@topcrew.example.com", wo.GetProperty("sub").GetProperty("methods")[0].GetProperty("value").GetString());
+        Assert.Equal("Dumpster in driveway", wo.GetProperty("instructions").GetString());
+        Assert.Equal(2250m, wo.GetProperty("lines")[0].GetProperty("amount").GetDecimal());
+        Assert.Equal("issued", wo.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.NoContent, (await Post($"/api/v1/work-orders/{woId}/complete")).StatusCode);
+        Assert.Equal("completed", (await Json(await api.GetAsync($"/api/v1/work-orders/{woId}"))).GetProperty("status").GetString());
+        var again = await Post($"/api/v1/work-orders/{woId}/complete");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, again.StatusCode); // completed can't be completed again
+
+        // The lead's claim, then after the adjuster meeting: number, inspection day and approved amount, the rest kept.
+        var claims = await Json(await api.GetAsync($"/api/v1/claims?opportunityId={oppId}"));
+        Assert.Equal(claimId, claims.EnumerateArray().Single().GetProperty("id").GetGuid());
+        var claim = await Json(await api.GetAsync($"/api/v1/claims/{claimId}"));
+        Assert.Equal("not_filed", claim.GetProperty("status").GetString());
+        Assert.Equal("Ada Adjuster", claim.GetProperty("adjuster").GetProperty("name").GetString());
+        Assert.True(claim.GetProperty("canEdit").GetBoolean());
+        var put = await api.PutAsync($"/api/v1/claims/{claimId}/field", System.Net.Http.Json.JsonContent.Create(new
+        {
+            status = "approved", claimNumber = "CLM-77", inspectionOn = "2026-12-01", approvedAmount = 14250.50m, notes = "Full roof approved",
+        }));
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        claim = await Json(await api.GetAsync($"/api/v1/claims/{claimId}"));
+        Assert.Equal(("approved", "CLM-77", "2026-12-01", 14250.50m), (claim.GetProperty("status").GetString(), claim.GetProperty("claimNumber").GetString(),
+            claim.GetProperty("inspectionOn").GetString(), claim.GetProperty("approvedAmount").GetDecimal()));
+        Assert.Equal(("POL-9", 1000m), (claim.GetProperty("policyNumber").GetString(), claim.GetProperty("deductible").GetDecimal()));
+        Assert.Equal(adjuster, claim.GetProperty("adjuster").GetProperty("contactId").GetGuid());
+        var bad = await api.PutAsync($"/api/v1/claims/{claimId}/field", System.Net.Http.Json.JsonContent.Create(new { status = "bogus" }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+    }
 }
