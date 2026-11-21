@@ -195,4 +195,50 @@ public sealed class AssistantTests(MySqlFixture fx)
         }))).Content.ReadAsStringAsync();
         Assert.Contains("event: error\ndata: {\"message\":\"Type a message.\"}", empty);
     }
+
+    [Fact]
+    public async Task Field_app_chats_with_the_assistant_and_a_retried_send_asks_only_once()
+    {
+        var w = await WorldAsync();
+        fx.Ai.Reset(Calls("search_records", new { query = "Ann" }), Says("You have one: Ann Visible."));
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = w.RepA.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+        Task<HttpResponseMessage> Post(string url, object body, string key)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", key);
+            return api.SendAsync(req);
+        }
+
+        Assert.True((await Json(await api.GetAsync("/api/v1/assistant"))).GetProperty("configured").GetBoolean());
+        var id = (await Json(await Post("/api/v1/assistant/conversations", new { entityType = "opportunity", entityId = w.OppA }, Guid.NewGuid().ToString())))
+            .GetProperty("id").GetGuid();
+        var started = await Json(await api.GetAsync($"/api/v1/assistant/conversations/{id}"));
+        Assert.Equal(("opportunity", w.OppA), (started.GetProperty("entityType").GetString(), started.GetProperty("entityId").GetGuid()));
+
+        var key = Guid.NewGuid().ToString();
+        var reply = await Json(await Post($"/api/v1/assistant/conversations/{id}/messages", new { text = "Which Ann leads do I have?" }, key));
+        var lines = reply.GetProperty("lines").EnumerateArray().ToList();
+        Assert.Equal("You have one: Ann Visible.", lines[^1].GetProperty("text").GetString());
+        Assert.Equal("assistant", lines[^1].GetProperty("role").GetString());
+        Assert.Equal(2, fx.Ai.Requests.Count);
+
+        // The phone lost the answer and sends again with the same key: the saved answer comes back, nothing is asked again.
+        var again = await Json(await Post($"/api/v1/assistant/conversations/{id}/messages", new { text = "Which Ann leads do I have?" }, key));
+        Assert.Equal("You have one: Ann Visible.", again.GetProperty("lines").EnumerateArray().Last().GetProperty("text").GetString());
+        Assert.Equal(2, fx.Ai.Requests.Count);
+
+        Assert.Contains((await Json(await api.GetAsync("/api/v1/assistant"))).GetProperty("conversations").EnumerateArray(), c => c.GetProperty("id").GetGuid() == id);
+        var blank = await Post($"/api/v1/assistant/conversations/{id}/messages", new { text = " " }, Guid.NewGuid().ToString());
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, blank.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, (await api.DeleteAsync($"/api/v1/assistant/conversations/{id}")).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await api.GetAsync($"/api/v1/assistant/conversations/{id}")).StatusCode);
+    }
 }

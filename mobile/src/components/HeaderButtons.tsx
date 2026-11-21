@@ -9,7 +9,8 @@ import { colors } from '@/lib/theme';
 
 /** Search and the bell (with the unread count), on every tab. The count refreshes each minute and when the user changes screen. */
 export function HeaderButtons() {
-  const { api } = useApi();
+  const { api, me } = useApi();
+  const canAsk = me.permissions.includes('ai.assistant');
   const path = usePathname();
   const [unread, setUnread] = useState(0);
   useEffect(() => {
@@ -22,6 +23,7 @@ export function HeaderButtons() {
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginRight: 16 }}>
+      {canAsk && <Ionicons name="sparkles-outline" size={22} color={colors.white} onPress={() => router.push('/assistant')} accessibilityLabel="Assistant" />}
       <Ionicons name="search" size={22} color={colors.white} onPress={() => router.push('/search')} accessibilityLabel="Search" />
       <View>
         <Ionicons name={unread > 0 ? 'notifications' : 'notifications-outline'} size={22} color={colors.white}

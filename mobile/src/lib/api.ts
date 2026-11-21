@@ -245,6 +245,11 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type AssistantHome = { configured: boolean; conversations: { id: string; title: string; lastMessageAt: string }[] };
+export type ChatLine = { role: 'user' | 'assistant' | string; text: string; at: string; tools: string[] };
+export type Conversation = {
+  id: string; title: string; entityType: string | null; entityId: string | null; recordLabel: string | null; recordUrl: string | null; lines: ChatLine[];
+};
 export type Storm = {
   id: string; name: string; eventDate: string; perilKey: string; maxHailSizeIn: number | null; maxWindMph: number | null; zipCount: number; opportunities: number;
 };

@@ -7,7 +7,7 @@ import { LeadActions } from '@/components/LeadActions';
 import { OfflineNote } from '@/components/OfflineNote';
 import { useRecordFeed } from '@/components/RecordFeed';
 import { ClaimList, EstimateList } from '@/components/Records';
-import { Card, Loading, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
+import { Button, Card, Loading, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
 import { ClaimItem, EstimateItem, Opportunity } from '@/lib/api';
 import { money } from '@/lib/format';
 import { useApi } from '@/lib/session';
@@ -15,6 +15,7 @@ import { colors, radius, space } from '@/lib/theme';
 import { useCached } from '@/lib/useCached';
 
 const PHONE_KINDS = ['mobile', 'phone', 'work', 'home', 'office'];
+const newKey = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export default function OpportunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,8 +25,25 @@ export default function OpportunityScreen() {
   const feed = useRecordFeed('opportunity', id, opp?.number ?? 'a lead', 'Add to this lead');
   const estimates = useCached<EstimateItem[]>(`/api/v1/estimates?opportunityId=${id}`, "Couldn't load the estimates.");
   const claims = useCached<ClaimItem[]>(`/api/v1/claims?opportunityId=${id}`, "Couldn't load the claim.");
-  const { me } = useApi();
+  const { api, me } = useApi();
   const canEstimate = me.permissions.includes('estimates.create') || me.permissions.includes('estimates.manage');
+  const canAsk = me.permissions.includes('ai.assistant');
+  const [asking, setAsking] = useState(false);
+
+  async function ask() {
+    setAsking(true);
+    try {
+      const { id: convo } = await api.json<{ id: string }>('/api/v1/assistant/conversations', {
+        method: 'POST', body: JSON.stringify({ entityType: 'opportunity', entityId: id }),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': newKey() },
+      });
+      router.push(`/assistant/${convo}`);
+    } catch (x) {
+      setActionError(x instanceof Error ? x.message : "Couldn't start the assistant.");
+    } finally {
+      setAsking(false);
+    }
+  }
   const error = lead.error;
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -73,6 +91,8 @@ export default function OpportunityScreen() {
 
       <Message text={actionError} />
       <Message text={notice} kind="success" />
+
+      {canAsk && <Button title="Ask the assistant about this lead" kind="secondary" onPress={ask} busy={asking} />}
 
       <LeadActions opp={opp} onSent={load} onMessage={(text, kind) => {
         if (kind === 'success') { setNotice(text); setActionError(null); } else { setActionError(text); setNotice(null); }
