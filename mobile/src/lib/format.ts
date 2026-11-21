@@ -35,6 +35,22 @@ export function when(utc: string): string {
 export const money = (n: number | null | undefined) =>
   n == null ? '' : `$${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 
+/** "8", "8:30", "8:30am", "5 pm", "17:00" → "HH:mm" (24-hour); null when it isn't a time. */
+export function parseTime(raw: string): string | null {
+  const m = /^\s*(\d{1,2})(?::?(\d{2}))?\s*([ap])?\.?\s*m?\.?\s*$/i.exec(raw);
+  if (!m) return null;
+  let h = +m[1];
+  const mi = m[2] ? +m[2] : 0;
+  const ap = m[3]?.toLowerCase();
+  if (mi > 59 || h > 23 || (ap && (h < 1 || h > 12))) return null;
+  if (ap === 'p' && h < 12) h += 12;
+  if (ap === 'a' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+}
+
+/** "13:30" → "1:30 pm". */
+export const clock = (hhmm: string) => time(`2000-01-01T${hhmm}`);
+
 /** Dollars and cents, for prices and line amounts. */
 export const cents = (n: number | null | undefined) =>
   n == null ? '' : `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;

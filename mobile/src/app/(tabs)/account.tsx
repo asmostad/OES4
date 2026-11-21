@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
 
@@ -100,6 +100,12 @@ export default function Account() {
           </View>
         )}
         {pushError && <Text style={{ color: colors.danger, marginTop: space.sm }}>{pushError}</Text>}
+      </Card>
+
+      <SectionTitle>Online booking</SectionTitle>
+      <Card>
+        <Muted>The hours customers can book you through the company’s booking page.</Muted>
+        <View style={{ marginTop: space.md }}><Button title="My booking hours" kind="secondary" onPress={() => router.push('/hours')} /></View>
       </Card>
 
       <Card>

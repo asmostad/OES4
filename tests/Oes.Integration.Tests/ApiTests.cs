@@ -339,4 +339,30 @@ public sealed class ApiTests(MySqlFixture fx)
         await using (var s = fx.ScopeAs(t.Id, admin))
             Assert.Null(await s.Get<OesDbContext>().Notifications.Where(n => n.Id == adminNote).Select(n => n.ReadAt).SingleAsync()); // untouched
     }
+
+    [Fact]
+    public async Task Field_app_sets_my_booking_hours()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        var api = await SignedInAsync(rep, t.Id);
+        Assert.Empty((await Json(await api.GetAsync("/api/v1/me/hours"))).EnumerateArray());
+
+        var put = await api.PutAsJsonAsync("/api/v1/me/hours", new
+        {
+            hours = new[] { new { day = 1, start = "08:00", end = "12:00" }, new { day = 1, start = "13:00", end = "17:30" }, new { day = 6, start = "09:00", end = "12:00" } },
+        });
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        var hours = (await Json(await api.GetAsync("/api/v1/me/hours"))).EnumerateArray()
+            .Select(h => (h.GetProperty("day").GetInt32(), h.GetProperty("start").GetString(), h.GetProperty("end").GetString())).ToList();
+        Assert.Equal([(1, "08:00", "12:00"), (1, "13:00", "17:30"), (6, "09:00", "12:00")], hours);
+
+        var overlap = await api.PutAsJsonAsync("/api/v1/me/hours", new { hours = new[] { new { day = 2, start = "08:00", end = "12:00" }, new { day = 2, start = "11:00", end = "14:00" } } });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, overlap.StatusCode);
+        Assert.Contains("overlap", await overlap.Content.ReadAsStringAsync());
+        var blank = await api.PutAsJsonAsync("/api/v1/me/hours", new { hours = new[] { new { day = 3, start = "", end = "12:00" } } });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, blank.StatusCode);
+        await using (var s = fx.ScopeAs(t.Id, admin))
+            Assert.Equal(3, await s.Get<OesDbContext>().AvailabilityRules.CountAsync(r => r.UserId == rep.Id)); // refusals changed nothing
+    }
 }

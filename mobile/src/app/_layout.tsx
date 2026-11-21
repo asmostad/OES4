@@ -45,6 +45,7 @@ function Navigator() {
         <Stack.Screen name="work-order/[id]" options={{ title: 'Work order' }} />
         <Stack.Screen name="claim/[id]" options={{ title: 'Claim' }} />
         <Stack.Screen name="canvass" options={{ title: 'Canvass' }} />
+        <Stack.Screen name="hours" options={{ title: 'Booking hours' }} />
         <Stack.Screen name="change-order/[id]" options={{ title: 'Change order' }} />
         <Stack.Screen name="new-change-order" options={{ title: 'Change order', presentation: 'modal' }} />
         <Stack.Screen name="assistant/index" options={{ title: 'Assistant' }} />
