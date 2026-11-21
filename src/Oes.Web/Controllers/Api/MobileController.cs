@@ -11,6 +11,7 @@ namespace Oes.Web.Controllers.Api;
 public sealed record MyDayResponse(int Overdue, int DueToday, IReadOnlyList<TaskRow> Tasks, IReadOnlyList<AppointmentRow> Appointments);
 public sealed record DoneRequest(bool Done);
 public sealed record AppointmentStatusInput(string? Status);
+public sealed record ContactEditInput(string? FirstName, string? LastName, string? OrganizationName, List<ContactMethodDto>? Methods);
 public sealed record NoteRequest(string Body);
 public sealed record CreatedResponse(Guid Id);
 public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary);
@@ -21,7 +22,7 @@ public sealed record StageOption(Guid Id, string Name, string Color, string Outc
 public sealed record LinkDto(Guid Id, string Label, string? Role);
 public sealed record OpportunityBriefDto(Guid Id, string Number, string Name, string StageName, string StageColor, string Outcome, string? Address);
 public sealed record ContactDto(Guid Id, string Name, string Type, string? OwnerName, List<ContactMethodDto> Methods, List<LinkDto> Properties,
-    List<OpportunityBriefDto> Opportunities, bool CanEdit);
+    List<OpportunityBriefDto> Opportunities, bool CanEdit, string? FirstName = null, string? LastName = null, string? OrganizationName = null);
 public sealed record PropertyContactDto(Guid Id, string Name, string Role, bool IsPrimary, string? Phone, string? Email);
 public sealed record PropertyDto(Guid Id, string Address, List<PropertyContactDto> Contacts, List<OpportunityBriefDto> Opportunities);
 public sealed record OptionsResponse(List<StageOption> Stages, List<Option> LostReasons, List<Option> AppointmentTypes, List<Option> LeadSources);
@@ -114,7 +115,27 @@ public sealed class MobileController(WorkService work, OpportunityService opport
         return new ContactDto(d.Contact.Id, d.Contact.DisplayName, d.Contact.Type, d.OwnerName,
             d.Methods.OrderByDescending(m => m.IsPrimary).Select(m => new ContactMethodDto(m.Kind, m.Value, m.IsPrimary)).ToList(),
             d.Properties.Where(p => p.IsCurrent).Select(p => new LinkDto(p.PropertyId, p.Address, p.RoleKey)).ToList(),
-            d.Opportunities.Select(Brief).ToList(), d.CanEdit);
+            d.Opportunities.Select(Brief).ToList(), d.CanEdit, d.Contact.FirstName, d.Contact.LastName, d.Contact.OrganizationName);
+    }
+
+    /// <summary>
+    /// Fixes a contact's name and phones and emails from the field (a wrong number, a new email). Everything else
+    /// (owner, source, notes, labels on unchanged numbers) stays as it is. Same edit rights as the web.
+    /// </summary>
+    [HttpPut("contacts/{id:guid}")]
+    public async Task<IActionResult> UpdateContact(Guid id, ContactEditInput input, CancellationToken ct)
+    {
+        var c = (await contacts.GetAsync(id, ct)).Contact;
+        var labels = c.Methods.GroupBy(m => (m.Kind, m.Value)).ToDictionary(g => g.Key, g => g.First().Label);
+        await contacts.UpdateAsync(id, new ContactInput
+        {
+            Type = c.Type, FirstName = input.FirstName ?? c.FirstName, LastName = input.LastName ?? c.LastName,
+            OrganizationName = input.OrganizationName ?? c.OrganizationName, OwnerUserId = c.OwnerUserId, SourceKey = c.SourceKey,
+            CautionNote = c.CautionNote, Notes = c.Notes,
+            Methods = (input.Methods ?? []).Where(m => !string.IsNullOrWhiteSpace(m.Value))
+                .Select(m => new MethodInput(m.Kind, m.Value.Trim(), labels.GetValueOrDefault((m.Kind, m.Value.Trim())), m.IsPrimary)).ToList(),
+        }, ct);
+        return NoContent();
     }
 
     /// <summary>A property for the app: who's on it and its leads.</summary>

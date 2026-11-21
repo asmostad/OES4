@@ -402,4 +402,44 @@ public sealed class ApiTests(MySqlFixture fx)
         var theirs = await SignedInAsync(other, t.Id);
         Assert.Equal(HttpStatusCode.NotFound, (await theirs.PutAsJsonAsync($"/api/v1/appointments/{id}/status", new { status = "scheduled" })).StatusCode);
     }
+
+    [Fact]
+    public async Task Field_app_fixes_a_contacts_phone_and_email_and_keeps_the_rest()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        Guid id;
+        await using (var s = fx.ScopeAs(t.Id, rep))
+            id = await s.Get<ContactService>().CreateAsync(new ContactInput
+            {
+                FirstName = "Pat", LastName = "Fixme", OwnerUserId = rep.Id, SourceKey = "door_knock", Notes = "Dog in yard",
+                Methods = [new MethodInput(ContactMethodKinds.Mobile, "(402) 555-0100", "Pat's cell", true), new MethodInput(ContactMethodKinds.Email, "old@example.com", null, true)],
+            });
+        var api = await SignedInAsync(rep, t.Id);
+        var put = await api.PutAsJsonAsync($"/api/v1/contacts/{id}", new
+        {
+            lastName = "Fixed",
+            methods = new[]
+            {
+                new { kind = "mobile", value = "(402) 555-0100", isPrimary = true }, new { kind = "email", value = "new@example.com", isPrimary = true },
+                new { kind = "phone", value = "  ", isPrimary = false },
+            },
+        });
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        var c = await Json(await api.GetAsync($"/api/v1/contacts/{id}"));
+        Assert.Equal("Pat Fixed", c.GetProperty("name").GetString());
+        Assert.Equal(["(402) 555-0100", "new@example.com"], c.GetProperty("methods").EnumerateArray().Select(m => m.GetProperty("value").GetString()).Order());
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            var contact = await db.Contacts.Include(x => x.Methods).SingleAsync(x => x.Id == id);
+            Assert.Equal(("door_knock", "Dog in yard", rep.Id), (contact.SourceKey, contact.Notes, contact.OwnerUserId!.Value));
+            Assert.Equal("Pat's cell", contact.Methods.Single(m => m.Kind == "mobile").Label);
+        }
+        var bad = await api.PutAsJsonAsync($"/api/v1/contacts/{id}", new { methods = new[] { new { kind = "email", value = "not-an-email", isPrimary = true } } });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+
+        var other = await SignedInAsync(await fx.AddMemberAsync(t.Id, "Sales Rep"), t.Id);
+        Assert.NotEqual(HttpStatusCode.NoContent, (await other.PutAsJsonAsync($"/api/v1/contacts/{id}", new { lastName = "Hacked" })).StatusCode);
+    }
 }

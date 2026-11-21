@@ -187,6 +187,8 @@ public sealed class ContactService(OesDbContext db, RecordScope scope, RecordIte
         contact.Methods.Clear();
         input.Type = contact.Type; // type is fixed after creation
         Apply(contact, input);
+        // The new rows have their ids already, so EF would take them for existing rows being updated; they're new.
+        foreach (var m in contact.Methods) db.Entry(m).State = EntityState.Added;
         await items.LogAsync(EntityTypes.Contact, contact.Id, "contact.updated", "Details updated", ct);
         await db.SaveChangesAsync(ct);
     }

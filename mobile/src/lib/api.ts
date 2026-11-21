@@ -198,7 +198,7 @@ export type OpportunityBrief = { id: string; number: string; name: string; stage
 export type Link = { id: string; label: string; role: string | null };
 export type ContactDetail = {
   id: string; name: string; type: string; ownerName: string | null; methods: ContactMethod[]; properties: Link[];
-  opportunities: OpportunityBrief[]; canEdit: boolean;
+  opportunities: OpportunityBrief[]; canEdit: boolean; firstName?: string | null; lastName?: string | null; organizationName?: string | null;
 };
 export type PropertyContact = { id: string; name: string; role: string; isPrimary: boolean; phone: string | null; email: string | null };
 export type PropertyDetail = { id: string; address: string; contacts: PropertyContact[]; opportunities: OpportunityBrief[] };

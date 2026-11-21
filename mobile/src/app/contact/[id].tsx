@@ -27,6 +27,7 @@ export default function ContactScreen() {
       <Card>
         <Text style={[styles.title, { fontSize: 20 }]}>{d.name}</Text>
         <Muted>{d.type === 'organization' ? 'Organization' : 'Person'}{d.ownerName ? ` · owner ${d.ownerName}` : ''}</Muted>
+        {d.canEdit && <View style={{ marginTop: 12 }}><Button title="Edit name, phone or email" kind="secondary" onPress={() => router.push({ pathname: '/edit-contact', params: { id: d.id } })} /></View>}
       </Card>
       <SectionTitle>Reach them</SectionTitle>
       <Card>
