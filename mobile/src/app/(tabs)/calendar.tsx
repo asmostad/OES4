@@ -63,16 +63,15 @@ export default function Calendar() {
           {d.items.length === 0 ? <Muted>Nothing scheduled.</Muted> : (
             <Card style={d.date === today ? { borderLeftWidth: 3, borderLeftColor: colors.orange } : undefined}>
               {d.items.map((a, i) => {
-                const lead = a.entityType === 'opportunity' && a.entityId;
                 return (
-                  <Row key={`${a.id}-${d.date}`} last={i === d.items.length - 1} onPress={lead ? () => router.push(`/opportunity/${a.entityId}`) : undefined}>
+                  <Row key={`${a.id}-${d.date}`} last={i === d.items.length - 1} onPress={() => router.push({ pathname: '/appointment/[id]', params: { id: a.id, date: a.startLocal.slice(0, 10) } })}>
                     <View style={{ flexDirection: 'row', gap: space.md }}>
                       <Text style={{ width: 72, fontWeight: '600', color: colors.navy }}>{a.isAllDay ? 'All day' : time(a.startLocal)}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.body, a.status === 'cancelled' && { textDecorationLine: 'line-through', color: colors.muted }]}>{a.title}</Text>
                         <Muted>{[label(a.typeKey), a.isAllDay ? null : `until ${time(a.endLocal)}`, a.location].filter(Boolean).join(' · ')}</Muted>
                       </View>
-                      {lead && <Ionicons name="chevron-forward" size={18} color={colors.muted} />}
+                      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
                     </View>
                   </Row>
                 );

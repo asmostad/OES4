@@ -17,6 +17,7 @@ export type TaskRow = {
 export type AppointmentRow = {
   id: string; title: string; typeKey: string; startLocal: string; endLocal: string; location: string | null; notes: string | null;
   assigneeName: string; status: string; entityType: string | null; entityId: string | null; isAllDay: boolean;
+  recordUrl?: string | null; canEdit?: boolean; attendeeNames?: string[] | null;
 };
 export type MyDay = { overdue: number; dueToday: number; tasks: TaskRow[]; appointments: AppointmentRow[] };
 export type OpportunityRow = {

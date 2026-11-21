@@ -10,6 +10,7 @@ namespace Oes.Web.Controllers.Api;
 
 public sealed record MyDayResponse(int Overdue, int DueToday, IReadOnlyList<TaskRow> Tasks, IReadOnlyList<AppointmentRow> Appointments);
 public sealed record DoneRequest(bool Done);
+public sealed record AppointmentStatusInput(string? Status);
 public sealed record NoteRequest(string Body);
 public sealed record CreatedResponse(Guid Id);
 public sealed record ContactMethodDto(string Kind, string Value, bool IsPrimary);
@@ -149,6 +150,22 @@ public sealed class MobileController(WorkService work, OpportunityService opport
     [Idempotent]
     public async Task<ActionResult<CreatedResponse>> CreateAppointment(AppointmentInput input, CancellationToken ct) =>
         StatusCode(StatusCodes.Status201Created, new CreatedResponse(await work.CreateAppointmentAsync(input, ct)));
+
+    /// <summary>Moves or edits an appointment (yours, one you made, or anyone's with calendar.manage). Invitees stay as they are.</summary>
+    [HttpPut("appointments/{id:guid}")]
+    public async Task<IActionResult> UpdateAppointment(Guid id, AppointmentInput input, CancellationToken ct)
+    {
+        await work.UpdateAppointmentAsync(id, input, ct);
+        return NoContent();
+    }
+
+    /// <summary>Done, cancelled (everyone on it is told), or back to scheduled.</summary>
+    [HttpPut("appointments/{id:guid}/status")]
+    public async Task<IActionResult> AppointmentStatus(Guid id, AppointmentStatusInput input, CancellationToken ct)
+    {
+        await work.SetAppointmentStatusAsync(id, input.Status ?? "", ct);
+        return NoContent();
+    }
 
     /// <summary>This phone's Expo push address, after the user allowed notifications. Calling again refreshes it.</summary>
     /// <summary>The user's bell: unread first, then the newest. The same list as the web header.</summary>

@@ -45,9 +45,8 @@ export default function Today() {
           <Card>
             {data.appointments.length === 0 && <Muted>Nothing on the calendar today.</Muted>}
             {data.appointments.map((a, i) => {
-              const lead = a.entityType === 'opportunity' && a.entityId;
               return (
-                <Row key={a.id} last={i === data.appointments.length - 1} onPress={lead ? () => router.push(`/opportunity/${a.entityId}`) : undefined}>
+                <Row key={a.id} last={i === data.appointments.length - 1} onPress={() => router.push({ pathname: '/appointment/[id]', params: { id: a.id, date: a.startLocal.slice(0, 10) } })}>
                   <Text style={{ fontWeight: '600', color: colors.navy }}>{a.isAllDay ? 'All day' : `${time(a.startLocal)} – ${time(a.endLocal)}`}</Text>
                   <Text style={styles.body}>{a.title}</Text>
                   <Muted>{[label(a.typeKey), a.location].filter(Boolean).join(' · ')}</Muted>

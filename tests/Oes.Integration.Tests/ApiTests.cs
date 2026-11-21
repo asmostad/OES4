@@ -365,4 +365,41 @@ public sealed class ApiTests(MySqlFixture fx)
         await using (var s = fx.ScopeAs(t.Id, admin))
             Assert.Equal(3, await s.Get<OesDbContext>().AvailabilityRules.CountAsync(r => r.UserId == rep.Id)); // refusals changed nothing
     }
+
+    [Fact]
+    public async Task Field_app_moves_finishes_and_cancels_appointments()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        var rep = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        var other = await fx.AddMemberAsync(t.Id, "Sales Rep");
+        var api = await SignedInAsync(rep, t.Id);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5);
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/appointments")
+        {
+            Content = JsonContent.Create(new { title = "Inspection – Pat", typeKey = "inspection", date = date.ToString("yyyy-MM-dd"), startTime = "10:00", durationMinutes = 60 }),
+        };
+        req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var id = (await Json(await api.SendAsync(req))).GetProperty("id").GetGuid();
+
+        // Running late: an hour later and 90 minutes long.
+        var moved = await api.PutAsJsonAsync($"/api/v1/appointments/{id}", new
+        {
+            title = "Inspection – Pat", typeKey = "inspection", date = date.ToString("yyyy-MM-dd"), startTime = "11:00", durationMinutes = 90, location = "9 Elm",
+        });
+        Assert.Equal(HttpStatusCode.NoContent, moved.StatusCode);
+        var row = (await Json(await api.GetAsync($"/api/v1/appointments?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&user={rep.Id}"))).EnumerateArray().Single();
+        Assert.StartsWith($"{date:yyyy-MM-dd}T11:00", row.GetProperty("startLocal").GetString());
+        Assert.StartsWith($"{date:yyyy-MM-dd}T12:30", row.GetProperty("endLocal").GetString());
+        Assert.Equal("9 Elm", row.GetProperty("location").GetString());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"/api/v1/appointments/{id}/status", new { status = "completed" })).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await api.PutAsJsonAsync($"/api/v1/appointments/{id}/status", new { status = "bogus" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"/api/v1/appointments/{id}/status", new { status = "cancelled" })).StatusCode);
+        var cancelledMove = await api.PutAsJsonAsync($"/api/v1/appointments/{id}", new { title = "x", date = date.ToString("yyyy-MM-dd"), startTime = "09:00", durationMinutes = 30 });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, cancelledMove.StatusCode);
+
+        // Someone else's appointment isn't there to change.
+        var theirs = await SignedInAsync(other, t.Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await theirs.PutAsJsonAsync($"/api/v1/appointments/{id}/status", new { status = "scheduled" })).StatusCode);
+    }
 }
