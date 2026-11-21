@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Oes.Domain.Crm;
@@ -152,5 +153,65 @@ public sealed class MeasurementTests(MySqlFixture fx)
 
         // Mode can't change once a trade has measurements.
         await Assert.ThrowsAsync<CrmRuleException>(() => svc.SaveTradeAsync(roofing.Id, roofing.Name, MeasurementModes.Linear, roofing.Color, true));
+    }
+
+    [Fact]
+    public async Task Field_app_reads_and_takes_measurements_on_site()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        Guid property, structure, roofingId, sidingId, v1;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var (p, st, roofingTrade, sidingTrade) = await SetupAsync(s, "8 Tape Ln");
+            (property, structure, roofingId, sidingId) = (p, st, roofingTrade.Id, sidingTrade.Id);
+            v1 = await s.Get<MeasurementService>().SaveVersionAsync(property, structure, roofingId, Roof(2400, 30));
+        }
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = admin.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+        Task<HttpResponseMessage> Post(string url, object body)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+            req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            return api.SendAsync(req);
+        }
+
+        // What's on file, with each trade's fields and surfaces.
+        var onFile = await Json(await api.GetAsync($"/api/v1/properties/{property}/measurements"));
+        Assert.True(onFile.GetProperty("canMeasure").GetBoolean());
+        var siding = onFile.GetProperty("trades").EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == sidingId);
+        Assert.Equal(["front", "rear", "left", "right"], siding.GetProperty("surfaces").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(v1, onFile.GetProperty("current").EnumerateArray().Single().GetProperty("id").GetGuid());
+
+        // A tape measurement on site makes version 2; version 1 stays as history and shows as "previous".
+        var saved = await Json(await Post($"/api/v1/properties/{property}/measurements", new
+        {
+            structureId = structure, tradeTypeId = roofingId, notes = "Measured from the ladder", values = new Dictionary<string, decimal?> { ["|total_area"] = 2450, ["|valleys"] = 32, ["|ridges"] = null },
+        }));
+        var v2 = saved.GetProperty("setId").GetGuid();
+        var set = await Json(await api.GetAsync($"/api/v1/measurement-sets/{v2}"));
+        Assert.Equal((2, true, "field_tape"), (set.GetProperty("versionNo").GetInt32(), set.GetProperty("isCurrent").GetBoolean(), set.GetProperty("source").GetString()));
+        Assert.Equal(2450m, set.GetProperty("values").GetProperty("|total_area").GetDecimal());
+        Assert.Equal(2400m, set.GetProperty("previous").GetProperty("|total_area").GetDecimal());
+        Assert.Equal(2, set.GetProperty("versions").GetArrayLength());
+        Assert.False((await Json(await api.GetAsync($"/api/v1/measurement-sets/{v1}"))).GetProperty("isCurrent").GetBoolean());
+
+        // Per-side siding, a new structure, and refusals that read as messages.
+        Assert.Equal(HttpStatusCode.NoContent, (await Post($"/api/v1/properties/{property}/structures", new { name = "Detached garage" })).StatusCode);
+        var garage = (await Json(await api.GetAsync($"/api/v1/properties/{property}/measurements"))).GetProperty("structures").EnumerateArray()
+            .Single(x => x.GetProperty("name").GetString() == "Detached garage").GetProperty("id").GetGuid();
+        var wall = siding.GetProperty("fields")[0].GetProperty("key").GetString();
+        await Json(await Post($"/api/v1/properties/{property}/measurements", new { structureId = garage, tradeTypeId = sidingId, values = new Dictionary<string, decimal?> { [$"front|{wall}"] = 300 } }));
+        var empty = await Post($"/api/v1/properties/{property}/measurements", new { structureId = garage, tradeTypeId = roofingId, values = new Dictionary<string, decimal?>() });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
+        Assert.Contains("Enter at least one measurement.", await empty.Content.ReadAsStringAsync());
+        var unknown = await Post($"/api/v1/properties/{property}/measurements", new { structureId = garage, tradeTypeId = roofingId, values = new Dictionary<string, decimal?> { ["front|total_area"] = 1 } });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
     }
 }

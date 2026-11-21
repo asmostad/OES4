@@ -44,6 +44,8 @@ function Navigator() {
         <Stack.Screen name="estimate/[id]" options={{ title: 'Estimate' }} />
         <Stack.Screen name="work-order/[id]" options={{ title: 'Work order' }} />
         <Stack.Screen name="claim/[id]" options={{ title: 'Claim' }} />
+        <Stack.Screen name="measure" options={{ title: 'Measure', presentation: 'modal' }} />
+        <Stack.Screen name="measurements/[id]" options={{ title: 'Measurements' }} />
         <Stack.Screen name="contact/[id]" options={{ title: 'Contact' }} />
         <Stack.Screen name="property/[id]" options={{ title: 'Property' }} />
       </Stack.Protected>

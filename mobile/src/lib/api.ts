@@ -245,6 +245,23 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type MeasureField = { key: string; label: string; unit: string; group: string | null };
+export type MeasureTrade = { id: string; name: string; color: string; mode: string; surfaces: string[]; fields: MeasureField[] };
+export type SetSummary = {
+  id: string; structureId: string; structureName: string; tradeTypeId: string; tradeName: string; tradeColor: string; versionNo: number;
+  versionCount: number; source: string; sourceLabel: string; measuredOn: string | null; measuredBy: string | null; headline: string;
+};
+export type PropertyMeasurements = {
+  propertyId: string; address: string; structures: { id: string; name: string }[]; trades: MeasureTrade[]; current: SetSummary[]; canMeasure: boolean;
+};
+/** Values are keyed "surface|field": "|total_area" for the whole structure, "front|wall_area" for a side. */
+export type MeasurementSet = {
+  id: string; propertyId: string; structureId: string; structureName: string; tradeTypeId: string; tradeName: string; tradeColor: string; mode: string;
+  versionNo: number; isCurrent: boolean; source: string; sourceLabel: string; measuredOn: string | null; measuredBy: string | null; notes: string | null;
+  surfaces: string[]; fields: MeasureField[]; values: Record<string, number>; previous: Record<string, number>;
+  reportDocumentId: string | null; reportFileName: string | null;
+  versions: { id: string; versionNo: number; isCurrent: boolean; sourceLabel: string; measuredOn: string | null }[]; canEdit: boolean;
+};
 export type Person = { contactId: string; name: string; methods: ContactMethod[] };
 export type WorkOrderItem = {
   id: string; number: string; status: string; acceptStatus: string; subName: string; projectId: string; projectNumber: string; tradeId: string;
