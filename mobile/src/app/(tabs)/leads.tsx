@@ -37,6 +37,7 @@ export default function Leads() {
       <OfflineNote offline={leads.offline} savedAt={leads.savedAt} />
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1 }}><Button title="New lead" onPress={() => router.push('/new-lead')} /></View>
+        <View style={{ flex: 1 }}><Button title="Canvass" kind="secondary" onPress={() => router.push('/canvass')} /></View>
         {canCall && <View style={{ flex: 1 }}><Button title="Call list" kind="secondary" onPress={() => router.push('/calls')} /></View>}
       </View>
       <TextInput value={q} onChangeText={setQ} placeholder="Search name, number, address, phone" placeholderTextColor={colors.muted}

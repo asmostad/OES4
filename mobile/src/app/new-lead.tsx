@@ -1,8 +1,8 @@
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { Button, Card, Chips, Field, Message, Screen, SectionTitle } from '@/components/ui';
+import { Button, Card, Chips, Field, Message, Muted, Screen, SectionTitle, styles } from '@/components/ui';
 import { Options } from '@/lib/api';
 import { outcomeMessage, useOutbox } from '@/lib/outbox';
 import { space } from '@/lib/theme';
@@ -13,25 +13,31 @@ import { useCached } from '@/lib/useCached';
  * it's an insurance job. One step on the server; through the outbox, so it works with no signal.
  */
 export default function NewLead() {
+  // From a storm's canvass list: the house is already on file, and the lead is tied to the storm.
+  const door = useLocalSearchParams<{ propertyId?: string; address?: string; stormEventId?: string; stormName?: string }>();
   const outbox = useOutbox();
   const options = useCached<Options>('/api/v1/options', "Couldn't load lead sources.");
   const [f, setF] = useState({ firstName: '', lastName: '', phone: '', email: '', line1: '', city: '', state: '', postalCode: '', notes: '' });
   const [source, setSource] = useState('door_knock');
-  const [insurance, setInsurance] = useState(false);
+  const [insurance, setInsurance] = useState(!!door.stormEventId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (key: keyof typeof f) => (value: string) => setF({ ...f, [key]: value });
 
   async function save() {
     if (!f.firstName.trim() && !f.lastName.trim()) return setError('Enter their name.');
-    if (f.line1.trim() && (!f.city.trim() || !f.state.trim() || !f.postalCode.trim())) return setError('Finish the address: city, state and ZIP.');
+    if (!door.propertyId && f.line1.trim() && (!f.city.trim() || !f.state.trim() || !f.postalCode.trim())) return setError('Finish the address: city, state and ZIP.');
     setBusy(true);
     setError(null);
     const name = `${f.firstName} ${f.lastName}`.trim();
+    const street = door.address ?? f.line1.trim();
     const outcome = await outbox.enqueue({
       kind: 'lead', method: 'POST', path: '/api/v1/leads',
-      json: { ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim() || null])), sourceKey: source, isInsurance: insurance },
-      label: `New lead: ${name}${f.line1.trim() ? `, ${f.line1.trim()}` : ''}`,
+      json: {
+        ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim() || null])), sourceKey: source, isInsurance: insurance,
+        propertyId: door.propertyId ?? null, stormEventId: door.stormEventId ?? null,
+      },
+      label: `New lead: ${name}${street ? `, ${street}` : ''}`,
     });
     setBusy(false);
     if (outcome.status === 'failed') return setError(outcomeMessage(outcome, '').text);
@@ -55,6 +61,12 @@ export default function NewLead() {
       </Card>
 
       <SectionTitle>Address</SectionTitle>
+      {door.propertyId ? (
+        <Card>
+          <Text style={styles.body}>{door.address}</Text>
+          {door.stormName && <Muted>{`Canvassing ${door.stormName}`}</Muted>}
+        </Card>
+      ) : (
       <Card>
         <Field label="Street" value={f.line1} onChangeText={set('line1')} textContentType="fullStreetAddress" placeholder="123 Main St" />
         <Field label="City" value={f.city} onChangeText={set('city')} textContentType="addressCity" />
@@ -63,6 +75,7 @@ export default function NewLead() {
           <View style={{ flex: 2 }}><Field label="ZIP" value={f.postalCode} onChangeText={set('postalCode')} keyboardType="number-pad" maxLength={10} textContentType="postalCode" /></View>
         </View>
       </Card>
+      )}
 
       <SectionTitle>How it came in</SectionTitle>
       <Chips value={source} onChange={setSource} options={sources.map((s) => ({ label: s.label, value: s.value }))} />

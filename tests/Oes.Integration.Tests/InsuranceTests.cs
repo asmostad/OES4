@@ -183,4 +183,62 @@ public sealed class InsuranceTests(MySqlFixture fx)
         Assert.Contains("yard_sign", keys);
         Assert.Contains("yard_sign_2", keys);
     }
+
+    [Fact]
+    public async Task Field_app_canvasses_a_storm_nearest_door_first_and_takes_leads_at_the_door()
+    {
+        var (t, admin) = await fx.CreateTenantAsync();
+        Guid stormId, near, far, unplaced;
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            stormId = await s.Get<StormService>().SaveAsync(null, new StormInput { Name = "Canvass hail", ZipCodes = "68502, 68516" });
+            var props = s.Get<PropertyService>();
+            far = await props.CreateAsync(new PropertyInput { Line1 = "1 Far Rd", City = "Lincoln", State = "NE", PostalCode = "68516" });
+            near = await props.CreateAsync(new PropertyInput { Line1 = "9 Near Rd", City = "Lincoln", State = "NE", PostalCode = "68502" });
+            unplaced = await props.CreateAsync(new PropertyInput { Line1 = "5 Unmapped Rd", City = "Lincoln", State = "NE", PostalCode = "68502" });
+            await props.CreateAsync(new PropertyInput { Line1 = "3 Outside Rd", City = "Omaha", State = "NE", PostalCode = "68102" });
+            var db = s.Get<OesDbContext>();
+            (await db.Properties.SingleAsync(p => p.Id == near)).Latitude = 40.8136m;
+            (await db.Properties.SingleAsync(p => p.Id == near)).Longitude = -96.7026m;
+            (await db.Properties.SingleAsync(p => p.Id == far)).Latitude = 40.7400m;
+            (await db.Properties.SingleAsync(p => p.Id == far)).Longitude = -96.6400m;
+            await db.SaveChangesAsync();
+        }
+        var api = fx.App.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
+        var tok = await System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync(api, "/api/v1/auth/token", new { email = admin.Email, password = MySqlFixture.Password });
+        var access = (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(tok.Content)).GetProperty("accessToken").GetString();
+        api.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        async Task<System.Text.Json.JsonElement> Json(HttpResponseMessage r)
+        {
+            Assert.True(r.IsSuccessStatusCode, $"{(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}");
+            return await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<System.Text.Json.JsonElement>(r.Content);
+        }
+
+        Assert.Contains((await Json(await api.GetAsync("/api/v1/storms"))).EnumerateArray(), x => x.GetProperty("id").GetGuid() == stormId);
+
+        // Standing at 40.81, -96.70: the near house first, the far one next, the unmapped one last; Omaha isn't in the storm.
+        var doors = (await Json(await api.GetAsync($"/api/v1/storms/{stormId}/canvass?lat=40.8130&lng=-96.7020"))).EnumerateArray().ToList();
+        Assert.Equal([near, far, unplaced], doors.Select(d => d.GetProperty("propertyId").GetGuid()));
+        Assert.True(doors[0].GetProperty("miles").GetDouble() < 0.1);
+        Assert.True(doors[1].GetProperty("miles").GetDouble() > 4);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, doors[2].GetProperty("miles").ValueKind);
+
+        // A lead at the near door: tied to the storm and the house, which leaves the list.
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/leads")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new { firstName = "Door", lastName = "Answerer", phone = "(402) 555-0111", propertyId = near, stormEventId = stormId }),
+        };
+        req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var lead = await Json(await api.SendAsync(req));
+        Assert.Equal(near, lead.GetProperty("propertyId").GetGuid());
+        await using (var s = fx.ScopeAs(t.Id, admin))
+        {
+            var db = s.Get<OesDbContext>();
+            var opp = await db.Opportunities.SingleAsync(o => o.Id == lead.GetProperty("opportunityId").GetGuid());
+            Assert.Equal((stormId, near, true, "door_knock"), (opp.StormEventId!.Value, opp.PropertyId!.Value, opp.IsInsurance, opp.SourceKey));
+            Assert.True(await db.PropertyContacts.AnyAsync(pc => pc.PropertyId == near && pc.ContactId == opp.PrimaryContactId));
+        }
+        doors = (await Json(await api.GetAsync($"/api/v1/storms/{stormId}/canvass"))).EnumerateArray().ToList();
+        Assert.Equal(new[] { far, unplaced }.Order(), doors.Select(d => d.GetProperty("propertyId").GetGuid()).Order());
+    }
 }

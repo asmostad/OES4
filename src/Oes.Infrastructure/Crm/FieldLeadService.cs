@@ -19,6 +19,10 @@ public sealed class FieldLeadInput
     public string? SourceKey { get; set; }
     public bool IsInsurance { get; set; }
     public string? Notes { get; set; }
+    /// <summary>A property already on file (canvassing a storm), instead of typing the address.</summary>
+    public Guid? PropertyId { get; set; }
+    /// <summary>The storm being canvassed: ties the lead to it (and takes it off that storm's canvass list).</summary>
+    public Guid? StormEventId { get; set; }
 }
 
 public sealed record FieldLeadResult(Guid OpportunityId, Guid ContactId, Guid? PropertyId);
@@ -35,7 +39,7 @@ public sealed class FieldLeadService(OesDbContext db, RecordScope scope, ICurren
         await scope.EnsurePermissionAsync(Permissions.RecordsCreate);
         var me = user.UserId ?? throw new RecordForbiddenException("Sign in first.");
         if (string.IsNullOrWhiteSpace(i.FirstName) && string.IsNullOrWhiteSpace(i.LastName)) throw new CrmRuleException("Enter their name.");
-        var hasAddress = !string.IsNullOrWhiteSpace(i.Line1);
+        var hasAddress = i.PropertyId is null && !string.IsNullOrWhiteSpace(i.Line1);
         if (hasAddress && (string.IsNullOrWhiteSpace(i.City) || string.IsNullOrWhiteSpace(i.State) || string.IsNullOrWhiteSpace(i.PostalCode)))
             throw new CrmRuleException("Finish the address: city, state and ZIP.");
 
@@ -51,8 +55,15 @@ public sealed class FieldLeadService(OesDbContext db, RecordScope scope, ICurren
         }, ct);
         var oppId = await opportunities.CreateAsync(new OpportunityInput
         {
-            PrimaryContactId = contactId, OwnerUserId = me, SourceKey = source, IsInsurance = i.IsInsurance, Description = ContactService.Clean(i.Notes),
+            PrimaryContactId = contactId, OwnerUserId = me, SourceKey = source, IsInsurance = i.IsInsurance || i.StormEventId is not null,
+            Description = ContactService.Clean(i.Notes), StormEventId = i.StormEventId,
         }, ct);
+        if (i.PropertyId is { } existing)
+        {
+            await opportunities.AttachPropertyAsync(oppId, existing, ct); // checks the user can see it, and links the contact
+            await tx.CommitAsync(ct);
+            return new FieldLeadResult(oppId, contactId, existing);
+        }
         Guid? propertyId = hasAddress
             ? await opportunities.AttachNewPropertyAsync(oppId, new PropertyInput
             {

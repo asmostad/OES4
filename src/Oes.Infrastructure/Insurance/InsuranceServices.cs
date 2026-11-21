@@ -208,16 +208,19 @@ public sealed class StormService(OesDbContext db, RecordScope scope)
     }
 
     /// <summary>Visible properties inside the storm's ZIP codes that have no opportunity on this storm yet (canvass list).</summary>
-    public async Task<List<PropertyRow>> UntouchedPropertiesAsync(Guid stormId, int take = 100, CancellationToken ct = default)
+    public async Task<List<PropertyRow>> UntouchedPropertiesAsync(Guid stormId, int take = 100, CancellationToken ct = default) =>
+        (await UntouchedAsync(stormId, take, ct)).Select(p => new PropertyRow(p.Id, p.Line1, p.Line2, p.CityLine, p.Kind, null, 0, p.CreatedAt)).ToList();
+
+    /// <summary>The same canvass list as properties (with their map position, for sorting by distance in the field).</summary>
+    public async Task<List<Property>> UntouchedAsync(Guid stormId, int take = 100, CancellationToken ct = default)
     {
         var storm = await GetAsync(stormId, ct);
         var zips = storm.Zips.Select(z => z.Length > 5 ? z[..5] : z).ToList();
         if (zips.Count == 0) return [];
         var props = await scope.PropertiesAsync();
-        var rows = await props.Where(p => zips.Contains(p.PostalCode.Substring(0, 5))
-                                         && !db.Opportunities.Any(o => o.PropertyId == p.Id && o.StormEventId == stormId))
+        return await props.Where(p => zips.Contains(p.PostalCode.Substring(0, 5))
+                                     && !db.Opportunities.Any(o => o.PropertyId == p.Id && o.StormEventId == stormId))
             .OrderBy(p => p.PostalCode).ThenBy(p => p.Line1).Take(take).ToListAsync(ct);
-        return rows.Select(p => new PropertyRow(p.Id, p.Line1, p.Line2, p.CityLine, p.Kind, null, 0, p.CreatedAt)).ToList();
     }
 
     /// <summary>Suggests the storm for a property's ZIP and a date of loss (same ZIP, within 3 days).</summary>

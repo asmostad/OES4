@@ -245,6 +245,13 @@ export type MessageFull = {
   channel: 'sms' | 'email'; id: string; direction: 'inbound' | 'outbound' | string; at: string; senderName: string | null; counterparty: string;
   subject: string | null; body: string; status: string; error: string | null; cc: string | null; attachments: { documentId: string; fileName: string }[];
 };
+export type Storm = {
+  id: string; name: string; eventDate: string; perilKey: string; maxHailSizeIn: number | null; maxWindMph: number | null; zipCount: number; opportunities: number;
+};
+/** A house on a storm's canvass list; miles from the phone when it shared its position and the house is mapped. */
+export type CanvassDoor = {
+  propertyId: string; line1: string; line2: string | null; cityLine: string; postalCode: string; latitude: number | null; longitude: number | null; miles: number | null;
+};
 export type MeasureField = { key: string; label: string; unit: string; group: string | null };
 export type MeasureTrade = { id: string; name: string; color: string; mode: string; surfaces: string[]; fields: MeasureField[] };
 export type SetSummary = {
